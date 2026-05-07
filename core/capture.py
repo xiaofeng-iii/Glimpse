@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from threading import Lock
 
 import mss
-import numpy as np
 from PIL import Image
 
 if TYPE_CHECKING:
@@ -229,3 +228,8 @@ class CaptureManager:
 
     def close(self):
         self._sct.close()
+
+
+# 全局实例占位 — 实际实例由 DIContainer 通过初始化路径管理器后注入
+# 参见 container.py:initialize_defaults()
+capture_manager = None

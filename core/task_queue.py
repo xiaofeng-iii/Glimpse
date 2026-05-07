@@ -210,6 +210,14 @@ class TaskQueue:
                 self._condition.notify_all()
         return cancelled_count
     
+    def reset(self):
+        """重置队列状态（用于测试或重新初始化场景）"""
+        with self._lock:
+            self._shutdown = False
+            # 如果 executor 已关闭，创建新的
+            if self._executor._shutdown:
+                self._executor = ThreadPoolExecutor(max_workers=4)
+
     def shutdown(self, wait: bool = True):
         with self._lock:
             self._shutdown = True

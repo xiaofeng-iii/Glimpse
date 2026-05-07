@@ -74,3 +74,6 @@ class EmbeddingClient:
         except Exception as e:
             print(f"计算相似度失败: {e}")
             return 0.0
+
+
+embedding_client = EmbeddingClient()

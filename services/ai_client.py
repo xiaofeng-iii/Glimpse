@@ -101,3 +101,6 @@ class AIClient:
         import base64
         with open(image_path, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
+
+
+ai_client = AIClient()
