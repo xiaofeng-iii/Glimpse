@@ -4,7 +4,7 @@ SQLite Manager - 封装 SQLite CRUD，包含 FTS5 配置与写入互斥锁
 """
 import sqlite3
 import threading
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from pathlib import Path
 
@@ -20,13 +20,39 @@ class MemoryRecord:
     ai_summary: str
     app_name: str
     text_content: Optional[str] = None
+    extra_images: Optional[str] = None
     sync_status: str = "PENDING"
+    match_sources: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_row(cls, row: tuple) -> "MemoryRecord":
+    def from_row(cls, row) -> "MemoryRecord":
+        # sqlite3.Row supports dict-like access; plain tuples used in tests do not
+        if hasattr(row, "keys"):
+            return cls(
+                id=row["id"],
+                created_at=row["created_at"],
+                image_path=row["image_path"],
+                ai_summary=row["ai_summary"],
+                app_name=row["app_name"],
+                text_content=row["text_content"] if "text_content" in row.keys() else None,
+                extra_images=row["extra_images"] if "extra_images" in row.keys() else None,
+                sync_status=row["sync_status"] if "sync_status" in row.keys() else "PENDING",
+            )
+        # Fallback for plain tuples (tests)
+        if len(row) >= 8:
+            return cls(
+                id=row[0],
+                created_at=row[1],
+                image_path=row[2],
+                ai_summary=row[3],
+                app_name=row[4],
+                text_content=row[5] if len(row) > 5 else None,
+                extra_images=row[6],
+                sync_status=row[7],
+            )
         return cls(
             id=row[0],
             created_at=row[1],
@@ -34,6 +60,7 @@ class MemoryRecord:
             ai_summary=row[3],
             app_name=row[4],
             text_content=row[5] if len(row) > 5 else None,
+            extra_images=None,
             sync_status=row[6] if len(row) > 6 else "PENDING",
         )
 
@@ -64,6 +91,7 @@ class SQLiteManager:
                 ai_summary TEXT,
                 app_name TEXT,
                 text_content TEXT,
+                extra_images TEXT,
                 sync_status TEXT DEFAULT 'PENDING'
             )
         """)
@@ -101,6 +129,13 @@ class SQLiteManager:
             END
         """)
 
+        # Migration: add extra_images column if not exists
+        cursor.execute("PRAGMA table_info(memories)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if "extra_images" not in columns:
+            cursor.execute("ALTER TABLE memories ADD COLUMN extra_images TEXT")
+            self._conn.commit()
+
         self._conn.commit()
 
     def insert_memory(self, record: MemoryRecord) -> bool:
@@ -109,8 +144,8 @@ class SQLiteManager:
                 cursor = self._conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO memories (id, created_at, image_path, ai_summary, app_name, text_content, sync_status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO memories (id, created_at, image_path, ai_summary, app_name, text_content, extra_images, sync_status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         record.id,
@@ -119,6 +154,7 @@ class SQLiteManager:
                         record.ai_summary,
                         record.app_name,
                         record.text_content,
+                        record.extra_images,
                         record.sync_status,
                     ),
                 )
@@ -159,19 +195,22 @@ class SQLiteManager:
                 (query, limit),
             )
             rows = cursor.fetchall()
-            return [MemoryRecord.from_row(row) for row in rows]
+            if rows:
+                return [MemoryRecord.from_row(row) for row in rows]
         except Exception:
-            cursor.execute(
-                """
-                SELECT m.* FROM memories m
-                WHERE m.ai_summary LIKE ? OR m.text_content LIKE ?
-                ORDER BY m.created_at DESC
-                LIMIT ?
-                """,
-                (f"%{query}%", f"%{query}%", limit),
-            )
-            rows = cursor.fetchall()
-            return [MemoryRecord.from_row(row) for row in rows]
+            pass
+
+        cursor.execute(
+            """
+            SELECT m.* FROM memories m
+            WHERE m.ai_summary LIKE ? OR m.text_content LIKE ?
+            ORDER BY m.created_at DESC
+            LIMIT ?
+            """,
+            (f"%{query}%", f"%{query}%", limit),
+        )
+        rows = cursor.fetchall()
+        return [MemoryRecord.from_row(row) for row in rows]
 
     def update_memory_summary(self, memory_id: str, summary: str) -> bool:
         with self._write_lock:
@@ -207,3 +246,6 @@ class SQLiteManager:
         if self._conn:
             self._conn.close()
             self._conn = None
+
+
+sqlite_manager: Optional["SQLiteManager"] = None  # populated by container

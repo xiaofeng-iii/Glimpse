@@ -36,19 +36,34 @@ class SearchService:
     def get_search_mode(self) -> str:
         return self._search_mode
 
-    def search(self, query: str, limit: int = 20) -> List:
+    def search(self, query: str, limit: int = 20, source_filter: Optional[str] = None) -> List:
         if not query.strip():
             return self.get_recent_memories(limit=limit)
 
-        if self._search_mode == "text":
+        # source_filter overrides internal _search_mode if provided
+        mode = self._search_mode
+        if source_filter == "ocr":
+            mode = "text"
+        elif source_filter == "semantic":
+            mode = "vector"
+        elif source_filter == "all":
+            mode = "hybrid"
+
+        if mode == "text":
             return self._search_text(query, limit)
-        elif self._search_mode == "vector":
+        elif mode == "vector":
             return self._search_vector(query, limit)
         else:
             return self._search_hybrid(query, limit)
 
     def _search_text(self, query: str, limit: int) -> List:
-        return self._sqlite_manager.search_memories(query, limit=limit)
+        results = self._sqlite_manager.search_memories(query, limit=limit)
+        for memory in results:
+            if not hasattr(memory, "match_sources"):
+                memory.match_sources = []
+            if "OCR" not in memory.match_sources:
+                memory.match_sources.append("OCR")
+        return results
 
     def _search_vector(self, query: str, limit: int) -> List:
         embedding = self._embedding_client.get_embedding(query)
@@ -64,6 +79,10 @@ class SearchService:
         for mem_id in memory_ids:
             memory = self._sqlite_manager.get_memory_by_id(mem_id)
             if memory:
+                if not hasattr(memory, "match_sources"):
+                    memory.match_sources = []
+                if "语义" not in memory.match_sources:
+                    memory.match_sources.append("语义")
                 memories.append(memory)
 
         return memories
@@ -73,6 +92,11 @@ class SearchService:
 
         embedding = self._embedding_client.get_embedding(query)
         if not embedding:
+            for memory in text_results[:limit]:
+                if not hasattr(memory, "match_sources"):
+                    memory.match_sources = []
+                if "OCR" not in memory.match_sources:
+                    memory.match_sources.append("OCR")
             return text_results[:limit]
 
         vector_results = self._chroma_manager.search_similar(embedding, n_results=limit * 2)
@@ -96,6 +120,12 @@ class SearchService:
         for mem_id in sorted_ids[:limit]:
             memory = self._sqlite_manager.get_memory_by_id(mem_id)
             if memory:
+                if not hasattr(memory, "match_sources"):
+                    memory.match_sources = []
+                if mem_id in text_rank and "OCR" not in memory.match_sources:
+                    memory.match_sources.append("OCR")
+                if mem_id in vector_rank and "语义" not in memory.match_sources:
+                    memory.match_sources.append("语义")
                 merged.append(memory)
 
         return merged
