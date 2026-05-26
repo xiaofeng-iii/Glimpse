@@ -38,6 +38,7 @@ Glimpse/
 ├── db/                     # 数据库（SQLite、ChromaDB）
 ├── services/               # 业务服务（记忆、搜索）
 ├── ui/                     # 界面
+├── docs/                   # 文档
 └── GlimpseData/            # 数据存储
 ```
 
@@ -46,3 +47,24 @@ Glimpse/
 - `Ctrl+Shift+G` - 全局截图
 - `Ctrl+F` - 聚焦搜索框
 - `Escape` - 清空搜索
+
+## 前端开发
+
+项目使用 **PySide6** 构建桌面 UI。
+
+### 前端文档
+
+- [前端架构](./docs/FRONTEND_ARCHITECTURE.md) — 技术栈、数据流、信号总线
+- [UI 组件清单](./docs/UI_COMPONENTS.md) — 所有控件、布局、信号连接
+- [用户交互流程](./docs/UI_FLOWS.md) — 搜索、截图、设置等完整流程
+- [前端待办事项](./docs/FRONTEND_TODO.md) — 已知需求和改进建议
+
+### 快速开始
+
+```bash
+# 进入前端开发环境
+conda activate glimpse
+
+# 运行应用
+python main.py
+```
