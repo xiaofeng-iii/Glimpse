@@ -61,8 +61,8 @@ class SearchService:
         for memory in results:
             if not hasattr(memory, "match_sources"):
                 memory.match_sources = []
-            if "OCR" not in memory.match_sources:
-                memory.match_sources.append("OCR")
+            if "精确" not in memory.match_sources:
+                memory.match_sources.append("精确")
         return results
 
     def _search_vector(self, query: str, limit: int) -> List:
@@ -95,8 +95,8 @@ class SearchService:
             for memory in text_results[:limit]:
                 if not hasattr(memory, "match_sources"):
                     memory.match_sources = []
-                if "OCR" not in memory.match_sources:
-                    memory.match_sources.append("OCR")
+                if "精确" not in memory.match_sources:
+                    memory.match_sources.append("精确")
             return text_results[:limit]
 
         vector_results = self._chroma_manager.search_similar(embedding, n_results=limit * 2)
@@ -122,8 +122,8 @@ class SearchService:
             if memory:
                 if not hasattr(memory, "match_sources"):
                     memory.match_sources = []
-                if mem_id in text_rank and "OCR" not in memory.match_sources:
-                    memory.match_sources.append("OCR")
+                if mem_id in text_rank and "精确" not in memory.match_sources:
+                    memory.match_sources.append("精确")
                 if mem_id in vector_rank and "语义" not in memory.match_sources:
                     memory.match_sources.append("语义")
                 merged.append(memory)

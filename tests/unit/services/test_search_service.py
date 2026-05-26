@@ -125,7 +125,7 @@ class TestSearchServiceSearch:
         
         results = ss.search("test", source_filter="ocr")
         assert len(results) == 1
-        assert "OCR" in results[0].match_sources
+        assert "精确" in results[0].match_sources
         assert "语义" not in results[0].match_sources
         mock_services["sqlite_manager"].search_memories.assert_called_with("test", limit=20)
 
@@ -142,7 +142,7 @@ class TestSearchServiceSearch:
         results = ss.search("test", source_filter="semantic")
         assert len(results) == 1
         assert "语义" in results[0].match_sources
-        assert "OCR" not in results[0].match_sources
+        assert "精确" not in results[0].match_sources
 
     def test_search_source_filter_all(self, mock_services):
         from services.search_service import SearchService
@@ -168,12 +168,12 @@ class TestSearchServiceSearch:
         
         # Memory 1 should have both
         mem1 = next(m for m in results if m.id == "1")
-        assert "OCR" in mem1.match_sources
+        assert "精确" in mem1.match_sources
         assert "语义" in mem1.match_sources
         
         # Memory 2 should have only semantic
         mem2 = next(m for m in results if m.id == "2")
-        assert "OCR" not in mem2.match_sources
+        assert "精确" not in mem2.match_sources
         assert "语义" in mem2.match_sources
 
 

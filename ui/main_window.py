@@ -199,7 +199,7 @@ class MainWindow(QMainWindow):
         for memory in self._current_memories:
             badges = ""
             match_sources = getattr(memory, "match_sources", [])
-            if "OCR" in match_sources:
+            if "精确" in match_sources:
                 badges += "[OCR]"
             if "语义" in match_sources:
                 badges += "[语义]"
