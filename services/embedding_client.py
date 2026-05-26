@@ -3,15 +3,27 @@
 负责文本嵌入和向量处理
 """
 import numpy as np
-from sentence_transformers import SentenceTransformer
+import threading
 
 
 class EmbeddingClient:
     """嵌入服务客户端"""
-    
-    def __init__(self):
-        """初始化嵌入模型"""
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+
+    def __init__(self, model_name: str = 'BAAI/bge-small-zh-v1.5'):
+        """初始化嵌入客户端。模型按需加载，避免拖慢应用启动。"""
+        self._model_name = model_name
+        self._model = None
+        self._model_lock = threading.Lock()
+
+    @property
+    def model(self):
+        """Lazy-load sentence-transformers model on first embedding request."""
+        if self._model is None:
+            with self._model_lock:
+                if self._model is None:
+                    from sentence_transformers import SentenceTransformer
+                    self._model = SentenceTransformer(self._model_name)
+        return self._model
     
     def get_embedding(self, text: str) -> list:
         """获取文本嵌入
