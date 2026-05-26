@@ -94,7 +94,7 @@ class MemoryService:
         if self._ai_client.is_configured():
             ai_summary = self._ai_client.analyze_image(
                 image_path,
-                prompt="为这张截图生成简短的中文摘要，描述主要内容：",
+                prompt="请直接描述画面内容和场景，不要提及载体类型（如截图、图片）。用简洁的中文描述界面元素、文字信息、操作意图和关键实体：",
                 stream_callback=stream_callback,
             )
         else:
