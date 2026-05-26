@@ -26,6 +26,7 @@ class SearchService:
 
         self._search_mode = "hybrid"
         self._rrf_k = 60
+        self._semantic_threshold = 1.15  # 语义匹配阈值，distance ≤ 此值才打 [语义] 标签
 
     def set_search_mode(self, mode: str) -> bool:
         if mode in ("text", "vector", "hybrid"):
@@ -74,9 +75,15 @@ class SearchService:
         if not results:
             return []
 
-        memory_ids = [r["id"] for r in results]
         memories = []
-        for mem_id in memory_ids:
+        for result in results:
+            mem_id = result["id"]
+            distance = result.get("distance")
+
+            # 只有相似度超过阈值才认为是语义匹配
+            if distance is not None and distance > self._semantic_threshold:
+                continue
+
             memory = self._sqlite_manager.get_memory_by_id(mem_id)
             if memory:
                 if not hasattr(memory, "match_sources"):
@@ -105,9 +112,14 @@ class SearchService:
         for rank, memory in enumerate(text_results):
             text_rank[memory.id] = 1.0 / (self._rrf_k + rank + 1)
 
+        # 保存 vector result 的 distance 用于阈值判断
         vector_rank: Dict[str, float] = {}
+        vector_distance: Dict[str, float] = {}
         for rank, result in enumerate(vector_results):
-            vector_rank[result["id"]] = 1.0 / (self._rrf_k + rank + 1)
+            result_id = result["id"]
+            vector_rank[result_id] = 1.0 / (self._rrf_k + rank + 1)
+            if "distance" in result:
+                vector_distance[result_id] = result["distance"]
 
         all_ids = set(text_rank.keys()) | set(vector_rank.keys())
         rrf_scores: Dict[str, float] = {}
@@ -124,8 +136,11 @@ class SearchService:
                     memory.match_sources = []
                 if mem_id in text_rank and "精确" not in memory.match_sources:
                     memory.match_sources.append("精确")
-                if mem_id in vector_rank and "语义" not in memory.match_sources:
-                    memory.match_sources.append("语义")
+                # 只有 distance 存在且不超过阈值才打语义标签
+                distance = vector_distance.get(mem_id)
+                if mem_id in vector_rank and distance is not None and distance <= self._semantic_threshold:
+                    if "语义" not in memory.match_sources:
+                        memory.match_sources.append("语义")
                 merged.append(memory)
 
         return merged

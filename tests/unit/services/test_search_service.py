@@ -136,7 +136,7 @@ class TestSearchServiceSearch:
         
         mock_memory = MemoryRecord(id="1", created_at="now", image_path="path", ai_summary="sum", app_name="app")
         mock_services["embedding_client"].get_embedding.return_value = [0.1, 0.2]
-        mock_services["chroma_manager"].search_similar.return_value = [{"id": "1"}]
+        mock_services["chroma_manager"].search_similar.return_value = [{"id": "1", "distance": 0.5}]
         mock_services["sqlite_manager"].get_memory_by_id.return_value = mock_memory
         
         results = ss.search("test", source_filter="semantic")
@@ -154,7 +154,10 @@ class TestSearchServiceSearch:
         
         mock_services["sqlite_manager"].search_memories.return_value = [mock_memory1]
         mock_services["embedding_client"].get_embedding.return_value = [0.1, 0.2]
-        mock_services["chroma_manager"].search_similar.return_value = [{"id": "1"}, {"id": "2"}]
+        mock_services["chroma_manager"].search_similar.return_value = [
+            {"id": "1", "distance": 0.5},
+            {"id": "2", "distance": 0.8}
+        ]
         
         def get_memory_side_effect(mem_id):
             if mem_id == "1": return mock_memory1
