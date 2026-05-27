@@ -1,73 +1,91 @@
-# Glimpse 项目运行概况
+# Glimpse AI Session Guide
 
-## 项目简介
+This file is the shared starting point for new AI coding sessions. Keep it short, factual, and durable. Temporary plans, prompts, tool notes, and session scratch files should stay out of Git.
 
-**Glimpse** — AI 驱动的桌面记忆检索系统。通过全局快捷键截图 → OCR 识别 → AI 摘要 → 双数据库存储(SQLite + ChromaDB) → 语义搜索。
+## Product In One Sentence
 
-## 环境
+Glimpse is a desktop memory assistant: a user captures the screen, the app extracts text and visual meaning, stores the result locally, and lets the user search those memories later.
 
-- **Conda 环境名**: `glimpse` (Python 3.10.13)
-- **Python 路径**: `C:\Users\RXiaoen\.conda\envs\glimpse\python.exe`
-- **运行命令前缀**: `& "C:\Users\RXiaoen\.conda\envs\glimpse\python.exe"`
-- **依赖**: 已全部安装 (`pip install -r requirements.txt`，在 glimpse 环境下)
-- **缺少 API Key**: 截图分析功能不可用，但搜索/浏览仍可运行
+## First Principles
 
-## 架构
+- Preserve the local-memory pipeline: capture -> OCR -> AI summary -> embedding -> SQLite + ChromaDB -> search/UI.
+- Keep user data local by default. Runtime data belongs under `GlimpseData/`, not in the repo.
+- Prefer dependency injection through `container.get(...)`. Avoid introducing new module-level global instances.
+- Treat UI, services, storage, and capture as separate layers. Cross layers through existing services/signals instead of shortcut imports.
+- Make behavior robust when AI credentials are missing. Search/browse should still work with OCR text and saved data.
+- Do not commit AI session artifacts. Keep only this guide as the repo-level instruction file for future sessions.
 
-```
-main.py                 # 单一入口：加载 .env → 初始化 DI 容器 → 启动 UI
-container.py            # 依赖注入容器 (DIContainer, 单例/作用域/瞬态)
-config/
-  path_manager.py       # 路径管理 (所有数据写入 ./GlimpseData/)
-  settings_manager.py   # 配置读写 (GlipmseData/config/settings.json)
-core/
-  capture.py            # 截图管理 (mss, 防抖/集群检测)
-  task_queue.py         # 异步任务队列 (ThreadPoolExecutor)
-db/
-  sqlite_manager.py     # SQLite (MemoryRecord, CRUD, FTS5 全文搜索)
-  chroma_manager.py     # ChromaDB 向量数据库
-services/
-  memory_service.py     # 记忆编排 (OCR → AI摘要 → 双写)
-  search_service.py     # 搜索 (text/vector/hybrid, RRF 合并)
-  ai_client.py          # OpenAI API 客户端 (vision + text)
-  ocr_engine.py         # OCR (RapidOCR, NativeOCR 回退)
-  embedding_client.py   # 文本嵌入 (sentence-transformers, 余弦相似度)
-  keyboard_manager.py   # 全局快捷键 (pynput)
-  hotkey_utils.py       # 快捷键格式转换 (pynput ↔ QKeySequence)
-ui/
-  main_window.py        # 主窗口 (PySide6, 托盘图标, 搜索)
-  settings_dialog.py    # 设置对话框 (AI/OCR/快捷键/截图 配置)
-  signals.py            # 跨线程信号总线
-```
+## Environment
 
-## 运行
+Use the existing conda environment:
 
 ```powershell
-& "C:\Users\RXiaoen\.conda\envs\glimpse\python.exe" main.py
+conda activate glimpse
+python main.py
 ```
 
-快捷键: `Ctrl+Shift+G` 截图, `Ctrl+F` 搜索, `Escape` 清空搜索
-
-## 测试
+For non-interactive commands, prefer:
 
 ```powershell
-# 全部测试 (302 个)
-& "C:\Users\RXiaoen\.conda\envs\glimpse\python.exe" -m pytest tests/ -v
-
-# 仅单元测试 (255 个)
-& "C:\Users\RXiaoen\.conda\envs\glimpse\python.exe" -m pytest tests/unit/ -v
-
-# 仅集成测试 (47 个)
-& "C:\Users\RXiaoen\.conda\envs\glimpse\python.exe" -m pytest tests/integration/ -v
+conda run -n glimpse python -m pytest tests/unit -v
+conda run -n glimpse python -m py_compile main.py container.py
 ```
 
-工作目录: `5.25Glimpse/`
+The project is developed on Windows with PySide6. The configured Python is expected to be `Python 3.10.x` inside the `glimpse` environment.
 
-## 关键约定
+## Runtime Entry Points
 
-- **DI 容器**: 所有服务通过 `container.get("name")` 获取，不直接 import 模块级实例
-- **路径**: 所有数据强制写入 `./GlimpseData/`，由 `PathManager` 路由
-- **数据库**: SQLite (元数据+FTS5) + ChromaDB (向量嵌入)，通过 UUID 关联
-- **约束并发**: `MemoryService` 用 `Semaphore(5)` 限制同时创建的记忆数
-- **中文搜索**: FTS5 不支持中文分词，`search_memories()` 有 LIKE 回退逻辑
-- **Mock 测试**: 单元测试大量使用 `unittest.mock`；集成测试用真实 DB + Mock AI/OCR
+- `main.py`: application entry. Loads `.env`, initializes the DI container, creates the Qt app, registers the global screenshot hotkey after the window is shown, and shuts the container down on exit.
+- `container.py`: service registry and lifecycle owner. Add shared services here instead of constructing them ad hoc from UI code.
+- `ui/main_window.py`: main desktop experience, memory list, search box, screenshot actions, tray/window behavior.
+- `ui/settings_dialog.py`: editable app settings, including AI, OCR, screenshot, cluster, and hotkeys.
+
+## Core Flow
+
+1. Screenshot is captured by `core/capture.py`.
+2. Cluster mode, if enabled, buffers multiple screenshots in `core/cluster_buffer.py`.
+3. `services/memory_service.py` orchestrates OCR, AI summary, embeddings, and persistence.
+4. `db/sqlite_manager.py` stores memory metadata, OCR text, summaries, and FTS search data.
+5. `db/chroma_manager.py` stores vector-search data.
+6. `services/search_service.py` combines exact and semantic search results.
+7. UI renders list/detail state and hides placeholder app names such as empty strings or `unknown`.
+
+## Important Conventions
+
+- Settings live in `GlimpseData/config/settings.json` and are managed by `config/settings_manager.py`.
+- Paths should come from `config/path_manager.py`; avoid writing generated data beside source files.
+- Global hotkeys are handled by `services/keyboard_manager.py`; settings dialogs should not let saved global hotkeys fire while editing shortcuts.
+- `Escape` clears search in the main window. It is not a configurable global hotkey.
+- AI providers are OpenAI-compatible. Provider/base URL/model/timeout settings belong under the `ai` settings section.
+- Chinese search needs fallback behavior because SQLite FTS does not tokenize Chinese reliably.
+
+## What To Ignore
+
+These are intentionally ignored or should remain untracked:
+
+- `.omo/`
+- `docs/superpowers/`
+- `.codex/`, `.opencode/`, `.cursor/`, `.windsurf/`, `.claude/`
+- prompt scratch files and one-off AI helper scripts
+- runtime data under `GlimpseData/`
+
+Keep `AGENTS.md` tracked. It is the one generic document meant for the next AI session.
+
+## Testing
+
+Run focused tests for the area you changed. Useful defaults:
+
+```powershell
+conda run -n glimpse python -m pytest tests/unit/config/test_settings_manager.py tests/unit/services/test_keyboard_manager.py -v
+conda run -n glimpse python -m pytest tests/unit/services/test_ai_client.py tests/unit/services/test_ocr_engine.py tests/unit/core/test_capture.py -v
+conda run -n glimpse python -m pytest tests/unit -v
+```
+
+When touching Qt UI, also run the app manually in the `glimpse` environment and check the affected workflow.
+
+## Git Hygiene
+
+- Keep commits functional and small.
+- Existing style: English type before the colon, Chinese subject after it, for example `fix: 修复快捷键监听与应用名占位显示`.
+- Do not rewrite or discard user changes unless explicitly asked.
+- If removing tracked AI artifacts, use `git rm --cached` so local scratch files are not deleted.
