@@ -54,8 +54,13 @@
     "hotkey_search": "搜索快捷键:",
     "hotkey_clear": "清除快捷键:",
     "debounce_interval": "防抖间隔:",
-    "cluster_threshold": "集群阈值:",
     "max_captures": "最大截图数:",
+    "cluster_capture": "集群截图",
+    "cluster_mode": "启用集群截图模式",
+    "cluster_auto_submit": "倒计时结束后自动提交",
+    "cluster_max_images": "最多收集张数:",
+    "cluster_timeout": "提交等待时间:",
+    "cluster_desc": "启用后，连续截图会先进入同一组，达到上限或倒计时结束后合并分析。",
     "api_key": "API Key:",
     "model": "模型:",
     "base_url": "Base URL:",
@@ -83,7 +88,9 @@
     "validation_input_error": "输入错误",
     "validation_api_key": "API Key 不能只包含空白字符",
     "validation_debounce": "防抖间隔必须大于 0",
-    "validation_max_captures": "最大截图数必须大于 0"
+    "validation_max_captures": "最大截图数必须大于 0",
+    "validation_cluster_max_images": "集群最多收集张数必须在 1 到 10 之间",
+    "validation_cluster_timeout": "集群提交等待时间必须在 1 到 10 秒之间"
   },
   "detail": {
     "title": "记忆详情",

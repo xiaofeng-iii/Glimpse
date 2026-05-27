@@ -54,8 +54,13 @@
     "hotkey_search": "Search Hotkey:",
     "hotkey_clear": "Clear Hotkey:",
     "debounce_interval": "Debounce Interval:",
-    "cluster_threshold": "Cluster Threshold:",
     "max_captures": "Max Captures:",
+    "cluster_capture": "Cluster Capture",
+    "cluster_mode": "Enable cluster capture mode",
+    "cluster_auto_submit": "Auto-submit when countdown ends",
+    "cluster_max_images": "Max Images:",
+    "cluster_timeout": "Submit Delay:",
+    "cluster_desc": "When enabled, consecutive screenshots are collected into one group and analyzed together when the limit or countdown is reached.",
     "api_key": "API Key:",
     "model": "Model:",
     "base_url": "Base URL:",
@@ -83,7 +88,9 @@
     "validation_input_error": "Input Error",
     "validation_api_key": "API Key cannot be blank or whitespace only",
     "validation_debounce": "Debounce interval must be greater than 0",
-    "validation_max_captures": "Max captures must be greater than 0"
+    "validation_max_captures": "Max captures must be greater than 0",
+    "validation_cluster_max_images": "Cluster max images must be between 1 and 10",
+    "validation_cluster_timeout": "Cluster submit delay must be between 1 and 10 seconds"
   },
   "detail": {
     "title": "Memory Detail",

@@ -93,8 +93,13 @@ class SettingsDialog(QDialog):
             "hotkeys": copy.deepcopy(DEFAULT_HOTKEYS),
             "screenshot": {
                 "debounce_interval": 5.0,
-                "cluster_threshold": 2.0,
                 "max_captures_per_window": 10,
+            },
+            "cluster": {
+                "cluster_mode": False,
+                "cluster_auto_submit": True,
+                "cluster_max_images": 5,
+                "cluster_timeout": 5,
             },
             "ai": {"api_key": "", "model": "gpt-4o-mini", "timeout": 30},
             "ocr": {"engine": "rapidocr", "language": "ch"},
@@ -206,15 +211,33 @@ class SettingsDialog(QDialog):
         self._debounce_interval.setSuffix(" s")
         layout.addRow(t("settings.debounce_interval"), self._debounce_interval)
 
-        self._cluster_threshold = QDoubleSpinBox()
-        self._cluster_threshold.setRange(0.1, 30.0)
-        self._cluster_threshold.setSingleStep(0.5)
-        self._cluster_threshold.setSuffix(" s")
-        layout.addRow(t("settings.cluster_threshold"), self._cluster_threshold)
-
         self._max_captures = QSpinBox()
         self._max_captures.setRange(1, 100)
         layout.addRow(t("settings.max_captures"), self._max_captures)
+
+        cluster_group = QGroupBox(t("settings.cluster_capture"))
+        cluster_layout = QFormLayout(cluster_group)
+        cluster_layout.setSpacing(10)
+        cluster_layout.setContentsMargins(12, 12, 12, 12)
+
+        self._cluster_mode = QCheckBox(t("settings.cluster_mode"))
+        cluster_layout.addRow("", self._cluster_mode)
+
+        self._cluster_auto_submit = QCheckBox(t("settings.cluster_auto_submit"))
+        cluster_layout.addRow("", self._cluster_auto_submit)
+
+        self._cluster_max_images = QSpinBox()
+        self._cluster_max_images.setRange(1, 10)
+        cluster_layout.addRow(t("settings.cluster_max_images"), self._cluster_max_images)
+
+        self._cluster_timeout = QSpinBox()
+        self._cluster_timeout.setRange(1, 10)
+        self._cluster_timeout.setSuffix(" s")
+        cluster_layout.addRow(t("settings.cluster_timeout"), self._cluster_timeout)
+
+        cluster_desc = self._section_description(t("settings.cluster_desc"))
+        cluster_layout.addRow(cluster_desc)
+        layout.addRow(cluster_group)
 
         return widget
 
@@ -302,8 +325,13 @@ class SettingsDialog(QDialog):
 
         screenshot = merged.get("screenshot", {})
         self._debounce_interval.setValue(screenshot.get("debounce_interval", 5.0))
-        self._cluster_threshold.setValue(screenshot.get("cluster_threshold", 2.0))
         self._max_captures.setValue(screenshot.get("max_captures_per_window", 10))
+
+        cluster = merged.get("cluster", {})
+        self._cluster_mode.setChecked(cluster.get("cluster_mode", False))
+        self._cluster_auto_submit.setChecked(cluster.get("cluster_auto_submit", True))
+        self._cluster_max_images.setValue(cluster.get("cluster_max_images", 5))
+        self._cluster_timeout.setValue(cluster.get("cluster_timeout", 5))
 
         ai = merged.get("ai", {})
         self._ai_api_key.setText(ai.get("api_key", ""))
@@ -325,12 +353,7 @@ class SettingsDialog(QDialog):
             self._ui_theme.setCurrentIndex(idx)
         self._ui_auto_hide.setChecked(ui.get("auto_hide", False))
         self._ui_start_minimized.setChecked(ui.get("start_minimized", False))
-        ui_settings = self._collect_settings_from_ui()
-        for key in ui_settings:
-            if key in self._original_settings and isinstance(self._original_settings[key], dict):
-                self._original_settings[key].update(ui_settings[key])
-            else:
-                self._original_settings[key] = ui_settings[key]
+        self._original_settings = self._collect_settings_from_ui()
         self._pending_settings = copy.deepcopy(self._original_settings)
 
     def _collect_settings_from_ui(self) -> dict:
@@ -341,8 +364,13 @@ class SettingsDialog(QDialog):
             },
             "screenshot": {
                 "debounce_interval": self._debounce_interval.value(),
-                "cluster_threshold": self._cluster_threshold.value(),
                 "max_captures_per_window": self._max_captures.value(),
+            },
+            "cluster": {
+                "cluster_mode": self._cluster_mode.isChecked(),
+                "cluster_auto_submit": self._cluster_auto_submit.isChecked(),
+                "cluster_max_images": self._cluster_max_images.value(),
+                "cluster_timeout": self._cluster_timeout.value(),
             },
             "ai": {
                 "api_key": self._ai_api_key.text(),
@@ -496,6 +524,14 @@ class SettingsDialog(QDialog):
             return False
         if screenshot.get("max_captures_per_window", 1) <= 0:
             QMessageBox.warning(self, t("settings.validation_input_error"), t("settings.validation_max_captures"))
+            return False
+
+        cluster = settings.get("cluster", {})
+        if not (1 <= cluster.get("cluster_max_images", 5) <= 10):
+            QMessageBox.warning(self, t("settings.validation_input_error"), t("settings.validation_cluster_max_images"))
+            return False
+        if not (1 <= cluster.get("cluster_timeout", 5) <= 10):
+            QMessageBox.warning(self, t("settings.validation_input_error"), t("settings.validation_cluster_timeout"))
             return False
 
         return True

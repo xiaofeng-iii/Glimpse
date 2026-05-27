@@ -9,8 +9,21 @@ class FakeSettingsManager:
     def __init__(self, settings=None):
         self._settings = settings or {
             "hotkeys": {"screenshot": "<ctrl>+<shift>+g", "search": "<ctrl>+<f>"},
-            "screenshot": {"debounce_interval": 5.0, "cluster_threshold": 2.0, "max_captures_per_window": 10},
-            "ai": {"api_key": "sk-test", "model": "gpt-4o-mini", "timeout": 30},
+            "screenshot": {"debounce_interval": 5.0, "max_captures_per_window": 10},
+            "cluster": {
+                "cluster_mode": False,
+                "cluster_auto_submit": True,
+                "cluster_max_images": 5,
+                "cluster_timeout": 5,
+            },
+            "ai": {
+                "provider": "OpenAI",
+                "provider_type": "openai_compatible",
+                "base_url": "https://api.openai.com/v1",
+                "api_key": "sk-test",
+                "model": "gpt-4o-mini",
+                "timeout": 30,
+            },
             "ocr": {"engine": "rapidocr", "language": "ch"},
             "ui": {"theme": "light", "auto_hide": False, "start_minimized": False},
         }
@@ -55,6 +68,23 @@ class TestOnSave:
             result = settings_dialog._on_save()
             assert result is True
             mock_info.assert_not_called()
+
+    def test_save_cluster_settings(self, settings_dialog, qtbot):
+        """Cluster capture controls are persisted under the cluster settings section."""
+        settings_dialog._cluster_mode.setChecked(True)
+        settings_dialog._cluster_auto_submit.setChecked(False)
+        settings_dialog._cluster_max_images.setValue(7)
+        settings_dialog._cluster_timeout.setValue(4)
+
+        result = settings_dialog._on_save()
+
+        assert result is True
+        assert settings_dialog._settings_manager._settings["cluster"] == {
+            "cluster_mode": True,
+            "cluster_auto_submit": False,
+            "cluster_max_images": 7,
+            "cluster_timeout": 4,
+        }
 
 
 class TestOnApply:
