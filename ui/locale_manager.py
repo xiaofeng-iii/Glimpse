@@ -101,6 +101,9 @@ class LocaleManager:
         Returns:
             Translated string, or the key itself if not found
         """
+        if not self._translations:
+            self.init()
+
         keys = key.split(".")
         value: Any = self._translations.get(self._current, {})
 

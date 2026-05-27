@@ -2,9 +2,12 @@
 键盘管理器
 负责全局快捷键监听和配置
 """
+import traceback
 from typing import Dict, Callable, Optional
 from pynput import keyboard
 from threading import Lock
+
+from services.hotkey_utils import normalize_pynput_hotkey
 
 
 class KeyboardManager:
@@ -37,8 +40,12 @@ class KeyboardManager:
             hotkey: 快捷键字符串，如 "<ctrl>+<shift>+g"
             callback: 回调函数
         """
+        normalized_hotkey = normalize_pynput_hotkey(hotkey)
+        if not normalized_hotkey:
+            raise ValueError("hotkey cannot be empty")
+
         with self._lock:
-            self._hotkeys[hotkey] = callback
+            self._hotkeys[normalized_hotkey] = callback
     
     def unregister_hotkey(self, hotkey: str):
         """注销全局快捷键
@@ -66,7 +73,9 @@ class KeyboardManager:
             return None
         try:
             return keyboard.GlobalHotKeys(hotkey_dict)
-        except Exception:
+        except Exception as e:
+            print(f"Failed to create GlobalHotKeys: {e}")
+            traceback.print_exc()
             return None
 
     def start_listening(self):
@@ -81,11 +90,12 @@ class KeyboardManager:
                         listener.start()
                         self._listener = listener
                         self._running = True
-                    except Exception:
+                    except Exception as e:
+                        print(f"Error starting listener: {e}")
                         try:
                             listener.stop()
-                        except Exception:
-                            pass
+                        except Exception as e2:
+                            print(f"Error stopping listener after start failure: {e2}")
 
     def stop_listening(self):
         """停止监听全局快捷键"""
@@ -93,8 +103,8 @@ class KeyboardManager:
             if self._running and self._listener:
                 try:
                     self._listener.stop()
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Error stopping listener: {e}")
                 self._running = False
                 self._listener = None
 
@@ -114,8 +124,8 @@ class KeyboardManager:
             if old_running and old_listener:
                 try:
                     old_listener.stop()
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Error stopping old listener during restart: {e}")
 
             with self._lock:
                 new_listener = self._create_listener_locked()
@@ -124,11 +134,12 @@ class KeyboardManager:
                         new_listener.start()
                         self._listener = new_listener
                         self._running = True
-                    except Exception:
+                    except Exception as e:
+                        print(f"Error starting new listener during restart: {e}")
                         try:
                             new_listener.stop()
-                        except Exception:
-                            pass
+                        except Exception as e2:
+                            print(f"Error stopping new listener after restart failure: {e2}")
 
     def is_running(self) -> bool:
         """检查是否正在监听"""
@@ -148,6 +159,15 @@ class KeyboardManager:
         Returns:
             是否重载成功
         """
+        try:
+            normalized_hotkeys = {}
+            for hotkey, callback in hotkeys.items():
+                normalized_hotkey = normalize_pynput_hotkey(hotkey)
+                if normalized_hotkey:
+                    normalized_hotkeys[normalized_hotkey] = callback
+        except ValueError:
+            return False
+
         old_hotkeys = self._hotkeys.copy()
         old_listener = self._listener
         old_running = self._running
@@ -160,11 +180,11 @@ class KeyboardManager:
                 if old_running and old_listener:
                     try:
                         old_listener.stop()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"Error stopping old listener during reload: {e}")
 
                 with self._lock:
-                    self._hotkeys = hotkeys.copy()
+                    self._hotkeys = normalized_hotkeys
                     self._listener = None
                     self._running = False
 
@@ -175,15 +195,18 @@ class KeyboardManager:
                             self._listener = new_listener
                             new_running = True
                             self._running = True
-                        except Exception:
+                        except Exception as e:
+                            print(f"Error starting new listener during reload: {e}")
                             try:
                                 new_listener.stop()
-                            except Exception:
-                                pass
+                            except Exception as e2:
+                                print(f"Error stopping new listener after reload failure: {e2}")
 
-                    return new_running or not hotkeys
+                    return new_running or not normalized_hotkeys
 
-        except Exception:
+        except Exception as e:
+            print(f"Reload hotkeys failed: {e}")
+            traceback.print_exc()
             with self._listener_lock:
                 with self._lock:
                     if old_running and old_listener:
@@ -191,7 +214,8 @@ class KeyboardManager:
                             old_listener.start()
                             self._listener = old_listener
                             self._running = old_running
-                        except Exception:
+                        except Exception as e2:
+                            print(f"Error rolling back listener during reload: {e2}")
                             self._listener = None
                             self._running = False
                     else:

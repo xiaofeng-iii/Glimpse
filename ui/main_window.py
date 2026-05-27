@@ -107,6 +107,14 @@ def _make_thumbnail_placeholder() -> QPixmap:
     return pixmap
 
 
+def _display_app_name(memory) -> str:
+    """Return a displayable app name, hiding placeholder values."""
+    app_name = (getattr(memory, "app_name", "") or "").strip()
+    if not app_name or app_name.lower() == "unknown":
+        return ""
+    return app_name
+
+
 class MemoryListItemWidget(QWidget):
     """Custom widget for each memory list item with styled badges and thumbnail."""
 
@@ -147,7 +155,7 @@ class MemoryListItemWidget(QWidget):
 
         # Add styled badge labels
         match_sources = getattr(memory, "match_sources", [])
-        if "OCR" in match_sources:
+        if "精确" in match_sources:
             ocr_badge = QLabel(t("badges.ocr"))
             ocr_badge.setObjectName("ocrBadge")
             top_row.addWidget(ocr_badge)
@@ -181,7 +189,7 @@ class MemoryListItemWidget(QWidget):
         layout.addLayout(content_layout, 1)
 
         # Right: app name chip
-        app_name = getattr(memory, "app_name", "") or "unknown"
+        app_name = _display_app_name(memory)
         if app_name:
             app_chip = QLabel(app_name)
             app_chip.setObjectName("appChip")
@@ -429,12 +437,10 @@ class MainWindow(QMainWindow):
             settings_manager = container.get("settings_manager")
             screenshot_pynput = settings_manager.get("hotkeys.screenshot", "<ctrl>+<shift>+g")
             search_pynput = settings_manager.get("hotkeys.search", "<ctrl>+f")
-            clear_pynput = settings_manager.get("hotkeys.clear", "<escape>")
 
             from services.hotkey_utils import pynput_to_qkeysequence
             screenshot_qt = pynput_to_qkeysequence(screenshot_pynput)
             search_qt = pynput_to_qkeysequence(search_pynput)
-            clear_qt = pynput_to_qkeysequence(clear_pynput)
 
             self.screenshot_btn.setText(f"{t('toolbar.screenshot')} ({screenshot_qt})")
             self.search_input.setPlaceholderText(
@@ -446,7 +452,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, "search_shortcut"):
                 self.search_shortcut.setKey(QKeySequence(search_qt))
             if hasattr(self, "clear_shortcut"):
-                self.clear_shortcut.setKey(QKeySequence(clear_qt))
+                self.clear_shortcut.setKey(QKeySequence("Esc"))
         except Exception:
             pass  # Backend not wired yet; use defaults
 
@@ -542,8 +548,6 @@ class MainWindow(QMainWindow):
     def _refresh_i18n(self):
         """Refresh all UI strings after locale change."""
         self.setWindowTitle(t("app.title"))
-        self.screenshot_btn.setText(t('toolbar.screenshot'))
-        self.search_input.setPlaceholderText(t("toolbar.search_placeholder"))
         self.filter_btn_all.setText(t("toolbar.source_all"))
         self.filter_btn_ocr.setText(t("toolbar.source_ocr"))
         self.filter_btn_semantic.setText(t("toolbar.source_semantic"))
@@ -552,6 +556,7 @@ class MainWindow(QMainWindow):
         self._cluster_submit_btn.setText(t("status.cluster_submit"))
         self._cluster_cancel_btn.setText(t("status.cluster_cancel"))
         self._update_memory_list()
+        self._update_shortcut_hints()
 
     # ============================================================
     # Memory List
@@ -590,14 +595,21 @@ class MainWindow(QMainWindow):
         index = self.memory_list.row(item)
         if 0 <= index < len(self._current_memories):
             memory = self._current_memories[index]
+            app_name = _display_app_name(memory)
+            app_row = (
+                f"""
+                <p style="color: #64748B; margin-bottom: 4px;">
+                    <b>{t('detail.app')}:</b> {app_name}
+                </p>
+                """
+                if app_name else ""
+            )
             detail_html = f"""
             <div style="font-family: 'Segoe UI', 'PingFang SC', sans-serif;">
                 <p style="color: #64748B; margin-bottom: 4px;">
                     <b>{t('detail.time')}:</b> {memory.created_at}
                 </p>
-                <p style="color: #64748B; margin-bottom: 4px;">
-                    <b>{t('detail.app')}:</b> {memory.app_name}
-                </p>
+                {app_row}
                 <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 8px 0;">
                 <p style="line-height: 1.8; margin-top: 8px;">
                     {memory.ai_summary}
@@ -846,10 +858,17 @@ class MainWindow(QMainWindow):
     # ============================================================
 
     def _on_open_settings(self):
+        keyboard_manager = None
+        try:
+            keyboard_manager = container.get("keyboard_manager")
+            keyboard_manager.stop_listening()
+        except Exception:
+            pass
+
         try:
             dialog = SettingsDialog(
                 container.get("settings_manager"),
-                container.get("keyboard_manager"),
+                keyboard_manager,
                 container.get("capture_manager"),
                 container.get("task_queue"),
                 self,
@@ -861,17 +880,33 @@ class MainWindow(QMainWindow):
                 None, None, None, None, self,
                 theme_manager=self._theme_manager,
             )
-        if dialog.exec():
-            self._update_shortcut_hints()
+        try:
+            dialog.exec()
+        finally:
+            self._reload_global_screenshot_hotkey(keyboard_manager)
             self._refresh_i18n()
 
-            # Reload theme from settings
-            try:
-                settings_manager = container.get("settings_manager")
-                theme = settings_manager.get("ui.theme", "light")
-                self._apply_theme(theme)
-            except Exception:
-                pass
+        # Reload theme from settings
+        try:
+            settings_manager = container.get("settings_manager")
+            theme = settings_manager.get("ui.theme", "light")
+            self._apply_theme(theme)
+        except Exception:
+            pass
+
+    def _reload_global_screenshot_hotkey(self, keyboard_manager=None):
+        try:
+            if keyboard_manager is None:
+                keyboard_manager = container.get("keyboard_manager")
+            settings_manager = container.get("settings_manager")
+            screenshot_hotkey = settings_manager.get("hotkeys.screenshot", "<ctrl>+<shift>+g")
+
+            def on_screenshot():
+                signals.screenshot_requested.emit()
+
+            keyboard_manager.reload_hotkeys({screenshot_hotkey: on_screenshot})
+        except Exception:
+            pass
 
     # ============================================================
     # Window & Tray
