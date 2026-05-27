@@ -83,6 +83,8 @@ def __init__(
 |-----|------|-------|------|
 | `create_memory(image_path, app_name="unknown", stream_callback=None)` | `image_path: str`, `app_name: str`, `stream_callback: Optional[Callable[[str], None]]` | `Optional[str]` | 创建记忆（同步） |
 | `create_memory_async(image_path, app_name="unknown", on_complete=None, on_error=None)` | `image_path: str`, `app_name: str`, `on_complete: Optional[Callable[[Optional[str]], None]]`, `on_error: Optional[Callable[[str], None]]` | `None` | 创建记忆（异步） |
+| `create_cluster_memory(image_paths, app_name="unknown", stream_callback=None)` | `image_paths: List[str]`, `app_name: str`, `stream_callback: Optional[Callable[[str], None]]` | `Optional[str]` | 创建集群记忆 |
+| `create_cluster_memory_async(image_paths, app_name="unknown", on_complete=None, on_error=None)` | `image_paths: List[str]`, `app_name: str`, `on_complete: Optional[Callable[[Optional[str]], None]]`, `on_error: Optional[Callable[[str], None]]` | `None` | 创建集群记忆（异步） |
 | `delete_memory(memory_id)` | `memory_id: str` | `bool` | 删除记忆 |
 | `get_memory(memory_id)` | `memory_id: str` | `Optional[MemoryRecord]` | 获取单条记忆 |
 | `get_recent_memories(limit=100, offset=0)` | `limit: int`, `offset: int` | `List[MemoryRecord]` | 获取最近记忆 |
@@ -137,7 +139,9 @@ class MemoryRecord:
     ai_summary: str
     app_name: str
     text_content: Optional[str] = None
+    extra_images: Optional[str] = None
     sync_status: str = "PENDING"
+    match_sources: List[str] = field(default_factory=list)
 ```
 
 #### 方法
@@ -218,7 +222,7 @@ def __init__(self, settings_manager: Optional["SettingsManager"] = None)
 
 | 方法 | 参数 | 返回值 | 说明 |
 |-----|------|-------|------|
-| `configure(api_key, base_url="https://api.openai.com/v1")` | `api_key: str`, `base_url: str` | `None` | 配置API |
+| `configure(api_key, base_url=DEFAULT_BASE_URL, model=None, timeout=DEFAULT_TIMEOUT, provider=DEFAULT_PROVIDER, provider_type=DEFAULT_PROVIDER_TYPE)` | `api_key: str`, `base_url: str`, `model: Optional[str]`, `timeout: int`, `provider: str`, `provider_type: str` | `bool` | 配置API |
 | `configure_from_settings()` | 无 | `bool` | 从设置加载配置 |
 | `is_configured()` | 无 | `bool` | 检查是否已配置 |
 | `test_connection()` | 无 | `bool` | 测试连接 |
@@ -513,6 +517,9 @@ def __init__(self, path_manager: "PathManager")
         "max_captures_per_window": 10
     },
     "ai": {
+        "provider": "OpenAI",
+        "provider_type": "openai_compatible",
+        "base_url": "https://api.openai.com/v1",
         "api_key": "",
         "model": "gpt-4o-mini",
         "timeout": 30
@@ -524,6 +531,12 @@ def __init__(self, path_manager: "PathManager")
     "database": {
         "sqlite_timeout": 30,
         "chroma_collection": "memories"
+    },
+    "cluster": {
+        "cluster_mode": false,
+        "cluster_auto_submit": true,
+        "cluster_max_images": 5,
+        "cluster_timeout": 5
     },
     "ui": {
         "theme": "light",
@@ -551,6 +564,7 @@ def __init__(self, path_manager: "PathManager")
 | `capture_manager` | 单例 | `CaptureManager` | 截图管理 |
 | `sqlite_manager` | 单例 | `SQLiteManager` | SQLite 管理 |
 | `chroma_manager` | 单例 | `ChromaManager` | ChromaDB 管理 |
+| `cluster_buffer` | 单例 | `ClusterBuffer` | 集群缓冲 |
 | `memory_service` | 单例 | `MemoryService` | 记忆服务 |
 | `search_service` | 单例 | `SearchService` | 搜索服务 |
 

@@ -14,9 +14,23 @@
 ```
 ui/
 ├── __init__.py          # UI 包初始化
+├── app_icon.py          # 应用图标资源
+├── locale_manager.py    # 国际化翻译管理
 ├── main_window.py       # 主窗口（核心界面）
+├── memory_detail_dialog.py  # 记忆详情对话框
 ├── settings_dialog.py   # 设置对话框
-└── signals.py           # 全局信号总线
+├── signals.py           # 全局信号总线
+├── theme_manager.py     # 主题管理器
+├── locales/
+│   ├── zh-CN.json       # 简体中文翻译
+│   └── en-US.json       # 英文翻译
+├── styles/
+│   ├── dark.qss         # 暗色主题样式表
+│   └── light.qss        # 亮色主题样式表
+└── widgets/
+    ├── __init__.py
+    ├── loading_spinner.py   # 加载动画组件
+    └── segmented_filter.py  # 分段筛选组件
 ```
 
 ---
@@ -87,14 +101,14 @@ from services.search_service import SearchService  # 不要这样做
 
 ---
 
-## 5. 样式现状
+## 5. 主题/样式
 
-- **当前**: 无统一样式表，使用 Qt 默认主题
-- **主题设置**: `settings_dialog.py` 中有主题选择（light/dark/system），但实现为空
-- **可改进**: 
-  - 添加 `resources/styles.qss` 统一样式表
-  - 实现 QPalette 动态切换
-  - 支持高 DPI 适配
+`ThemeManager` (`ui/theme_manager.py`) 负责主题加载与运行时切换：
+
+- **主题类型**: light / dark / system（跟随操作系统）
+- **实现方式**: 从 `ui/styles/dark.qss` 和 `ui/styles/light.qss` 加载 QSS 样式表，通过 `QApplication.setStyleSheet()` 全局应用
+- **运行时切换**: `ThemeManager.apply_theme(name)` 切换主题，并通过 `theme_changed` 信号通知其他组件刷新
+- **系统主题检测**: 支持 Windows 注册表、macOS `AppleInterfaceStyle`、Linux GTK `color-scheme`
 
 ---
 
@@ -102,7 +116,7 @@ from services.search_service import SearchService  # 不要这样做
 
 ### 6.1 添加新窗口
 
-1. 在 `ui/` 创建新文件（如 `memory_detail_dialog.py`）
+1. 在 `ui/` 创建新 Python 文件
 2. 继承 `QDialog` 或 `QWidget`
 3. 通过 `container.get()` 获取需要的服务
 4. 如需跨窗口通信，使用 `signals` 发射信号

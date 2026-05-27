@@ -73,10 +73,14 @@ QMainWindow
 |--------|--------|----------|
 | **快捷键** | 截图/搜索/清除快捷键 | `QKeySequenceEdit` ×3 |
 | **截图** | 防抖间隔、最大截图数 | `QDoubleSpinBox`, `QSpinBox` |
-| **AI 服务** | Provider、Base URL、API Key、模型、超时 | `QLineEdit`, `QComboBox`, `QSpinBox` |
+| **AI 服务** | API Key、Base URL、模型、超时 | `QLineEdit`, `QSpinBox` |
 | **OCR** | 引擎、语言 | `QComboBox` ×2 |
 | **界面** | 主题、自动隐藏、启动最小化 | `QComboBox`, `QCheckBox` ×2 |
 | **集群截图** | 启用模式、自动提交、最大截图数、超时 | `QCheckBox`, `QSpinBox` ×2 |
+
+AI 服务控件详情:
+- **Model**: QLineEdit (free-text), placeholder `gpt-4o-mini`
+- **Base URL**: QLineEdit, placeholder `https://api.openai.com/v1`
 
 ### 2.2 按钮区域
 
@@ -129,16 +133,15 @@ QMainWindow
 
 ---
 
-## 5. 样式表现状
+## 5. 样式表
 
-当前项目**未使用 QSS 样式表**。所有控件使用默认 Qt 样式。
+**文件**: `ui/styles/light.qss`, `ui/styles/dark.qss`
+**加载**: 通过 `ThemeManager` (`ui/theme_manager.py`) 动态加载和切换
 
-**已有主题配置项**（未实现功能）:
 - `ui.theme`: `light` / `dark` / `system`
-- 存储在 `settings.json` 中
-- SettingsDialog 可读取和修改
-
-**建议**: 在 `resources/` 目录添加 QSS 文件，按主题加载。
+- 存储在 `settings.json` 中，SettingsDialog 可读取和修改
+- `ThemeManager` 支持系统主题检测（Windows 注册表 / macOS / Linux GTK）
+- QSS 内容以缓存方式加载，避免重复读取
 
 ---
 
@@ -149,3 +152,16 @@ QMainWindow
 - 无外部图片资源
 
 **建议**: 添加 `resources/icons/` 目录存放实际图标文件。
+
+---
+
+## 7. 其他 UI 组件
+
+| 组件 | 文件 | 说明 |
+|------|------|------|
+| **MemoryDetailDialog** | `ui/memory_detail_dialog.py` | 对话框，展示单条记忆的完整详情 |
+| **LoadingSpinner** | `ui/widgets/loading_spinner.py` | 覆盖层，带动画旋转指示器 |
+| **SegmentedFilter** | `ui/widgets/segmented_filter.py` | 搜索来源过滤器按钮组 |
+| **LocaleManager** | `ui/locale_manager.py` | 国际化管理，提供 `t()` 翻译函数 |
+| **ThemeManager** | `ui/theme_manager.py` | 主题切换，加载 QSS 并检测系统主题 |
+| **locales/** | `ui/locales/zh-CN.json`, `en-US.json` | 中/英文翻译文件 |
