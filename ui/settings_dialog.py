@@ -503,6 +503,13 @@ class SettingsDialog(QDialog):
     def _apply_runtime_settings(self, settings: dict) -> None:
         degraded = []
 
+        if self._ai_client:
+            try:
+                if not self._ai_client.configure_from_settings():
+                    degraded.append("ai")
+            except Exception:
+                degraded.append("ai")
+
         if self._capture_manager:
             try:
                 screenshot_settings = settings.get("screenshot", {})
