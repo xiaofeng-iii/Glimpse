@@ -325,7 +325,12 @@ class SettingsDialog(QDialog):
             self._ui_theme.setCurrentIndex(idx)
         self._ui_auto_hide.setChecked(ui.get("auto_hide", False))
         self._ui_start_minimized.setChecked(ui.get("start_minimized", False))
-        self._original_settings = self._collect_settings_from_ui()
+        ui_settings = self._collect_settings_from_ui()
+        for key in ui_settings:
+            if key in self._original_settings and isinstance(self._original_settings[key], dict):
+                self._original_settings[key].update(ui_settings[key])
+            else:
+                self._original_settings[key] = ui_settings[key]
         self._pending_settings = copy.deepcopy(self._original_settings)
 
     def _collect_settings_from_ui(self) -> dict:
@@ -391,8 +396,14 @@ class SettingsDialog(QDialog):
         if new_settings == self._original_settings:
             return True
         if self._settings_manager:
+            merged = copy.deepcopy(self._original_settings)
+            for key in new_settings:
+                if key in merged:
+                    merged[key].update(new_settings[key])
+                else:
+                    merged[key] = new_settings[key]
             try:
-                self._settings_manager.update(new_settings)
+                self._settings_manager.update(merged)
             except Exception:
                 pass
         self._pending_settings = new_settings
@@ -435,8 +446,14 @@ class SettingsDialog(QDialog):
             )
 
         if self._settings_manager:
+            merged = copy.deepcopy(self._original_settings)
+            for key in new_settings:
+                if key in merged:
+                    merged[key].update(new_settings[key])
+                else:
+                    merged[key] = new_settings[key]
             try:
-                self._settings_manager.update(new_settings)
+                self._settings_manager.update(merged)
             except Exception:
                 pass
 
