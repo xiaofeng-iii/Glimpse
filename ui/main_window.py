@@ -22,6 +22,7 @@ from ui.locale_manager import t, locale_manager
 from ui.theme_manager import ThemeManager
 from ui.memory_detail_dialog import MemoryDetailDialog
 from ui.widgets.loading_spinner import LoadingSpinner
+from ui.widgets.segmented_filter import SegmentedFilterControl
 from ui.app_icon import create_app_icon
 from container import container
 
@@ -264,34 +265,20 @@ class MainWindow(QMainWindow):
         search_row = QHBoxLayout()
         search_row.setSpacing(8)
 
-        # Sliding button group for source filter
-        self.source_filter_group = QWidget()
-        self.source_filter_group.setObjectName("slidingButtonGroup")
-        filter_layout = QHBoxLayout(self.source_filter_group)
-        filter_layout.setContentsMargins(3, 3, 3, 3)
-        filter_layout.setSpacing(0)
-
-        self.filter_btn_all = QPushButton(t("toolbar.source_all"))
-        self.filter_btn_all.setCheckable(True)
-        self.filter_btn_all.setChecked(True)
-        self.filter_btn_all.setObjectName("ghostBtn")
-        self.filter_btn_all.setToolTip(t("tooltips.source_all"))
-        self.filter_btn_all.clicked.connect(lambda: self._on_filter_clicked("all"))
-        filter_layout.addWidget(self.filter_btn_all)
-
-        self.filter_btn_ocr = QPushButton(t("toolbar.source_ocr"))
-        self.filter_btn_ocr.setCheckable(True)
-        self.filter_btn_ocr.setObjectName("ghostBtn")
-        self.filter_btn_ocr.setToolTip(t("tooltips.source_ocr"))
-        self.filter_btn_ocr.clicked.connect(lambda: self._on_filter_clicked("ocr"))
-        filter_layout.addWidget(self.filter_btn_ocr)
-
-        self.filter_btn_semantic = QPushButton(t("toolbar.source_semantic"))
-        self.filter_btn_semantic.setCheckable(True)
-        self.filter_btn_semantic.setObjectName("ghostBtn")
-        self.filter_btn_semantic.setToolTip(t("tooltips.source_semantic"))
-        self.filter_btn_semantic.clicked.connect(lambda: self._on_filter_clicked("semantic"))
-        filter_layout.addWidget(self.filter_btn_semantic)
+        self.source_filter_group = SegmentedFilterControl()
+        self.source_filter_group.set_labels(
+            {
+                "all": t("toolbar.source_all"),
+                "ocr": t("toolbar.source_ocr"),
+                "semantic": t("toolbar.source_semantic"),
+            },
+            {
+                "all": t("tooltips.source_all"),
+                "ocr": t("tooltips.source_ocr"),
+                "semantic": t("tooltips.source_semantic"),
+            },
+        )
+        self.source_filter_group.source_selected.connect(self._on_filter_clicked)
 
         search_row.addWidget(self.source_filter_group)
 
@@ -519,9 +506,18 @@ class MainWindow(QMainWindow):
     def _refresh_i18n(self):
         """Refresh all UI strings after locale change."""
         self.setWindowTitle(t("app.title"))
-        self.filter_btn_all.setText(t("toolbar.source_all"))
-        self.filter_btn_ocr.setText(t("toolbar.source_ocr"))
-        self.filter_btn_semantic.setText(t("toolbar.source_semantic"))
+        self.source_filter_group.set_labels(
+            {
+                "all": t("toolbar.source_all"),
+                "ocr": t("toolbar.source_ocr"),
+                "semantic": t("toolbar.source_semantic"),
+            },
+            {
+                "all": t("tooltips.source_all"),
+                "ocr": t("tooltips.source_ocr"),
+                "semantic": t("tooltips.source_semantic"),
+            },
+        )
         self.status_label.setText(t("status.ready"))
         self.settings_btn.setText(t("menu.settings"))
         self._cluster_submit_btn.setText(t("status.cluster_submit"))
@@ -627,9 +623,6 @@ class MainWindow(QMainWindow):
 
     def _on_filter_clicked(self, source: str):
         """Handle filter button toggle."""
-        self.filter_btn_all.setChecked(source == "all")
-        self.filter_btn_ocr.setChecked(source == "ocr")
-        self.filter_btn_semantic.setChecked(source == "semantic")
         self._active_source_filter = source
         self._show_loading(t("status.searching"))
         self._do_search()
@@ -641,7 +634,7 @@ class MainWindow(QMainWindow):
             if not query:
                 self._current_memories = search_service.get_recent_memories(limit=100)
             else:
-                source_filter = getattr(self, "_active_source_filter", "all")
+                source_filter = self.source_filter_group.active_source()
                 self._current_memories = search_service.search(query, source_filter=source_filter)
         except Exception:
             self._current_memories = []

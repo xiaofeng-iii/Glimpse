@@ -557,26 +557,33 @@ QWidget#searchContainer {
 
 /* --- Sliding Button Group (inspired by Floral Notepaper) --- */
 QWidget#slidingButtonGroup {
-    background-color: #25262B;
+    background-color: #111827;
+    border: 1px solid #334155;
     border-radius: 8px;
-    padding: 3px;
+    padding: 0;
+}
+
+QFrame#segmentIndicator {
+    background-color: #3730A3;
+    border: 1px solid #4F46E5;
+    border-radius: 6px;
 }
 
 QWidget#slidingButtonGroup QPushButton {
     background-color: transparent;
-    color: #94A3B8;
+    color: #CBD5E1;
     border: none;
     border-radius: 6px;
-    padding: 6px 14px;
+    padding: 6px 12px;
     font-size: 12px;
     font-weight: 500;
 }
 
 QWidget#slidingButtonGroup QPushButton:checked {
-    background-color: #374151;
+    background-color: transparent;
     color: #F1F5F9;
     font-weight: 600;
-    border: 1px solid #4B5563;
+    border: none;
 }
 
 QWidget#slidingButtonGroup QPushButton:hover:!checked {
