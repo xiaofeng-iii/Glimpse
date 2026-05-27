@@ -3,25 +3,50 @@ Settings Dialog - polished with QSS styling and i18n support.
 Inspired by Floral Notepaper's SettingsPanel component.
 """
 import copy
-import re
 from typing import Dict, Any, Optional, Callable
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget,
     QWidget, QFormLayout, QLineEdit, QSpinBox,
     QDoubleSpinBox, QComboBox, QCheckBox, QPushButton,
-    QLabel, QMessageBox, QGroupBox, QScrollArea, QFrame
+    QLabel, QMessageBox, QGroupBox, QScrollArea, QFrame,
+    QKeySequenceEdit,
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QKeySequence
 
 from ui.locale_manager import t
 from ui.theme_manager import ThemeManager
+from services.hotkey_utils import (
+    is_valid_pynput_hotkey,
+    pynput_to_qkeysequence,
+    qkeysequence_to_pynput,
+)
+
+
+DEFAULT_HOTKEYS = {
+    "screenshot": "<ctrl>+<shift>+g",
+    "search": "<ctrl>+<f>",
+}
+
+
+class HotkeyRecorder(QKeySequenceEdit):
+    """Capture a shortcut directly from keyboard input."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        if hasattr(self, "setMaximumSequenceLength"):
+            self.setMaximumSequenceLength(1)
+
+    def set_pynput_hotkey(self, hotkey: str) -> None:
+        self.setKeySequence(QKeySequence(pynput_to_qkeysequence(hotkey)))
+
+    def pynput_hotkey(self) -> str:
+        portable_text = self.keySequence().toString(QKeySequence.SequenceFormat.PortableText)
+        return qkeysequence_to_pynput(portable_text)
 
 
 class SettingsDialog(QDialog):
     """Polished settings dialog with tabbed interface."""
-
-    HOTKEY_PATTERN = re.compile(r'^(<[^>]+>(\+<[^>]+>)*|\w+)$')
 
     def __init__(
         self,
@@ -65,7 +90,7 @@ class SettingsDialog(QDialog):
             except Exception:
                 pass
         return {
-            "hotkeys": {"screenshot": "", "search": "", "clear": ""},
+            "hotkeys": copy.deepcopy(DEFAULT_HOTKEYS),
             "screenshot": {
                 "debounce_interval": 5.0,
                 "cluster_threshold": 2.0,
@@ -81,8 +106,8 @@ class SettingsDialog(QDialog):
         if self._screenshot_callback is None:
             def on_screenshot():
                 try:
-                    from core.capture import capture_manager
-                    capture_manager.capture_fullscreen()
+                    from ui.signals import signals
+                    signals.screenshot_requested.emit()
                 except Exception:
                     pass
             self._screenshot_callback = on_screenshot
@@ -156,17 +181,16 @@ class SettingsDialog(QDialog):
         desc = self._section_description(t("settings.hotkey_desc"))
         layout.addRow(desc)
 
-        self._hotkey_screenshot = QLineEdit()
-        self._hotkey_screenshot.setPlaceholderText("<ctrl>+<shift>+g")
+        self._hotkey_screenshot = HotkeyRecorder()
         layout.addRow(t("settings.hotkey_screenshot"), self._hotkey_screenshot)
 
-        self._hotkey_search = QLineEdit()
-        self._hotkey_search.setPlaceholderText("<ctrl>+f")
+        self._hotkey_search = HotkeyRecorder()
         layout.addRow(t("settings.hotkey_search"), self._hotkey_search)
 
-        self._hotkey_clear = QLineEdit()
-        self._hotkey_clear.setPlaceholderText("<escape>")
-        layout.addRow(t("settings.hotkey_clear"), self._hotkey_clear)
+        self._restore_hotkeys_btn = QPushButton(t("settings.reset_default"))
+        self._restore_hotkeys_btn.setObjectName("ghostBtn")
+        self._restore_hotkeys_btn.clicked.connect(self._reset_hotkeys_to_defaults)
+        layout.addRow("", self._restore_hotkeys_btn)
 
         return widget
 
@@ -268,9 +292,12 @@ class SettingsDialog(QDialog):
         self._pending_settings = copy.deepcopy(merged)
 
         hotkeys = merged.get("hotkeys", {})
-        self._hotkey_screenshot.setText(hotkeys.get("screenshot", ""))
-        self._hotkey_search.setText(hotkeys.get("search", ""))
-        self._hotkey_clear.setText(hotkeys.get("clear", ""))
+        self._hotkey_screenshot.set_pynput_hotkey(
+            hotkeys.get("screenshot", DEFAULT_HOTKEYS["screenshot"])
+        )
+        self._hotkey_search.set_pynput_hotkey(
+            hotkeys.get("search", DEFAULT_HOTKEYS["search"])
+        )
 
         screenshot = merged.get("screenshot", {})
         self._debounce_interval.setValue(screenshot.get("debounce_interval", 5.0))
@@ -298,13 +325,14 @@ class SettingsDialog(QDialog):
             self._ui_theme.setCurrentIndex(idx)
         self._ui_auto_hide.setChecked(ui.get("auto_hide", False))
         self._ui_start_minimized.setChecked(ui.get("start_minimized", False))
+        self._original_settings = self._collect_settings_from_ui()
+        self._pending_settings = copy.deepcopy(self._original_settings)
 
     def _collect_settings_from_ui(self) -> dict:
         return {
             "hotkeys": {
-                "screenshot": self._hotkey_screenshot.text(),
-                "search": self._hotkey_search.text(),
-                "clear": self._hotkey_clear.text(),
+                "screenshot": self._hotkey_screenshot.pynput_hotkey(),
+                "search": self._hotkey_search.pynput_hotkey(),
             },
             "screenshot": {
                 "debounce_interval": self._debounce_interval.value(),
@@ -333,6 +361,10 @@ class SettingsDialog(QDialog):
         if self._theme_manager:
             self._theme_manager.apply_theme(theme)
 
+    def _reset_hotkeys_to_defaults(self):
+        self._hotkey_screenshot.set_pynput_hotkey(DEFAULT_HOTKEYS["screenshot"])
+        self._hotkey_search.set_pynput_hotkey(DEFAULT_HOTKEYS["search"])
+
     def _on_reset(self):
         reply = QMessageBox.question(
             self,
@@ -356,22 +388,15 @@ class SettingsDialog(QDialog):
         new_settings = self._collect_settings_from_ui()
         if not self._validate_input(new_settings):
             return False
+        if new_settings == self._original_settings:
+            return True
         if self._settings_manager:
             try:
-                if self._settings_manager.update(new_settings):
-                    self._pending_settings = new_settings
-                    self._original_settings = new_settings
-                    QMessageBox.information(
-                        self, t("settings.save_success"), t("settings.save_success_msg")
-                    )
-                    return True
+                self._settings_manager.update(new_settings)
             except Exception:
                 pass
         self._pending_settings = new_settings
         self._original_settings = new_settings
-        QMessageBox.information(
-            self, t("settings.save_success"), t("settings.save_success_msg")
-        )
         return True
 
     def _on_apply(self) -> bool:
@@ -406,21 +431,31 @@ class SettingsDialog(QDialog):
             except Exception:
                 pass
 
+        self._apply_runtime_settings(new_settings)
         self._pending_settings = new_settings
         self._original_settings = new_settings
-        QMessageBox.information(
-            self, t("settings.apply_success"), t("settings.apply_success_msg")
-        )
+        if self._degraded_services:
+            QMessageBox.warning(
+                self, t("settings.apply_partial"), self._degraded_label.text()
+            )
+        else:
+            QMessageBox.information(
+                self, t("settings.apply_success"), t("settings.apply_success_msg")
+            )
         return True
 
     def _validate_input(self, settings: dict) -> bool:
         hotkeys = settings.get("hotkeys", {})
+        hotkey_labels = {
+            "screenshot": t("settings.hotkey_screenshot").rstrip(":"),
+            "search": t("settings.hotkey_search").rstrip(":"),
+        }
         for key, value in hotkeys.items():
-            if value and not self.HOTKEY_PATTERN.match(value):
+            if not is_valid_pynput_hotkey(value, allow_empty=False):
                 QMessageBox.warning(
                     self,
                     t("settings.validation_input_error"),
-                    f"{t('settings.validation_hotkey_format', hotkey_name=key)}\n{t('settings.validation_hotkey_hint')}"
+                    f"{t('settings.validation_hotkey_format', hotkey_name=hotkey_labels.get(key, key))}\n{t('settings.validation_hotkey_hint')}"
                 )
                 return False
 
@@ -439,6 +474,20 @@ class SettingsDialog(QDialog):
             return False
 
         return True
+
+    def _apply_runtime_settings(self, settings: dict) -> None:
+        degraded = []
+
+        if self._capture_manager:
+            try:
+                screenshot_settings = settings.get("screenshot", {})
+                if not self._capture_manager.update_settings(screenshot_settings):
+                    degraded.append("capture")
+            except Exception:
+                degraded.append("capture")
+
+        self._degraded_services = degraded
+        self._update_degraded_label()
 
     def _update_degraded_label(self):
         if self._degraded_services:
