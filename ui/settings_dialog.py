@@ -509,15 +509,4 @@ class SettingsDialog(QDialog):
         return self._degraded_services.copy()
 
     def closeEvent(self, event):
-        current_settings = self._collect_settings_from_ui()
-        if current_settings != self._original_settings:
-            reply = QMessageBox.question(
-                self,
-                t("settings.confirm_close"),
-                t("settings.confirm_close_msg"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if reply == QMessageBox.StandardButton.No:
-                event.ignore()
-                return
         event.accept()

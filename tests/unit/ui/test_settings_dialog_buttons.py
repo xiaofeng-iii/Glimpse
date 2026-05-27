@@ -61,29 +61,45 @@ class TestOnApply:
     def test_apply_no_changes_closes_silently(self, settings_dialog, qtbot):
         """No changes -> accept() called, no popup."""
         from unittest.mock import patch
-        with patch.object(QMessageBox, "information"), \
-             patch.object(QMessageBox, "question"), \
-             patch.object(QMessageBox, "warning"):
+        with patch.object(QMessageBox, "information") as mock_info, \
+             patch.object(QMessageBox, "question") as mock_question, \
+             patch.object(QMessageBox, "warning") as mock_warning:
             settings_dialog._on_apply()
         assert settings_dialog.result() == 1
+        mock_info.assert_not_called()
+        mock_question.assert_not_called()
+        mock_warning.assert_not_called()
 
     def test_apply_with_changes_closes(self, settings_dialog, qtbot):
         """Changes + no conflicts -> accept() called, no confirmation popup."""
         settings_dialog._debounce_interval.setValue(10.0)
         from unittest.mock import patch
-        with patch.object(QMessageBox, "information"), \
-             patch.object(QMessageBox, "question"), \
-             patch.object(QMessageBox, "warning"):
+        with patch.object(QMessageBox, "information") as mock_info, \
+             patch.object(QMessageBox, "question") as mock_question, \
+             patch.object(QMessageBox, "warning") as mock_warning:
             settings_dialog._on_apply()
         assert settings_dialog.result() == 1
+        mock_question.assert_not_called()
+        assert settings_dialog._settings_manager._settings["screenshot"]["debounce_interval"] == 10.0
 
     def test_apply_with_conflict_shows_dialog(self, settings_dialog, qtbot):
         """Changes + conflict -> shows conflict dialog, user confirms -> accept()."""
         settings_dialog._debounce_interval.setValue(10.0)
         from unittest.mock import patch
-        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes), \
-             patch.object(QMessageBox, "information"), \
-             patch.object(QMessageBox, "warning"):
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes) as mock_question, \
+             patch.object(QMessageBox, "information") as mock_info, \
+             patch.object(QMessageBox, "warning") as mock_warning:
             with patch.object(settings_dialog, "_detect_conflicts", return_value=["Test conflict"]):
                 settings_dialog._on_apply()
         assert settings_dialog.result() == 1
+        mock_question.assert_called_once()
+
+
+class TestCloseEvent:
+    def test_close_with_changes_no_prompt(self, settings_dialog, qtbot):
+        """Closing with unsaved changes should NOT prompt (no dirty check)."""
+        settings_dialog._debounce_interval.setValue(99.0)
+        from unittest.mock import patch
+        with patch.object(QMessageBox, "question") as mock_question:
+            settings_dialog.close()
+        mock_question.assert_not_called()
