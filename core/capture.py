@@ -1,8 +1,9 @@
 """
-Capture - pynput 与 mss 的封装，包含集群防抖算法
+Capture - pynput 与 mss 的封装，包含防抖与窗口限流
 注入PathManager
 """
 import time
+import traceback
 from typing import Optional, Callable, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
 from threading import Lock
@@ -24,15 +25,13 @@ class CaptureResult:
 
 
 class CaptureManager:
-    """截图管理器 - 注入PathManager，包含集群防抖"""
+    """截图管理器 - 注入PathManager，负责截图本身，防重复逻辑由上层 ClusterBuffer 处理"""
 
     def __init__(self, path_manager: "PathManager"):
         self._path_manager = path_manager
         self._sct = mss.mss()
         self._last_capture_time = 0
         self._debounce_interval = 5.0
-        self._cluster_threshold = 2.0
-        self._last_region: Optional[Tuple[int, int, int, int]] = None
         self._capture_window_start = 0
         self._max_captures_per_window = 10
         self._fullscreen_debounce_time = 0
@@ -41,11 +40,11 @@ class CaptureManager:
         self._region_count = 0
         self._settings_lock = Lock()
 
-    def capture_fullscreen(self, delay: float = 0) -> Optional[CaptureResult]:
+    def capture_fullscreen(self, delay: float = 0, force_bypass_debounce: bool = False) -> Optional[CaptureResult]:
         if delay > 0:
             time.sleep(delay)
 
-        if not self._check_debounce(is_fullscreen=True):
+        if not force_bypass_debounce and not self._check_debounce(is_fullscreen=True):
             return None
 
         if self._check_force_split():
@@ -69,7 +68,8 @@ class CaptureManager:
                 timestamp=time.time(),
             )
         except Exception as e:
-            print(f"Capture error: {e}")
+            print(f"Capture fullscreen error: {e}")
+            traceback.print_exc()
             return None
 
     def capture_region(self, region: Tuple[int, int, int, int]) -> Optional[CaptureResult]:
@@ -81,9 +81,6 @@ class CaptureManager:
             return None
 
         if self._check_force_split():
-            return None
-
-        if self._is_clustered_region(region):
             return None
 
         try:
@@ -98,8 +95,6 @@ class CaptureManager:
 
             self._update_capture_count(is_fullscreen=False)
 
-            self._last_region = region
-
             return CaptureResult(
                 image_path=str(image_path),
                 width=w,
@@ -107,7 +102,8 @@ class CaptureManager:
                 timestamp=time.time(),
             )
         except Exception as e:
-            print(f"Capture error: {e}")
+            print(f"Capture region error: {e}")
+            traceback.print_exc()
             return None
 
     def _check_debounce(self, is_fullscreen: bool = True) -> bool:
@@ -140,35 +136,9 @@ class CaptureManager:
                 self._region_debounce_time = self._last_capture_time
                 self._region_count += 1
 
-    def _is_clustered_region(self, region: Tuple[int, int, int, int]) -> bool:
-        if self._last_region is None:
-            return False
-
-        x1, y1, w1, h1 = region
-        x2, y2, w2, h2 = self._last_region
-
-        x_overlap = max(0, min(x1 + w1, x2 + w2) - max(x1, x2))
-        y_overlap = max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
-        overlap_area = x_overlap * y_overlap
-
-        area1 = w1 * h1
-        area2 = w2 * h2
-        iou = overlap_area / (area1 + area2 - overlap_area + 1e-6)
-
-        time_diff = time.time() - self._last_capture_time
-
-        return iou > 0.5 and time_diff < self._cluster_threshold
-
     def set_debounce_interval(self, interval: float) -> bool:
         try:
             self._debounce_interval = float(interval)
-            return True
-        except (ValueError, TypeError):
-            return False
-
-    def set_cluster_threshold(self, threshold: float) -> bool:
-        try:
-            self._cluster_threshold = float(threshold)
             return True
         except (ValueError, TypeError):
             return False
@@ -183,11 +153,9 @@ class CaptureManager:
     def update_settings(self, settings: dict) -> bool:
         with self._settings_lock:
             old_debounce = self._debounce_interval
-            old_cluster = self._cluster_threshold
             old_max = self._max_captures_per_window
 
             new_debounce = old_debounce
-            new_cluster = old_cluster
             new_max = old_max
 
             try:
@@ -197,12 +165,6 @@ class CaptureManager:
                         raise ValueError(f"Invalid debounce_interval: {value}")
                     new_debounce = value
 
-                if "cluster_threshold" in settings:
-                    value = float(settings["cluster_threshold"])
-                    if value <= 0:
-                        raise ValueError(f"Invalid cluster_threshold: {value}")
-                    new_cluster = value
-
                 if "max_captures_per_window" in settings:
                     value = int(settings["max_captures_per_window"])
                     if value <= 0:
@@ -210,19 +172,16 @@ class CaptureManager:
                     new_max = value
 
                 self._debounce_interval = new_debounce
-                self._cluster_threshold = new_cluster
                 self._max_captures_per_window = new_max
                 return True
             except (ValueError, TypeError):
                 self._debounce_interval = old_debounce
-                self._cluster_threshold = old_cluster
                 self._max_captures_per_window = old_max
                 return False
 
     def get_settings(self) -> dict:
         return {
             "debounce_interval": self._debounce_interval,
-            "cluster_threshold": self._cluster_threshold,
             "max_captures_per_window": self._max_captures_per_window
         }
 

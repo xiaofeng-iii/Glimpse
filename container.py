@@ -40,7 +40,7 @@ class DIContainer:
             self._lifetimes: Dict[str, Lifetime] = {}
             self._scoped_instances: Dict[str, Dict[str, Any]] = {}
             self._scoped_lock = threading.Lock()
-            self._service_lock = threading.Lock()
+            self._service_lock = threading.RLock()
             self._shutdown_handlers: List[Callable[[], None]] = []
             self._current_scope: Optional[str] = None
 
@@ -168,6 +168,9 @@ class DIContainer:
 
         from core.task_queue import task_queue
         self.register_singleton("task_queue", task_queue)
+
+        from core.cluster_buffer import ClusterBuffer
+        self.register_singleton_factory("cluster_buffer", lambda: ClusterBuffer(self.get("settings_manager")))
 
         from core.capture import CaptureManager
         self.register_singleton_factory("capture_manager", lambda: CaptureManager(self.get("path_manager")))

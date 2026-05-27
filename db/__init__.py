@@ -1,7 +1,7 @@
 """
 DB module
 """
-from db.sqlite_manager import SQLiteManager, MemoryRecord, sqlite_manager
-from db.chroma_manager import ChromaManager, chroma_manager
+from db.sqlite_manager import SQLiteManager, MemoryRecord
+from db.chroma_manager import ChromaManager
 
-__all__ = ["SQLiteManager", "ChromaManager", "sqlite_manager", "chroma_manager", "MemoryRecord"]
+__all__ = ["SQLiteManager", "ChromaManager", "MemoryRecord"]
