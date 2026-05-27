@@ -179,13 +179,23 @@ class TestKeyboardManagerReload:
     def test_reload_hotkeys_with_running_listener(self, mock_ghk, manager):
         """验证: 监听运行中 reload 替换快捷键"""
         mock_ghk.return_value = _create_mock_listener()
-        manager.register_hotkey("<ctrl>+old", lambda: None)
+        manager.register_hotkey("<ctrl>+o", lambda: None)
         manager.start_listening()
 
-        new_hotkeys = {"<ctrl>+new": lambda: None}
+        new_hotkeys = {"<ctrl>+n": lambda: None}
         result = manager.reload_hotkeys(new_hotkeys)
         assert result is True
-        assert list(manager.get_hotkeys().keys()) == ["<ctrl>+new"]
+        assert list(manager.get_hotkeys().keys()) == ["<ctrl>+n"]
+
+    def test_reload_hotkeys_bad_key_returns_false_preserves_old(self, manager):
+        """验证: reload 非法热键返回 False 且旧 hotkeys 不变"""
+        old_cb = lambda: None
+        manager.register_hotkey("<ctrl>+o", old_cb)
+        old_hotkeys = manager.get_hotkeys()
+
+        result = manager.reload_hotkeys({"<ctrl>+badkey": lambda: None})
+        assert result is False
+        assert manager.get_hotkeys() == old_hotkeys
 
     def test_reload_hotkeys_empty_dict(self, manager):
         """验证: reload 空 dict 返回 True"""

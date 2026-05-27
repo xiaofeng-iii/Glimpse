@@ -55,6 +55,7 @@ class TestAIClientConfigure:
             mock_openai.assert_called_once_with(
                 api_key="test-key",
                 base_url="https://api.openai.com/v1",
+                timeout=30,
             )
 
     def test_configure_custom_base_url(self):
@@ -65,7 +66,31 @@ class TestAIClientConfigure:
             mock_openai.assert_called_once_with(
                 api_key="test-key",
                 base_url="https://custom.api.com/v1",
+                timeout=30,
             )
+
+    def test_configure_custom_base_url_and_timeout(self):
+        """验证: configure 将自定义 base_url 和 timeout 传给 OpenAI 客户端"""
+        with patch("openai.OpenAI") as mock_openai:
+            client = AIClient()
+            client.configure(
+                api_key="test-key",
+                base_url="https://custom.api.com/v1",
+                model="custom-model",
+                timeout=60,
+                provider="Local Provider",
+                provider_type="openai_compatible",
+            )
+            mock_openai.assert_called_once_with(
+                api_key="test-key",
+                base_url="https://custom.api.com/v1",
+                timeout=60,
+            )
+            assert client._provider == "Local Provider"
+            assert client._provider_type == "openai_compatible"
+            assert client._base_url == "https://custom.api.com/v1"
+            assert client._model == "custom-model"
+            assert client._timeout == 60
 
     def test_is_configured_after_configure(self):
         """验证: configure 后 is_configured 返回 True"""
@@ -73,6 +98,16 @@ class TestAIClientConfigure:
             client = AIClient()
             client.configure("test-key")
             assert client.is_configured() is True
+
+    def test_clear_configuration_resets_unconfigured_state(self):
+        """验证: clear_configuration 清理客户端状态"""
+        with patch("openai.OpenAI"):
+            client = AIClient()
+            client.configure("test-key")
+            client.clear_configuration()
+            assert client.is_configured() is False
+            assert client._api_key is None
+            assert client._base_url == "https://api.openai.com/v1"
 
 
 class TestAIClientConfigureFromSettings:
@@ -87,7 +122,9 @@ class TestAIClientConfigureFromSettings:
         """验证: API Key 为空时返回 False"""
         mock_settings_manager.get.return_value = ""
         client = AIClient(mock_settings_manager)
+        client._client = MagicMock()
         assert client.configure_from_settings() is False
+        assert client.is_configured() is False
 
     def test_valid_api_key_returns_true(self, mock_settings_manager):
         """验证: 有效 API Key 时配置成功返回 True"""
@@ -95,13 +132,30 @@ class TestAIClientConfigureFromSettings:
         def _get_with_key(key, default=None):
             if key == "ai.api_key":
                 return "sk-test-123"
+            if key == "ai.provider":
+                return "Custom Provider"
+            if key == "ai.provider_type":
+                return "openai_compatible"
+            if key == "ai.base_url":
+                return "https://custom.api.com/v1"
+            if key == "ai.model":
+                return "custom-model"
+            if key == "ai.timeout":
+                return 45
             return default
 
         mock_settings_manager.get = _get_with_key
-        with patch("openai.OpenAI"):
+        with patch("openai.OpenAI") as mock_openai:
             client = AIClient(mock_settings_manager)
             result = client.configure_from_settings()
             assert result is True
+            mock_openai.assert_called_once_with(
+                api_key="sk-test-123",
+                base_url="https://custom.api.com/v1",
+                timeout=45,
+            )
+            assert client._provider == "Custom Provider"
+            assert client._model == "custom-model"
 
 
 class TestAIClientTestConnection:
@@ -228,6 +282,56 @@ class TestAIClientAnalyzeImage:
             call_args = configured_client._client.chat.completions.create.call_args
             assert call_args[1]["model"] == "gpt-4o-mini"
             assert call_args[1]["max_tokens"] == 500
+
+    def test_analyze_images_not_configured_raises(self):
+        """验证: 未配置时调用 analyze_images 抛出 RuntimeError"""
+        client = AIClient()
+        with pytest.raises(RuntimeError, match="not configured"):
+            client.analyze_images(["test1.png", "test2.png"], "prompt")
+
+    def test_analyze_images_returns_content(self, configured_client):
+        """验证: analyze_images 返回 AI 响应内容"""
+        mock_choice = MagicMock()
+        mock_choice.message.content = "这些截图显示了多个界面"
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        configured_client._client.chat.completions.create.return_value = mock_response
+
+        with patch.object(configured_client, '_read_image_base64', return_value="base64data"):
+            result = configured_client.analyze_images(["test1.png", "test2.png"], "分析这些图片")
+            assert result == "这些截图显示了多个界面"
+
+            # 验证 API 调用包含多个 image_url 和最后的 text prompt
+            call_args = configured_client._client.chat.completions.create.call_args
+            messages = call_args[1]["messages"]
+            content = messages[0]["content"]
+            assert len(content) == 3
+            assert content[0]["type"] == "image_url"
+            assert content[0]["image_url"]["url"] == "data:image/jpeg;base64,base64data"
+            assert content[1]["type"] == "image_url"
+            assert content[1]["image_url"]["url"] == "data:image/jpeg;base64,base64data"
+            assert content[2]["type"] == "text"
+            assert content[2]["text"] == "分析这些图片"
+
+    def test_analyze_images_streaming(self, configured_client):
+        """验证: analyze_images 在 stream_callback 时逐块返回"""
+        mock_delta = MagicMock()
+        mock_delta.content = "流式响应"
+        mock_choice = MagicMock()
+        mock_choice.delta = mock_delta
+        mock_chunk = MagicMock()
+        mock_chunk.choices = [mock_choice]
+        configured_client._client.chat.completions.create.return_value = [mock_chunk]
+
+        collected = []
+        with patch.object(configured_client, '_read_image_base64', return_value="base64data"):
+            result = configured_client.analyze_images(
+                ["test1.png", "test2.png"],
+                "分析这些图片",
+                stream_callback=lambda s: collected.append(s),
+            )
+            assert result == "流式响应"
+            assert collected == ["流式响应"]
 
 
 class TestAIClientGenerateSummary:

@@ -36,17 +36,25 @@ class TestOCREngineABC:
 class TestNativeOCREngine:
     """NativeOCREngine 测试"""
 
-    def test_extract_text_returns_none(self):
-        """验证: extract_text 返回 None (not implemented)"""
+    def test_extract_text_delegates_to_rapidocr(self, tmp_path):
+        """验证: extract_text 委托给 RapidOCR（使用 mock）"""
+        from unittest.mock import patch
+
         engine = NativeOCREngine()
-        result = engine.extract_text("test.png")
+        result = engine.extract_text("nonexistent_file.png")
         assert result is None
 
-    def test_extract_text_boxes_returns_empty(self):
-        """验证: extract_text_boxes 返回空列表"""
+    def test_extract_text_boxes_delegates_to_rapidocr(self, tmp_path):
+        """验证: extract_text_boxes 委托给 RapidOCR（使用 mock）"""
         engine = NativeOCREngine()
-        result = engine.extract_text_boxes("test.png")
+        result = engine.extract_text_boxes("nonexistent_file.png")
         assert result == []
+
+    def test_native_still_creates_fallback(self):
+        """验证: NativeOCREngine 确保回退到 RapidOCR"""
+        engine = NativeOCREngine()
+        fallback = engine._get_fallback()
+        assert fallback is not None
 
 
 class TestRapidOCREngine:

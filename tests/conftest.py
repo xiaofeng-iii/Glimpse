@@ -8,6 +8,8 @@ pytest 全局配置
 """
 
 import sys
+import types
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -16,6 +18,35 @@ import pytest
 _project_root = Path(__file__).parent.parent.resolve()
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
+
+if importlib.util.find_spec("openai") is None:
+    openai_stub = types.ModuleType("openai")
+
+    class _OpenAI:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    openai_stub.OpenAI = _OpenAI
+    sys.modules["openai"] = openai_stub
+
+if importlib.util.find_spec("pynput") is None:
+    pynput_stub = types.ModuleType("pynput")
+    keyboard_stub = types.ModuleType("pynput.keyboard")
+
+    class GlobalHotKeys:
+        def __init__(self, hotkeys=None):
+            self.hotkeys = hotkeys
+
+        def start(self):
+            return None
+
+        def stop(self):
+            return None
+
+    keyboard_stub.GlobalHotKeys = GlobalHotKeys
+    pynput_stub.keyboard = keyboard_stub
+    sys.modules["pynput.keyboard"] = keyboard_stub
+    sys.modules["pynput"] = pynput_stub
 
 
 @pytest.fixture
@@ -80,14 +111,15 @@ def mock_settings_manager():
         "hotkeys": {
             "screenshot": "<ctrl>+<shift>+g",
             "search": "<ctrl>+<f>",
-            "clear": "<escape>",
         },
         "screenshot": {
             "debounce_interval": 5.0,
-            "cluster_threshold": 2.0,
             "max_captures_per_window": 10,
         },
         "ai": {
+            "provider": "OpenAI",
+            "provider_type": "openai_compatible",
+            "base_url": "https://api.openai.com/v1",
             "api_key": "",
             "model": "gpt-4o-mini",
             "timeout": 30,
