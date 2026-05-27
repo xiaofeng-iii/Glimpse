@@ -19,6 +19,8 @@ from collections import namedtuple
 from typing import Optional, Callable, Any, List, Dict
 from enum import Enum
 
+from PySide6.QtCore import QObject, Signal
+
 
 # ============================================================
 # Lifetime & DI Container core (from ourdemo)
@@ -202,6 +204,7 @@ class DIContainer:
         self.register_singleton("memory_service", _MockMemoryService())
         self.register_singleton("ai_client", _MockAIClient())
         self.register_singleton("ocr_engine", _MockOCREngine())
+        self.register_singleton("cluster_buffer", _MockClusterBuffer())
 
     # ============================================================
     # Shutdown
@@ -265,41 +268,57 @@ _DEMO_MEMORIES = [
     MockMemory(
         id="mem_001", created_at="2026-05-26 14:32:10",
         image_path="./GlimpseData/screenshots/cap_001.png",
-        ai_summary="在 Chrome 浏览器中查看了一个关于 Python 异步编程的技术文章，讨论了 asyncio 和协程的使用模式",
+        ai_summary="Browsing a technical article about Python async programming on Chrome, covering asyncio, coroutines, and event loop patterns.",
         app_name="Chrome",
-        text_content="Python asyncio 异步编程指南 - 协程、事件循环和任务调度",
-        match_sources=["OCR", "语义"], extra_images=None,
+        text_content="Python asyncio - A Guide to Async Programming: Coroutines, Event Loops, and Task Scheduling",
+        match_sources=["OCR", "Semantic"], extra_images=None,
     ),
     MockMemory(
         id="mem_002", created_at="2026-05-26 13:15:42",
         image_path="./GlimpseData/screenshots/cap_002.png",
-        ai_summary="VS Code 中正在编辑一个 React 组件，使用了 TypeScript 和 Tailwind CSS 的样式方案",
-        app_name="Code",
-        text_content="React component with TypeScript and Tailwind",
+        ai_summary="Editing a React component in VS Code using TypeScript with Tailwind CSS for styling.",
+        app_name="VS Code",
+        text_content="React component with TypeScript and Tailwind CSS",
         match_sources=["OCR"], extra_images=None,
     ),
     MockMemory(
         id="mem_003", created_at="2026-05-26 11:08:33",
         image_path="./GlimpseData/screenshots/cap_003.png",
-        ai_summary="微信聊天窗口中与团队成员讨论了 Glimpse 项目的 UI 设计方案，确定了配色和组件布局",
-        app_name="WeChat",
-        text_content="讨论 Glimpse UI 设计方案的团队聊天记录",
-        match_sources=["语义"], extra_images=None,
+        ai_summary="Team discussion in Slack about the Glimpse project UI design, finalizing the color scheme and component layout.",
+        app_name="Slack",
+        text_content="Team chat discussing Glimpse UI design direction and component architecture",
+        match_sources=["Semantic"], extra_images=None,
     ),
     MockMemory(
         id="mem_004", created_at="2026-05-25 18:45:01",
         image_path="./GlimpseData/screenshots/cap_004.png",
-        ai_summary="终端中运行 pytest 测试套件，所有 47 个测试通过，包括搜索服务和 OCR 引擎的单元测试",
+        ai_summary="Running pytest test suite in Terminal — all 47 tests passing, including unit tests for search service and OCR engine.",
         app_name="Terminal",
-        text_content="pytest results: 47 passed, 0 failed",
-        match_sources=["OCR", "语义"], extra_images=None,
+        text_content="pytest results: 47 passed, 0 failed in 12.34s",
+        match_sources=["OCR", "Semantic"], extra_images=None,
     ),
     MockMemory(
         id="mem_005", created_at="2026-05-25 16:22:18",
         image_path="./GlimpseData/screenshots/cap_005.png",
-        ai_summary="在 Figma 中查看了 Glimpse 应用的原型设计稿，包含主窗口布局和设置对话框的界面",
+        ai_summary="Reviewing the Glimpse app prototype design in Figma, including the main window layout and settings dialog interface.",
         app_name="Figma",
-        text_content="Glimpse app prototype design in Figma",
+        text_content="Glimpse app prototype — main window and settings dialog mockups",
+        match_sources=["OCR"], extra_images=None,
+    ),
+    MockMemory(
+        id="mem_006", created_at="2026-05-25 10:05:37",
+        image_path="./GlimpseData/screenshots/cap_006.png",
+        ai_summary="Reading API documentation for OpenAI's GPT-4o model, noting the new vision capabilities and reduced latency.",
+        app_name="Chrome",
+        text_content="OpenAI API Reference — GPT-4o model with vision, 128K context, improved multilingual support",
+        match_sources=["OCR", "Semantic"], extra_images=None,
+    ),
+    MockMemory(
+        id="mem_007", created_at="2026-05-24 15:20:55",
+        image_path="./GlimpseData/screenshots/cap_007.png",
+        ai_summary="Composing an email in Outlook about the Q3 product roadmap, including milestones for the memory assistant feature.",
+        app_name="Outlook",
+        text_content="Q3 Roadmap — Memory Assistant MVP, Search improvements, Cloud sync beta",
         match_sources=["OCR"], extra_images=None,
     ),
 ]
@@ -317,7 +336,7 @@ class _MockSearchService:
             if query_lower in text:
                 if source_filter == "ocr" and "OCR" not in m.match_sources:
                     continue
-                if source_filter == "semantic" and "语义" not in m.match_sources:
+                if source_filter == "semantic" and "Semantic" not in m.match_sources:
                     continue
                 results.append(m)
         return results
@@ -381,9 +400,18 @@ class _MockKeyboardManager:
         return True
 
 
+MockCaptureResult = namedtuple("MockCaptureResult", ["image_path", "app_name"])
+
+
 class _MockCaptureManager:
+    _counter = 0
+
     def capture_fullscreen(self, delay=0, force_bypass_debounce=False):
-        return None
+        _MockCaptureManager._counter += 1
+        return MockCaptureResult(
+            image_path=f"./GlimpseData/screenshots/cap_00{((_MockCaptureManager._counter - 1) % 7) + 1}.png",
+            app_name="Preview",
+        )
 
     def update_settings(self, settings):
         return True
@@ -407,13 +435,19 @@ class _MockTaskQueue:
 
 
 class _MockMemoryService:
+    _counter = 0
+
     def create_memory_async(self, image_path, app_name="unknown", on_complete=None, on_error=None):
+        _MockMemoryService._counter += 1
+        mem_id = f"mem_{_MockMemoryService._counter:03d}"
         if on_complete:
-            on_complete(None)
+            on_complete(mem_id)
 
     def create_cluster_memory_async(self, image_paths, app_name="unknown", on_complete=None, on_error=None):
+        _MockMemoryService._counter += 1
+        mem_id = f"cluster_{_MockMemoryService._counter:03d}"
         if on_complete:
-            on_complete(None)
+            on_complete(mem_id)
 
 
 class _MockAIClient:
@@ -424,6 +458,45 @@ class _MockAIClient:
 class _MockOCREngine:
     def extract_text(self, image_path):
         return ""
+
+
+class _MockClusterBuffer(QObject):
+    """Mock cluster buffer with Qt signals for UI preview."""
+
+    def __init__(self):
+        super().__init__()
+        self._collecting = False
+        self._images = []
+        self._max_count = 10
+
+    def is_collecting(self):
+        return self._collecting
+
+    def add_image(self, image_path):
+        if not self._collecting:
+            self._collecting = True
+        self._images.append(image_path)
+        self.state_changed.emit("COLLECTING", len(self._images), self._max_count)
+
+    def flush(self):
+        paths = list(self._images)
+        self._images.clear()
+        self._collecting = False
+        self.state_changed.emit("IDLE", 0, self._max_count)
+        self.flushed.emit(paths)
+
+    def discard(self):
+        self._images.clear()
+        self._collecting = False
+        self.state_changed.emit("IDLE", 0, self._max_count)
+        self.discarded.emit()
+
+
+# Define signals on the class (must be at class level for Qt)
+_MockClusterBuffer.state_changed = Signal(str, int, int)
+_MockClusterBuffer.countdown_changed = Signal(int)
+_MockClusterBuffer.flushed = Signal(list)
+_MockClusterBuffer.discarded = Signal()
 
 
 # ============================================================

@@ -151,7 +151,7 @@ class MemoryListItemWidget(QWidget):
             ocr_badge = QLabel(t("badges.ocr"))
             ocr_badge.setObjectName("ocrBadge")
             top_row.addWidget(ocr_badge)
-        if "语义" in match_sources:
+        if "Semantic" in match_sources:
             semantic_badge = QLabel(t("badges.semantic"))
             semantic_badge.setObjectName("semanticBadge")
             top_row.addWidget(semantic_badge)
