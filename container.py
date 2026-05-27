@@ -463,6 +463,11 @@ class _MockOCREngine:
 class _MockClusterBuffer(QObject):
     """Mock cluster buffer with Qt signals for UI preview."""
 
+    state_changed = Signal(str, int, int)
+    countdown_changed = Signal(int)
+    flushed = Signal(list)
+    discarded = Signal()
+
     def __init__(self):
         super().__init__()
         self._collecting = False
@@ -490,13 +495,6 @@ class _MockClusterBuffer(QObject):
         self._collecting = False
         self.state_changed.emit("IDLE", 0, self._max_count)
         self.discarded.emit()
-
-
-# Define signals on the class (must be at class level for Qt)
-_MockClusterBuffer.state_changed = Signal(str, int, int)
-_MockClusterBuffer.countdown_changed = Signal(int)
-_MockClusterBuffer.flushed = Signal(list)
-_MockClusterBuffer.discarded = Signal()
 
 
 # ============================================================

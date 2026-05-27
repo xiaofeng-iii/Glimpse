@@ -27,17 +27,17 @@ def main():
         initial_theme = sys.argv[1]
     print(f"Starting Glimpse Frontend Preview (theme: {initial_theme})...")
 
-    # Bootstrap: init locale manager
+    # Bootstrap: init locale manager (defaults to en-US)
     from ui.locale_manager import init_locale
     import locale
     try:
         sys_locale, _ = locale.getdefaultlocale()
-        if sys_locale and sys_locale.startswith("en"):
-            init_locale("en-US")
-        else:
+        if sys_locale and sys_locale.startswith("zh"):
             init_locale("zh-CN")
+        else:
+            init_locale()  # use default (en-US)
     except Exception:
-        init_locale("zh-CN")
+        init_locale()  # use default (en-US)
 
     # Initialize DI container in preview mode (mock services)
     from container import container
