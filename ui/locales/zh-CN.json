@@ -58,6 +58,7 @@
     "max_captures": "最大截图数:",
     "api_key": "API Key:",
     "model": "模型:",
+    "base_url": "Base URL:",
     "timeout": "超时时间:",
     "ocr_engine": "OCR 引擎:",
     "language": "语言:",

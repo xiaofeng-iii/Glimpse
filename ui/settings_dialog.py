@@ -229,11 +229,12 @@ class SettingsDialog(QDialog):
         self._ai_api_key.setPlaceholderText("sk-...")
         layout.addRow(t("settings.api_key"), self._ai_api_key)
 
-        self._ai_model = QComboBox()
-        self._ai_model.addItems([
-            "gpt-4o-mini", "gpt-4o", "gpt-4-turbo",
-            "claude-3-opus", "claude-3-sonnet",
-        ])
+        self._ai_base_url = QLineEdit()
+        self._ai_base_url.setPlaceholderText("https://api.openai.com/v1")
+        layout.addRow(t("settings.base_url"), self._ai_base_url)
+
+        self._ai_model = QLineEdit()
+        self._ai_model.setPlaceholderText("gpt-4o-mini")
         layout.addRow(t("settings.model"), self._ai_model)
 
         self._ai_timeout = QSpinBox()
@@ -306,9 +307,8 @@ class SettingsDialog(QDialog):
 
         ai = merged.get("ai", {})
         self._ai_api_key.setText(ai.get("api_key", ""))
-        idx = self._ai_model.findText(ai.get("model", "gpt-4o-mini"))
-        if idx >= 0:
-            self._ai_model.setCurrentIndex(idx)
+        self._ai_base_url.setText(ai.get("base_url", "https://api.openai.com/v1"))
+        self._ai_model.setText(ai.get("model", "gpt-4o-mini"))
         self._ai_timeout.setValue(ai.get("timeout", 30))
 
         ocr = merged.get("ocr", {})
@@ -346,7 +346,8 @@ class SettingsDialog(QDialog):
             },
             "ai": {
                 "api_key": self._ai_api_key.text(),
-                "model": self._ai_model.currentText(),
+                "base_url": self._ai_base_url.text(),
+                "model": self._ai_model.text(),
                 "timeout": self._ai_timeout.value(),
             },
             "ocr": {

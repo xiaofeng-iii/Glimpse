@@ -58,6 +58,7 @@
     "max_captures": "Max Captures:",
     "api_key": "API Key:",
     "model": "Model:",
+    "base_url": "Base URL:",
     "timeout": "Timeout:",
     "ocr_engine": "OCR Engine:",
     "language": "Language:",
