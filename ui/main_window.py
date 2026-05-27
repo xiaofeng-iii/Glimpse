@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer, QSize
 from PySide6.QtGui import (
-    QAction, QShortcut, QKeySequence, QIcon, QPixmap, QFont, QColor, QPainter
+    QAction, QShortcut, QKeySequence, QPixmap, QFont, QColor, QPainter
 )
 
 from ui.signals import signals
@@ -22,39 +22,8 @@ from ui.locale_manager import t, locale_manager
 from ui.theme_manager import ThemeManager
 from ui.memory_detail_dialog import MemoryDetailDialog
 from ui.widgets.loading_spinner import LoadingSpinner
+from ui.app_icon import create_app_icon
 from container import container
-
-
-# ============================================================
-# Tray Icon Generator
-# ============================================================
-
-def _generate_tray_icon(size: int = 24) -> QIcon:
-    """Generate a polished tray icon (indigo circle with 'G' letter).
-
-    Falls back to a simple colored square if rendering fails.
-    """
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.transparent)
-
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-    # Circle background
-    painter.setBrush(QColor("#6366F1"))
-    painter.setPen(Qt.PenStyle.NoPen)
-    margin = 2
-    painter.drawEllipse(margin, margin, size - 2 * margin, size - 2 * margin)
-
-    # Letter 'G'
-    font = QFont("Segoe UI", int(size * 0.5))
-    font.setBold(True)
-    painter.setFont(font)
-    painter.setPen(QColor("white"))
-    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "G")
-
-    painter.end()
-    return QIcon(pixmap)
 
 
 # ============================================================
@@ -207,6 +176,8 @@ class MainWindow(QMainWindow):
     def __init__(self, theme_manager: ThemeManager | None = None):
         super().__init__()
         self.setWindowTitle(t("app.title"))
+        self._app_icon = create_app_icon()
+        self.setWindowIcon(self._app_icon)
         self.setMinimumSize(960, 640)
         self.resize(1100, 720)
 
@@ -463,7 +434,7 @@ class MainWindow(QMainWindow):
             self.tray_icon = None
             return
 
-        icon = _generate_tray_icon()
+        icon = self._app_icon
         self.tray_icon = QSystemTrayIcon(icon, self)
         self.tray_icon.setToolTip(t("app.title"))
         self.tray_icon.activated.connect(self._on_tray_activated)
@@ -539,7 +510,7 @@ class MainWindow(QMainWindow):
 
         # Refresh tray icon for theme
         if self.tray_icon:
-            self.tray_icon.setIcon(_generate_tray_icon())
+            self.tray_icon.setIcon(self._app_icon)
 
     # ============================================================
     # i18n
@@ -945,6 +916,6 @@ class MainWindow(QMainWindow):
         self.tray_icon.showMessage(
             t("tray.minimized_title"),
             t("tray.minimized_msg"),
-            QSystemTrayIcon.MessageIcon.Information,
+            self._app_icon,
             2000,
         )

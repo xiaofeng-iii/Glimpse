@@ -57,6 +57,7 @@ screenshots/
 !assets/**/*.jpg
 !assets/**/*.jpeg
 !assets/**/*.gif
+!assets/**/*.ico
 
 # Environment files (sensitive)
 .env
@@ -77,6 +78,7 @@ docker-compose.*.yml
 *.spec
 *.manifest
 *.ico
+!assets/**/*.ico
 
 # Testing
 .pytest_cache/

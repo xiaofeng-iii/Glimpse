@@ -36,6 +36,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 def main():
     from container import container
     from services.bootstrap import configure_ai_client
+    from ui.app_icon import create_app_icon, set_windows_app_user_model_id
 
     print("Initializing container...")
     container.initialize_defaults()
@@ -72,9 +73,11 @@ def main():
         signals.screenshot_requested.emit()
 
     print("Starting UI...")
+    set_windows_app_user_model_id()
     app = QApplication(sys.argv)
     app.setApplicationName("Glimpse")
     app.setOrganizationName("Glimpse")
+    app.setWindowIcon(create_app_icon())
 
     from ui.main_window import MainWindow
     from ui.theme_manager import ThemeManager
