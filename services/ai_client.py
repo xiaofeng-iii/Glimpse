@@ -2,7 +2,7 @@
 AI Client - 负责打包数据并与云端大模型交互
 支持构造函数注入SettingsManager依赖
 """
-from typing import Optional, Callable, TYPE_CHECKING
+from typing import Optional, Callable, TYPE_CHECKING, List
 
 import openai
 
@@ -13,25 +13,76 @@ if TYPE_CHECKING:
 class AIClient:
     """AI 客户端 - 支持构造函数注入依赖"""
 
+    DEFAULT_MODEL = "gpt-4o-mini"
+    DEFAULT_PROVIDER = "OpenAI"
+    DEFAULT_PROVIDER_TYPE = "openai_compatible"
+    DEFAULT_BASE_URL = "https://api.openai.com/v1"
+    DEFAULT_TIMEOUT = 30
+
     def __init__(self, settings_manager: Optional["SettingsManager"] = None):
         self._settings_manager = settings_manager
         self._client: Optional[openai.OpenAI] = None
         self._api_key: Optional[str] = None
-        self._base_url: Optional[str] = None
+        self._provider: str = self.DEFAULT_PROVIDER
+        self._provider_type: str = self.DEFAULT_PROVIDER_TYPE
+        self._base_url: str = self.DEFAULT_BASE_URL
+        self._model: str = self.DEFAULT_MODEL
+        self._timeout: int = self.DEFAULT_TIMEOUT
 
-    def configure(self, api_key: str, base_url: str = "https://api.openai.com/v1"):
+    def clear_configuration(self):
+        self._client = None
+        self._api_key = None
+        self._provider = self.DEFAULT_PROVIDER
+        self._provider_type = self.DEFAULT_PROVIDER_TYPE
+        self._base_url = self.DEFAULT_BASE_URL
+        self._model = self.DEFAULT_MODEL
+        self._timeout = self.DEFAULT_TIMEOUT
+
+    def configure(
+        self,
+        api_key: str,
+        base_url: str = DEFAULT_BASE_URL,
+        model: Optional[str] = None,
+        timeout: int = DEFAULT_TIMEOUT,
+        provider: str = DEFAULT_PROVIDER,
+        provider_type: str = DEFAULT_PROVIDER_TYPE,
+    ):
+        if provider_type != self.DEFAULT_PROVIDER_TYPE:
+            raise ValueError(f"Unsupported provider_type: {provider_type}")
+        if not api_key:
+            self.clear_configuration()
+            return False
+
         self._api_key = api_key
-        self._base_url = base_url
-        self._client = openai.OpenAI(api_key=api_key, base_url=base_url)
+        self._provider = provider or self.DEFAULT_PROVIDER
+        self._provider_type = provider_type
+        self._base_url = base_url or self.DEFAULT_BASE_URL
+        self._model = model or self.DEFAULT_MODEL
+        self._timeout = timeout
+        self._client = openai.OpenAI(api_key=api_key, base_url=self._base_url, timeout=timeout)
+        return True
 
     def configure_from_settings(self) -> bool:
         if self._settings_manager is None:
+            self.clear_configuration()
             return False
+        provider = self._settings_manager.get("ai.provider", self.DEFAULT_PROVIDER)
+        provider_type = self._settings_manager.get("ai.provider_type", self.DEFAULT_PROVIDER_TYPE)
+        base_url = self._settings_manager.get("ai.base_url", self.DEFAULT_BASE_URL)
         api_key = self._settings_manager.get("ai.api_key", "")
+        model = self._settings_manager.get("ai.model", self.DEFAULT_MODEL)
+        timeout = self._settings_manager.get("ai.timeout", self.DEFAULT_TIMEOUT)
         if not api_key:
+            self.clear_configuration()
             return False
-        self.configure(api_key)
-        return True
+        return self.configure(
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            timeout=timeout,
+            provider=provider,
+            provider_type=provider_type,
+        )
 
     def is_configured(self) -> bool:
         return self._client is not None
@@ -51,21 +102,28 @@ class AIClient:
         prompt: str = "描述这张截图的内容",
         stream_callback: Optional[Callable[[str], None]] = None,
     ) -> str:
+        return self.analyze_images([image_path], prompt, stream_callback)
+
+    def analyze_images(
+        self,
+        image_paths: List[str],
+        prompt: str,
+        stream_callback: Optional[Callable[[str], None]] = None,
+    ) -> str:
         if not self._client:
             raise RuntimeError("AI client not configured")
 
-        image_base64 = self._read_image_base64(image_path)
+        content = []
+        for path in image_paths:
+            image_base64 = self._read_image_base64(path)
+            content.append(
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+            )
+        content.append({"type": "text", "text": prompt})
+
         response = self._client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
+            model=self._model,
+            messages=[{"role": "user", "content": content}],
             max_tokens=500,
             temperature=0.7,
             stream=True if stream_callback else False,
@@ -87,7 +145,7 @@ class AIClient:
             raise RuntimeError("AI client not configured")
 
         response = self._client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self._model,
             messages=[
                 {"role": "system", "content": "你是一个文本摘要助手。"},
                 {"role": "user", "content": f"{prompt}\n\n{text}"},

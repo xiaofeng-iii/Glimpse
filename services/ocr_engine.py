@@ -19,17 +19,31 @@ class OCREngine(ABC):
 
 
 class NativeOCREngine(OCREngine):
-    """原生 OCR 引擎 (使用系统内置能力)"""
+    """原生 OCR 引擎 (优先使用系统内置能力，不可用时回退到 RapidOCR)"""
 
     def __init__(self):
         self._available = False
+        self._fallback: Optional[OCREngine] = None
+
+    def _get_fallback(self) -> Optional[OCREngine]:
+        if self._fallback is None:
+            try:
+                self._fallback = RapidOCREngine()
+            except Exception:
+                self._fallback = None
+        return self._fallback
 
     def extract_text(self, image_path: str) -> Optional[str]:
-        # TODO: 实现原生 OCR
-        return None
+        engine = self._get_fallback()
+        if engine is None:
+            return None
+        return engine.extract_text(image_path)
 
     def extract_text_boxes(self, image_path: str) -> List[Tuple[str, Tuple[int, int, int, int]]]:
-        return []
+        engine = self._get_fallback()
+        if engine is None:
+            return []
+        return engine.extract_text_boxes(image_path)
 
 
 class RapidOCREngine(OCREngine):
@@ -52,7 +66,11 @@ class RapidOCREngine(OCREngine):
         if not engine:
             return None
 
-        result, _, _ = engine(image_path)
+        try:
+            result, _, _ = engine(image_path)
+        except Exception:
+            return None
+
         if not result:
             return None
 
@@ -63,7 +81,11 @@ class RapidOCREngine(OCREngine):
         if not engine:
             return []
 
-        result, _, _ = engine(image_path)
+        try:
+            result, _, _ = engine(image_path)
+        except Exception:
+            return []
+
         if not result:
             return []
 
