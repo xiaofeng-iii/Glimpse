@@ -399,27 +399,36 @@ class SettingsDialog(QDialog):
         self._original_settings = new_settings
         return True
 
+    def _detect_conflicts(self, new_settings: dict) -> list:
+        """Detect setting conflicts. Returns list of conflict description strings.
+
+        Currently no known conflicts exist. Add conflict detection rules here
+        as new inter-dependent settings are introduced.
+        """
+        conflicts = []
+        return conflicts
+
     def _on_apply(self) -> bool:
         new_settings = self._collect_settings_from_ui()
         if not self._validate_input(new_settings):
             return False
 
         if new_settings == self._original_settings:
-            QMessageBox.information(
-                self, t("settings.no_changes"), t("settings.no_changes_msg")
-            )
+            self.accept()
             return True
 
-        reply = QMessageBox.question(
-            self,
-            t("settings.confirm_apply"),
-            t("settings.confirm_apply_msg"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return False
+        conflicts = self._detect_conflicts(new_settings)
+        if conflicts:
+            conflict_text = "\n".join(f"  {c}" for c in conflicts)
+            reply = QMessageBox.question(
+                self,
+                t("settings.conflict_title"),
+                f"{conflict_text}\n\n{t('settings.conflict_proceed')}?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return False
 
-        # Apply theme immediately
         if self._theme_manager:
             self._theme_manager.apply_theme(
                 new_settings.get("ui", {}).get("theme", "light")
@@ -434,14 +443,12 @@ class SettingsDialog(QDialog):
         self._apply_runtime_settings(new_settings)
         self._pending_settings = new_settings
         self._original_settings = new_settings
+
         if self._degraded_services:
             QMessageBox.warning(
                 self, t("settings.apply_partial"), self._degraded_label.text()
             )
-        else:
-            QMessageBox.information(
-                self, t("settings.apply_success"), t("settings.apply_success_msg")
-            )
+        self.accept()
         return True
 
     def _validate_input(self, settings: dict) -> bool:
