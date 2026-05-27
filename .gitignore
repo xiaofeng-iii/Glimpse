@@ -87,11 +87,22 @@ htmlcov/
 # Documentation
 docs/_build/
 
-# Claude related
+# AI assistant/session artifacts
+.omo/
+docs/superpowers/
+scripts/apply_prompt.py
+.codex/
+.opencode/
+.cursor/
+.windsurf/
 .claude/
 claude-*.json
 claude-*.env
 *.claude.log
 anthropic*.json
 anthropic*.env
+*.prompt.md
+
+# Keep one shared guide for future vibe-coding sessions.
+!AGENTS.md
 CLAUDE.md
