@@ -85,9 +85,9 @@ const truncate = (text: string, length: number) => {
             <div class="flex items-center gap-2 mt-2">
               <span
                 v-if="memory.match_sources?.includes('精确')"
-                class="badge badge-ocr"
+                class="badge badge-exact"
               >
-                OCR
+                精确
               </span>
               <span
                 v-if="memory.match_sources?.includes('语义')"

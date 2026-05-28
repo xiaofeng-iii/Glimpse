@@ -19,7 +19,7 @@ const searchInput = ref<HTMLInputElement | null>(null)
 
 const sources = [
   { value: 'all', label: '综合结果' },
-  { value: 'ocr', label: '仅看 OCR' },
+  { value: 'exact', label: '仅看精确' },
   { value: 'semantic', label: '仅看语义' },
 ]
 

@@ -28,7 +28,7 @@ def memory_to_response(memory) -> dict:
 @router.get("", response_model=SearchResult)
 async def search(
     q: str = Query(..., min_length=1, description="Search query"),
-    source: str = Query("all", description="Filter source: all, ocr, semantic"),
+    source: str = Query("all", description="Filter source: all, exact, semantic"),
     limit: int = Query(20, ge=1, le=100),
 ):
     """Search memories by query"""
