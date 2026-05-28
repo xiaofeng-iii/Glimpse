@@ -541,7 +541,8 @@ def __init__(self, path_manager: "PathManager")
     "ui": {
         "theme": "light",
         "auto_hide": False,
-        "start_minimized": False
+        "start_minimized": False,
+        "close_action": "ask"
     }
 }
 ```

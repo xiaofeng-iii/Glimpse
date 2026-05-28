@@ -48,7 +48,7 @@ QMainWindow
 | 显示文本 | 数据值 | 说明 |
 |----------|--------|------|
 | `综合结果` | `all` | 混合搜索（OCR + 语义） |
-| `仅看 OCR` | `ocr` | 仅文本搜索 |
+| `仅看精确` | `exact` | 仅文本搜索 |
 | `仅看语义` | `semantic` | 仅向量搜索 |
 
 ### 1.4 快捷键
@@ -74,8 +74,7 @@ QMainWindow
 | **快捷键** | 截图/搜索/清除快捷键 | `QKeySequenceEdit` ×3 |
 | **截图** | 防抖间隔、最大截图数 | `QDoubleSpinBox`, `QSpinBox` |
 | **AI 服务** | API Key、Base URL、模型、超时 | `QLineEdit`, `QSpinBox` |
-| **OCR** | 引擎、语言 | `QComboBox` ×2 |
-| **界面** | 主题、自动隐藏、启动最小化 | `QComboBox`, `QCheckBox` ×2 |
+| **界面** | 主题、关闭按钮、自动隐藏、启动最小化 | `QComboBox` ×2, `QCheckBox` ×2 |
 | **集群截图** | 启用模式、自动提交、最大截图数、超时 | `QCheckBox`, `QSpinBox` ×2 |
 
 AI 服务控件详情:
@@ -104,7 +103,7 @@ AI 服务控件详情:
 
 **特性**:
 - 点击托盘图标显示窗口
-- 关闭窗口时最小化到托盘（非退出）
+- 关闭窗口行为由 `settings.ui.close_action` 控制：询问、最小化到托盘或退出
 - 显示气泡提示
 
 ---
@@ -139,6 +138,7 @@ AI 服务控件详情:
 **加载**: 通过 `ThemeManager` (`ui/theme_manager.py`) 动态加载和切换
 
 - `ui.theme`: `light` / `dark` / `system`
+- `ui.close_action`: `ask` / `minimize` / `exit`
 - 存储在 `settings.json` 中，SettingsDialog 可读取和修改
 - `ThemeManager` 支持系统主题检测（Windows 注册表 / macOS / Linux GTK）
 - QSS 内容以缓存方式加载，避免重复读取

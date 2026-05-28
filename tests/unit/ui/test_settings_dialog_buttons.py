@@ -12,7 +12,12 @@ class FakeSettingsManager:
             "screenshot": {"debounce_interval": 5.0, "cluster_threshold": 2.0, "max_captures_per_window": 10},
             "ai": {"api_key": "sk-test", "model": "gpt-4o-mini", "timeout": 30},
             "ocr": {"engine": "rapidocr", "language": "ch"},
-            "ui": {"theme": "light", "auto_hide": False, "start_minimized": False},
+            "ui": {
+                "theme": "light",
+                "auto_hide": False,
+                "start_minimized": False,
+                "close_action": "ask",
+            },
         }
 
     def get_all(self):

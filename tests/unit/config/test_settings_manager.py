@@ -76,6 +76,7 @@ class TestSettingsManagerInit:
         assert sm.get("ai.model") == "custom-model"
         assert sm.get("ai.timeout") == 45
         assert sm.get("hotkeys.clear") is None
+        assert sm.get("ui.close_action") == "ask"
 
         persisted = json.loads(settings_file.read_text(encoding="utf-8"))
         assert persisted["ai"]["provider"] == "OpenAI"
@@ -141,10 +142,12 @@ class TestSettingsManagerUpdate:
                 "theme": "dark",
                 "auto_hide": True,
                 "start_minimized": True,
+                "close_action": "minimize",
             }
         })
         assert result is True
         assert sm.get("ui.theme") == "dark"
+        assert sm.get("ui.close_action") == "minimize"
 
     def test_update_invalid_no_change(self, mock_path_manager):
         from config.settings_manager import SettingsManager
