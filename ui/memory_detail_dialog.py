@@ -150,17 +150,6 @@ class MemoryDetailDialog(QDialog):
         self._summary_text.setObjectName("detailText")
         layout.addWidget(self._summary_text)
 
-        # --- OCR Text ---
-        ocr_label = QLabel(t("detail.ocr_text"))
-        ocr_label.setObjectName("sectionTitle")
-        layout.addWidget(ocr_label)
-
-        self._ocr_text = QTextEdit()
-        self._ocr_text.setReadOnly(True)
-        self._ocr_text.setMaximumHeight(80)
-        self._ocr_text.setObjectName("detailText")
-        layout.addWidget(self._ocr_text)
-
         # --- Image path ---
         path_row = QHBoxLayout()
         path_row.setSpacing(8)
@@ -209,12 +198,6 @@ class MemoryDetailDialog(QDialog):
         """Fill in memory data."""
         summary = getattr(self._memory, "ai_summary", "") or ""
         self._summary_text.setPlainText(summary)
-
-        text_content = getattr(self._memory, "text_content", "") or ""
-        if text_content:
-            self._ocr_text.setPlainText(text_content)
-        else:
-            self._ocr_text.setPlainText("(No OCR text)")
 
     def _on_copy(self):
         """Copy memory summary to clipboard."""

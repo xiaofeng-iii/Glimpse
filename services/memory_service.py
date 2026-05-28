@@ -1,6 +1,6 @@
 """
 Memory Service - 记忆流程编排服务
-协调截图、OCR、AI摘要生成、存储的完整记忆流程
+协调截图、AI摘要生成、存储的完整记忆流程
 支持构造函数注入依赖，支持多实例隔离
 """
 import json
@@ -88,8 +88,7 @@ class MemoryService:
         memory_id = str(uuid.uuid4())
         created_at = time.strftime("%Y-%m-%d %H:%M:%S")
 
-        self._report_progress("正在提取文本...")
-        text_content = self._ocr_engine.extract_text(image_path) or ""
+        text_content = ""
 
         self._report_progress("正在生成摘要...")
         if self._ai_client.is_configured():
@@ -193,13 +192,7 @@ class MemoryService:
         primary_image = image_paths[0]
         extra_images = image_paths[1:] if len(image_paths) > 1 else []
 
-        self._report_progress("正在提取文本...")
-        all_texts = []
-        for path in image_paths:
-            text = self._ocr_engine.extract_text(path) or ""
-            if text:
-                all_texts.append(text)
-        text_content = "\n".join(all_texts)
+        text_content = ""
 
         self._report_progress("正在生成摘要...")
         if self._ai_client.is_configured():

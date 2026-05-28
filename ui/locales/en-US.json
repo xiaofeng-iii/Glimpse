@@ -55,7 +55,6 @@
     "hotkeys": "Hotkeys",
     "screenshot": "Screenshot",
     "ai_service": "AI Service",
-    "ocr": "Exact",
     "ui": "Interface",
     "hotkey_desc": "Click a field and press the shortcut you want for each global action",
     "hotkey_screenshot": "Screenshot Hotkey:",
@@ -73,8 +72,6 @@
     "model": "Model:",
     "base_url": "Base URL:",
     "timeout": "Timeout:",
-    "ocr_engine": "OCR Engine:",
-    "language": "Language:",
     "theme": "Theme:",
     "auto_hide": "Auto Hide",
     "start_minimized": "Start Minimized",
@@ -111,7 +108,6 @@
     "summary": "AI Summary",
     "image": "Image",
     "image_path": "Image Path",
-    "ocr_text": "OCR Text",
     "no_memories": "No memories yet. Press the screenshot hotkey to start recording.",
     "no_results": "No matching results found.",
     "items_count": "{count} memories",
@@ -122,7 +118,7 @@
     "confirm_delete_msg": "Are you sure you want to delete this memory? This action cannot be undone."
   },
   "badges": {
-    "ocr": "OCR",
+    "ocr": "Exact",
     "semantic": "Semantic"
   },
   "tooltips": {

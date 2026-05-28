@@ -136,7 +136,6 @@ class SettingsDialog(QDialog):
         self._tabs.addTab(self._create_hotkeys_tab(), t("settings.hotkeys"))
         self._tabs.addTab(self._create_screenshot_tab(), t("settings.screenshot"))
         self._tabs.addTab(self._create_ai_tab(), t("settings.ai_service"))
-        self._tabs.addTab(self._create_ocr_tab(), t("settings.ocr"))
         self._tabs.addTab(self._create_ui_tab(), t("settings.ui"))
 
         layout.addWidget(self._tabs)
@@ -272,22 +271,6 @@ class SettingsDialog(QDialog):
 
         return widget
 
-    def _create_ocr_tab(self) -> QWidget:
-        widget = QWidget()
-        layout = QFormLayout(widget)
-        layout.setSpacing(12)
-        layout.setContentsMargins(16, 20, 16, 16)
-
-        self._ocr_engine = QComboBox()
-        self._ocr_engine.addItems(["rapidocr", "tesseract", "easyocr"])
-        layout.addRow(t("settings.ocr_engine"), self._ocr_engine)
-
-        self._ocr_language = QComboBox()
-        self._ocr_language.addItems(["ch", "en", "ch+en"])
-        layout.addRow(t("settings.language"), self._ocr_language)
-
-        return widget
-
     def _create_ui_tab(self) -> QWidget:
         widget = QWidget()
         layout = QFormLayout(widget)
@@ -350,14 +333,6 @@ class SettingsDialog(QDialog):
         self._ai_model.setText(ai.get("model", "gpt-4o-mini"))
         self._ai_timeout.setValue(ai.get("timeout", 30))
 
-        ocr = merged.get("ocr", {})
-        idx = self._ocr_engine.findText(ocr.get("engine", "rapidocr"))
-        if idx >= 0:
-            self._ocr_engine.setCurrentIndex(idx)
-        idx = self._ocr_language.findText(ocr.get("language", "ch"))
-        if idx >= 0:
-            self._ocr_language.setCurrentIndex(idx)
-
         ui = merged.get("ui", {})
         idx = self._ui_theme.findText(ui.get("theme", "light"))
         if idx >= 0:
@@ -391,10 +366,9 @@ class SettingsDialog(QDialog):
                 "model": self._ai_model.text(),
                 "timeout": self._ai_timeout.value(),
             },
-            "ocr": {
-                "engine": self._ocr_engine.currentText(),
-                "language": self._ocr_language.currentText(),
-            },
+            "ocr": copy.deepcopy(
+                self._original_settings.get("ocr", {"engine": "rapidocr", "language": "ch"})
+            ),
             "ui": {
                 "theme": self._ui_theme.currentText(),
                 "auto_hide": self._ui_auto_hide.isChecked(),

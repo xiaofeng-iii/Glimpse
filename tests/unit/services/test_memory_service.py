@@ -97,7 +97,6 @@ class TestMemoryServiceCreateMemory:
         )
         memory_id = ms.create_memory("/fake/path.png")
         assert memory_id is not None
-        # Should still work, using OCR text as summary
         mock_services["sqlite_manager"].insert_memory.assert_called_once()
 
     def test_create_memory_chroma_fail_rolls_back(self, mock_services):
@@ -115,7 +114,7 @@ class TestMemoryServiceCreateMemory:
         # Rollback should delete from SQLite
         mock_services["sqlite_manager"].delete_memory.assert_called_once()
 
-    def test_create_memory_ocr_extracts_text(self, mock_services):
+    def test_create_memory_does_not_extract_ocr_text(self, mock_services):
         from services.memory_service import MemoryService
         mock_services["ocr_engine"].extract_text.return_value = "Hello World"
         ms = MemoryService(
@@ -126,7 +125,9 @@ class TestMemoryServiceCreateMemory:
             embedding_client=mock_services["embedding_client"],
         )
         ms.create_memory("/fake/path.png")
-        mock_services["ocr_engine"].extract_text.assert_called_once_with("/fake/path.png")
+        mock_services["ocr_engine"].extract_text.assert_not_called()
+        record = mock_services["sqlite_manager"].insert_memory.call_args[0][0]
+        assert record.text_content == ""
 
 
 class TestMemoryServiceAsync:

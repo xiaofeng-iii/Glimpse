@@ -7,7 +7,7 @@ Glimpse - AI 驱动的桌面级记忆检索系统
 2. 初始化容器（container）
 3. 初始化路径（path_manager）
 4. 初始化数据库（sqlite + chroma）
-5. 初始化服务（ocr、embedding、ai）
+5. 初始化服务（embedding、ai）
 6. 配置 AI 客户端
 7. 初始化任务队列
 8. 启动 UI
@@ -50,7 +50,6 @@ def main():
     chroma_manager = container.get("chroma_manager")
 
     print("Initializing services...")
-    ocr_engine = container.get("ocr_engine")
     ai_client = container.get("ai_client")
 
     # 配置 AI 客户端

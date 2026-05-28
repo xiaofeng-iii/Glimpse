@@ -21,7 +21,7 @@ class TestCaptureToStorage:
         assert record is not None
         assert record.app_name == "test_app"
         assert record.ai_summary == "这是一张包含文字内容的截图摘要"
-        assert record.text_content == "测试 OCR 识别文本内容"
+        assert record.text_content == ""
 
     def test_create_memory_stores_in_chroma(self, memory_service, sample_image_path, chroma_manager):
         """截图处理后应写入 ChromaDB 向量数据库"""
@@ -76,7 +76,7 @@ class TestCaptureToStorage:
         assert Path(record.image_path).is_absolute()
 
     def test_create_memory_without_ai_client(self, sqlite_manager, chroma_manager, mock_ocr_engine, mock_embedding_client, sample_image_path):
-        """无 AI 客户端时应仍能创建记忆（使用 OCR 文本作为摘要）"""
+        """无 AI 客户端时应仍能创建记忆（使用空内容占位摘要）"""
         from unittest.mock import MagicMock
         from services.memory_service import MemoryService
 

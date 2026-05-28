@@ -55,7 +55,6 @@
     "hotkeys": "快捷键",
     "screenshot": "截图",
     "ai_service": "AI 服务",
-    "ocr": "精确",
     "ui": "界面",
     "hotkey_desc": "点击输入框后直接按下组合键，设置全局快捷键以快速触发功能",
     "hotkey_screenshot": "截图快捷键:",
@@ -73,8 +72,6 @@
     "model": "模型:",
     "base_url": "Base URL:",
     "timeout": "超时时间:",
-    "ocr_engine": "OCR 引擎:",
-    "language": "语言:",
     "theme": "主题:",
     "auto_hide": "自动隐藏",
     "start_minimized": "启动时最小化",
@@ -111,7 +108,6 @@
     "summary": "AI 摘要",
     "image": "图片",
     "image_path": "图片路径",
-    "ocr_text": "OCR 文本",
     "no_memories": "暂无记忆，按截图快捷键开始记录",
     "no_results": "未找到匹配结果",
     "items_count": "{count} 条记忆",
@@ -122,7 +118,7 @@
     "confirm_delete_msg": "确定要删除这条记忆吗？此操作不可撤销。"
   },
   "badges": {
-    "ocr": "OCR",
+    "ocr": "精确",
     "semantic": "语义"
   },
   "tooltips": {
