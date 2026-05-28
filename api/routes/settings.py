@@ -41,6 +41,7 @@ def get_default_settings() -> dict:
             "theme": "light",
             "auto_hide": False,
             "start_minimized": False,
+            "close_action": "ask",
         },
         "cluster": {
             "cluster_mode": False,
@@ -61,8 +62,9 @@ def get_effective_settings(settings_manager) -> dict:
     ai["base_url"] = resolved["base_url"]
     ai["model"] = resolved["model"]
     ai["timeout"] = resolved["timeout"]
+    ai["api_key_configured"] = bool(resolved["api_key"])
 
-    # Never expose the env API key back to the frontend.
+    # Never expose the API key back to the frontend.
     ai["api_key"] = ""
     return effective
 
@@ -93,6 +95,10 @@ async def update_settings(settings: SettingsUpdate):
         update_dict = settings.model_dump(exclude_unset=True)
         for key, value in update_dict.items():
             if value is not None:
+                if key == "ai" and isinstance(value, dict):
+                    if value.get("api_key") == "" and current.get("ai", {}).get("api_key"):
+                        value = {k: v for k, v in value.items() if k != "api_key"}
+                    value.pop("api_key_configured", None)
                 if key in current and isinstance(current[key], dict):
                     current[key].update(value)
                 else:

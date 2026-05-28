@@ -97,8 +97,12 @@ class SettingsDialog(QDialog):
                 "max_captures_per_window": 10,
             },
             "ai": {"api_key": "", "model": "gpt-4o-mini", "timeout": 30},
-            "ocr": {"engine": "rapidocr", "language": "ch"},
-            "ui": {"theme": "light", "auto_hide": False, "start_minimized": False},
+            "ui": {
+                "theme": "light",
+                "auto_hide": False,
+                "start_minimized": False,
+                "close_action": "ask",
+            },
         }
 
     def _get_screenshot_callback(self) -> Callable:
@@ -126,7 +130,6 @@ class SettingsDialog(QDialog):
         self._tabs.addTab(self._create_hotkeys_tab(), t("settings.hotkeys"))
         self._tabs.addTab(self._create_screenshot_tab(), t("settings.screenshot"))
         self._tabs.addTab(self._create_ai_tab(), t("settings.ai_service"))
-        self._tabs.addTab(self._create_ocr_tab(), t("settings.ocr"))
         self._tabs.addTab(self._create_ui_tab(), t("settings.ui"))
 
         layout.addWidget(self._tabs)
@@ -244,22 +247,6 @@ class SettingsDialog(QDialog):
 
         return widget
 
-    def _create_ocr_tab(self) -> QWidget:
-        widget = QWidget()
-        layout = QFormLayout(widget)
-        layout.setSpacing(12)
-        layout.setContentsMargins(16, 20, 16, 16)
-
-        self._ocr_engine = QComboBox()
-        self._ocr_engine.addItems(["rapidocr", "tesseract", "easyocr"])
-        layout.addRow(t("settings.ocr_engine"), self._ocr_engine)
-
-        self._ocr_language = QComboBox()
-        self._ocr_language.addItems(["ch", "en", "ch+en"])
-        layout.addRow(t("settings.language"), self._ocr_language)
-
-        return widget
-
     def _create_ui_tab(self) -> QWidget:
         widget = QWidget()
         layout = QFormLayout(widget)
@@ -269,6 +256,12 @@ class SettingsDialog(QDialog):
         self._ui_theme = QComboBox()
         self._ui_theme.addItems(["light", "dark", "system"])
         layout.addRow(t("settings.theme"), self._ui_theme)
+
+        self._ui_close_action = QComboBox()
+        self._ui_close_action.addItem(t("settings.close_action_ask"), "ask")
+        self._ui_close_action.addItem(t("settings.close_action_minimize"), "minimize")
+        self._ui_close_action.addItem(t("settings.close_action_exit"), "exit")
+        layout.addRow(t("settings.close_action"), self._ui_close_action)
 
         self._ui_auto_hide = QCheckBox(t("settings.auto_hide"))
         layout.addRow("", self._ui_auto_hide)
@@ -311,18 +304,13 @@ class SettingsDialog(QDialog):
         self._ai_model.setText(ai.get("model", "gpt-4o-mini"))
         self._ai_timeout.setValue(ai.get("timeout", 30))
 
-        ocr = merged.get("ocr", {})
-        idx = self._ocr_engine.findText(ocr.get("engine", "rapidocr"))
-        if idx >= 0:
-            self._ocr_engine.setCurrentIndex(idx)
-        idx = self._ocr_language.findText(ocr.get("language", "ch"))
-        if idx >= 0:
-            self._ocr_language.setCurrentIndex(idx)
-
         ui = merged.get("ui", {})
         idx = self._ui_theme.findText(ui.get("theme", "light"))
         if idx >= 0:
             self._ui_theme.setCurrentIndex(idx)
+        idx = self._ui_close_action.findData(ui.get("close_action", "ask"))
+        if idx >= 0:
+            self._ui_close_action.setCurrentIndex(idx)
         self._ui_auto_hide.setChecked(ui.get("auto_hide", False))
         self._ui_start_minimized.setChecked(ui.get("start_minimized", False))
         ui_settings = self._collect_settings_from_ui()
@@ -350,14 +338,11 @@ class SettingsDialog(QDialog):
                 "model": self._ai_model.text(),
                 "timeout": self._ai_timeout.value(),
             },
-            "ocr": {
-                "engine": self._ocr_engine.currentText(),
-                "language": self._ocr_language.currentText(),
-            },
             "ui": {
                 "theme": self._ui_theme.currentText(),
                 "auto_hide": self._ui_auto_hide.isChecked(),
                 "start_minimized": self._ui_start_minimized.isChecked(),
+                "close_action": self._ui_close_action.currentData() or "ask",
             },
         }
 

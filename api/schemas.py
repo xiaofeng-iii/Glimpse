@@ -31,7 +31,7 @@ class MemoryListResponse(BaseModel):
 class SearchQuery(BaseModel):
     """Search request parameters"""
     query: str
-    source: str = "all"  # all, ocr, semantic
+    source: str = "all"  # all, exact, semantic
     limit: int = 20
 
 
@@ -69,6 +69,7 @@ class SettingsResponse(BaseModel):
         "theme": "light",
         "auto_hide": False,
         "start_minimized": False,
+        "close_action": "ask",
     })
     cluster: Dict[str, Any] = Field(default_factory=lambda: {
         "cluster_mode": False,
