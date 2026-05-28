@@ -25,7 +25,7 @@ export interface Settings {
   hotkeys: Record<string, string>
   screenshot: Record<string, any>
   ai: Record<string, any>
-  ocr: Record<string, string>
+  ocr?: Record<string, string>
   ui: Record<string, any>
   cluster: Record<string, any>
 }
@@ -63,8 +63,8 @@ export const screenshotApi = {
     return response.data
   },
 
-  triggerAndAnalyze: async (force = false): Promise<{ success: boolean, memory_id?: string, message?: string }> => {
-    const response = await api.post('/screenshot/analyze', { force })
+  triggerAndAnalyze: async (force = false): Promise<{ success: boolean, memory_id?: string, memory?: Memory, message?: string }> => {
+    const response = await api.post('/screenshot/analyze', { force }, { timeout: 120000 })
     return response.data
   },
 }

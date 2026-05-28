@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useMemoriesStore } from '@/stores/memories'
 import { useClusterStore } from '@/stores/cluster'
 import { useNotificationStore } from '@/stores/notification'
-import { screenshotApi, clusterApi, healthApi, type Memory } from '@/api/client'
+import { screenshotApi, clusterApi, healthApi, settingsApi, type Memory } from '@/api/client'
 import {
   closeDesktopWindow,
   focusDesktopWindow,
@@ -79,7 +79,7 @@ const handleScreenshot = async () => {
   }
 
   isCapturing.value = true
-  notificationStore.show('正在截图并提交分析...', 'info', 1800)
+  notificationStore.show('正在截图并提交分析...', 'info', 0)
 
   try {
     if (isDesktop) {
@@ -87,13 +87,22 @@ const handleScreenshot = async () => {
       await wait(180)
     }
 
+    // API now blocks until memory is fully created (mirrors main-branch Qt flow)
     const result = await screenshotApi.triggerAndAnalyze(true)
     if (!result.success) {
       notificationStore.show(result.message || '截图请求失败。', 'error', 4500)
       return
     }
 
-    notificationStore.show('截图已提交，等待分析完成。', 'success', 2200)
+    // Memory is already created — refresh list and select the new memory
+    await loadMemories()
+    if (result.memory_id) {
+      const created = memoriesStore.memories.find(m => m.id === result.memory_id)
+      if (created) {
+        memoriesStore.select(created)
+      }
+    }
+    notificationStore.show('记忆分析完成', 'success', 2200)
   } catch (error) {
     console.error('Screenshot failed:', error)
     notificationStore.show('截图请求失败，请检查后端日志。', 'error', 4500)
@@ -130,7 +139,30 @@ const handleHideWindow = async () => {
 }
 
 const handleCloseWindow = async () => {
-  await closeDesktopWindow()
+  let closeAction = 'ask'
+  try {
+    const settings = await settingsApi.get()
+    closeAction = settings.ui?.close_action || 'ask'
+  } catch (error) {
+    closeAction = 'ask'
+  }
+
+  if (closeAction === 'minimize') {
+    await hideDesktopWindow()
+    return
+  }
+
+  if (closeAction === 'exit') {
+    await closeDesktopWindow()
+    return
+  }
+
+  const shouldExit = window.confirm('关闭 Glimpse？\n\n确定：退出应用\n取消：最小化到托盘')
+  if (shouldExit) {
+    await closeDesktopWindow()
+  } else {
+    await hideDesktopWindow()
+  }
 }
 
 const handleRefresh = async () => {
@@ -297,7 +329,7 @@ onUnmounted(() => {
               @open="handleOpenMemoryDetail"
             />
             <div v-else class="card flex items-center justify-center p-8 text-sm text-slate-500">
-              选择一条记忆后，可在这里查看摘要与 OCR 文本。
+              选择一条记忆后，可在这里查看摘要与精确文本。
             </div>
           </div>
         </div>

@@ -17,7 +17,7 @@ class AIClient:
     DEFAULT_PROVIDER = "OpenAI"
     DEFAULT_PROVIDER_TYPE = "openai_compatible"
     DEFAULT_BASE_URL = "https://api.openai.com/v1"
-    DEFAULT_TIMEOUT = 30
+    DEFAULT_TIMEOUT = 120
 
     def __init__(self, settings_manager: Optional["SettingsManager"] = None):
         self._settings_manager = settings_manager
@@ -166,8 +166,23 @@ class AIClient:
 
     def _read_image_base64(self, image_path: str) -> str:
         import base64
-        with open(image_path, "rb") as f:
-            return base64.b64encode(f.read()).decode("utf-8")
+        import io
+        try:
+            from PIL import Image
+            img = Image.open(image_path)
+            # Resize to max 1920px width to keep payload under API limits
+            if img.width > 1920:
+                ratio = 1920 / img.width
+                new_size = (1920, int(img.height * ratio))
+                img = img.resize(new_size, Image.LANCZOS)
+            # Convert to JPEG with compression for faster upload
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG", quality=70, optimize=True)
+            return base64.b64encode(buf.getvalue()).decode("utf-8")
+        except Exception:
+            # Fallback: read raw file if PIL fails
+            with open(image_path, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
 
 
 ai_client = AIClient()

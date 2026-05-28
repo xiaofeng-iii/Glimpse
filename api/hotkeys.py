@@ -6,7 +6,7 @@ import os
 from typing import Callable, Dict, Optional
 
 from api.dependencies import get_keyboard_manager, get_settings_manager
-from api.desktop_actions import capture_and_analyze
+from api.desktop_actions import capture_and_analyze_background
 from api.websocket import broadcast_event
 
 _hotkey_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -54,7 +54,7 @@ def _build_hotkey_handlers() -> Dict[str, Callable[[], None]]:
     screenshot_hotkey = (configured_hotkeys.get("screenshot") or "").strip()
     if screenshot_hotkey:
         handlers[screenshot_hotkey] = lambda: _schedule(
-            capture_and_analyze(source="global_hotkey")
+            capture_and_analyze_background(source="global_hotkey")
         )
 
     search_hotkey = (configured_hotkeys.get("search") or "").strip()
