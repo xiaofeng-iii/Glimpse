@@ -16,7 +16,7 @@ class SegmentedFilterControl(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setSizePolicy(self.sizePolicy().Policy.Fixed, self.sizePolicy().Policy.Fixed)
 
-        self._sources = ("all", "ocr", "semantic")
+        self._sources = ("all", "exact", "semantic")
         self._buttons: dict[str, QPushButton] = {}
         self._active_source = "all"
 
