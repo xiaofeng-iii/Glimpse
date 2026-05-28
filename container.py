@@ -201,6 +201,7 @@ class DIContainer:
         self.register_shutdown_handler(self._shutdown_keyboard_manager)
         self.register_shutdown_handler(self._shutdown_task_queue)
         self.register_shutdown_handler(self._shutdown_capture_manager)
+        self.register_shutdown_handler(self._shutdown_cluster_buffer)
 
     def _shutdown_keyboard_manager(self) -> None:
         if self.has("keyboard_manager"):
@@ -220,6 +221,13 @@ class DIContainer:
         if self.has("capture_manager"):
             try:
                 self.get("capture_manager").close()
+            except Exception:
+                pass
+
+    def _shutdown_cluster_buffer(self) -> None:
+        if self.has("cluster_buffer"):
+            try:
+                self.get("cluster_buffer").close()
             except Exception:
                 pass
 

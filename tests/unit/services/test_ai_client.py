@@ -170,7 +170,7 @@ class TestAIClientTestConnection:
         """验证: API 响应正常时返回 True"""
         with patch("openai.OpenAI") as mock_openai:
             mock_client = mock_openai.return_value
-            mock_client.models.list.return_value = ["model1"]
+            mock_client.chat.completions.create.return_value = MagicMock()
 
             client = AIClient()
             client.configure("test-key")
@@ -180,11 +180,23 @@ class TestAIClientTestConnection:
         """验证: API 异常时返回 False"""
         with patch("openai.OpenAI") as mock_openai:
             mock_client = mock_openai.return_value
-            mock_client.models.list.side_effect = Exception("Connection refused")
+            mock_client.chat.completions.create.side_effect = Exception("Connection refused")
 
             client = AIClient()
             client.configure("test-key")
             assert client.test_connection() is False
+
+    def test_model_connection_returns_error_message(self):
+        """验证: test_model_connection 返回具体错误信息"""
+        with patch("openai.OpenAI") as mock_openai:
+            mock_client = mock_openai.return_value
+            mock_client.chat.completions.create.side_effect = Exception("Invalid model")
+
+            client = AIClient()
+            client.configure("test-key", model="bad-model")
+            success, message = client.test_model_connection()
+            assert success is False
+            assert "Invalid model" in message
 
 
 class TestAIClientAnalyzeImage:

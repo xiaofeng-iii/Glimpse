@@ -79,6 +79,9 @@ docker-compose.*.yml
 *.manifest
 *.ico
 !assets/**/*.ico
+glimpse-frontend/node_modules/
+glimpse-frontend/dist/
+glimpse-frontend/src-tauri/target/
 
 # Testing
 .pytest_cache/

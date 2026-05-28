@@ -21,6 +21,7 @@ from ui.settings_dialog import SettingsDialog
 from ui.locale_manager import t, locale_manager
 from ui.theme_manager import ThemeManager
 from ui.memory_detail_dialog import MemoryDetailDialog
+from ui.qt_event_bridge import QtEventBridge
 from ui.widgets.loading_spinner import LoadingSpinner
 from ui.widgets.segmented_filter import SegmentedFilterControl
 from ui.app_icon import create_app_icon
@@ -457,21 +458,25 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self):
         """Wire global signals to slots."""
-        signals.screenshot_requested.connect(self._on_screenshot)
-        signals.screenshot_completed.connect(self._on_screenshot_complete)
-        signals.memory_saved.connect(self._on_memory_saved)
-        signals.search_completed.connect(self._on_search_completed)
-        signals.error_occurred.connect(self._on_error)
-        signals.status_updated.connect(self._on_status_updated)
-
+        cluster_buffer = None
         try:
             cluster_buffer = container.get("cluster_buffer")
-            cluster_buffer.state_changed.connect(self._on_cluster_state_changed)
-            cluster_buffer.countdown_changed.connect(self._on_cluster_countdown)
-            cluster_buffer.flushed.connect(self._on_cluster_flushed)
-            cluster_buffer.discarded.connect(self._on_cluster_discarded)
         except Exception:
-            pass  # Cluster mode not wired yet
+            pass
+
+        self._event_bridge = QtEventBridge(cluster_buffer=cluster_buffer, parent=self)
+        self._event_bridge.screenshot_requested.connect(self._on_screenshot)
+        self._event_bridge.screenshot_completed.connect(self._on_screenshot_complete)
+        self._event_bridge.memory_saved.connect(self._on_memory_saved)
+        self._event_bridge.search_completed.connect(self._on_search_completed)
+        self._event_bridge.error_occurred.connect(self._on_error)
+        self._event_bridge.status_updated.connect(self._on_status_updated)
+
+        if cluster_buffer is not None:
+            self._event_bridge.cluster_state_changed.connect(self._on_cluster_state_changed)
+            self._event_bridge.cluster_countdown_changed.connect(self._on_cluster_countdown)
+            self._event_bridge.cluster_flushed.connect(self._on_cluster_flushed)
+            self._event_bridge.cluster_discarded.connect(self._on_cluster_discarded)
 
     # ============================================================
     # Theme

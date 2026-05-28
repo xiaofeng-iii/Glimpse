@@ -4,7 +4,7 @@ Capture - pynput 与 mss 的封装，包含防抖与窗口限流
 """
 import time
 import traceback
-from typing import Optional, Callable, Tuple, TYPE_CHECKING
+from typing import Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
 from threading import Lock
 
@@ -29,7 +29,6 @@ class CaptureManager:
 
     def __init__(self, path_manager: "PathManager"):
         self._path_manager = path_manager
-        self._sct = mss.mss()
         self._last_capture_time = 0
         self._debounce_interval = 5.0
         self._capture_window_start = 0
@@ -39,6 +38,21 @@ class CaptureManager:
         self._fullscreen_count = 0
         self._region_count = 0
         self._settings_lock = Lock()
+
+    def _save_screenshot(self, screenshot) -> CaptureResult:
+        img = Image.frombytes("RGB", screenshot.size, screenshot.rgb)
+
+        filename = f"screenshot_{int(time.time() * 1000)}.png"
+        image_path = self._path_manager.get_screenshot_path(filename)
+
+        img.save(str(image_path), "PNG")
+
+        return CaptureResult(
+            image_path=str(image_path),
+            width=screenshot.width,
+            height=screenshot.height,
+            timestamp=time.time(),
+        )
 
     def capture_fullscreen(self, delay: float = 0, force_bypass_debounce: bool = False) -> Optional[CaptureResult]:
         if delay > 0:
@@ -51,22 +65,11 @@ class CaptureManager:
             return None
 
         try:
-            screenshot = self._sct.grab(self._sct.monitors[1])
-            img = Image.frombytes("RGB", screenshot.size, screenshot.rgb)
-
-            filename = f"screenshot_{int(time.time() * 1000)}.png"
-            image_path = self._path_manager.get_screenshot_path(filename)
-
-            img.save(str(image_path), "PNG")
-
+            with mss.mss() as sct:
+                screenshot = sct.grab(sct.monitors[1])
+                result = self._save_screenshot(screenshot)
             self._update_capture_count(is_fullscreen=True)
-
-            return CaptureResult(
-                image_path=str(image_path),
-                width=screenshot.width,
-                height=screenshot.height,
-                timestamp=time.time(),
-            )
+            return result
         except Exception as e:
             print(f"Capture fullscreen error: {e}")
             traceback.print_exc()
@@ -85,22 +88,11 @@ class CaptureManager:
 
         try:
             monitor = {"top": y, "left": x, "width": w, "height": h}
-            screenshot = self._sct.grab(monitor)
-            img = Image.frombytes("RGB", screenshot.size, screenshot.rgb)
-
-            filename = f"screenshot_{int(time.time() * 1000)}.png"
-            image_path = self._path_manager.get_screenshot_path(filename)
-
-            img.save(str(image_path), "PNG")
-
+            with mss.mss() as sct:
+                screenshot = sct.grab(monitor)
+                result = self._save_screenshot(screenshot)
             self._update_capture_count(is_fullscreen=False)
-
-            return CaptureResult(
-                image_path=str(image_path),
-                width=w,
-                height=h,
-                timestamp=time.time(),
-            )
+            return result
         except Exception as e:
             print(f"Capture region error: {e}")
             traceback.print_exc()
@@ -186,7 +178,7 @@ class CaptureManager:
         }
 
     def close(self):
-        self._sct.close()
+        return None
 
 
 # 全局实例占位 — 实际实例由 DIContainer 通过初始化路径管理器后注入

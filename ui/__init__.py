@@ -1,5 +1,5 @@
 """
-UI module
+UI module.
 """
 from ui.signals import signals
 
