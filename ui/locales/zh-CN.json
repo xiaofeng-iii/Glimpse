@@ -12,7 +12,7 @@
     "screenshot": "截图",
     "search_placeholder": "搜索记忆...",
     "source_all": "综合结果",
-    "source_ocr": "仅看精确",
+    "source_exact": "仅看精确",
     "source_semantic": "仅看语义"
   },
   "status": {
@@ -118,7 +118,7 @@
     "confirm_delete_msg": "确定要删除这条记忆吗？此操作不可撤销。"
   },
   "badges": {
-    "ocr": "精确",
+    "exact": "精确",
     "semantic": "语义"
   },
   "tooltips": {
@@ -126,7 +126,7 @@
     "settings": "打开应用设置",
     "search": "搜索已保存的记忆",
     "source_all": "显示精确和语义搜索结果",
-    "source_ocr": "仅显示文本匹配结果",
+    "source_exact": "仅显示文本匹配结果",
     "source_semantic": "仅显示语义相似结果",
     "memory_item": "双击查看详情",
     "cluster_submit": "立即提交收集的截图进行分析",

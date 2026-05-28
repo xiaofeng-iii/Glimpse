@@ -43,7 +43,7 @@ class SearchService:
 
         # source_filter overrides internal _search_mode if provided
         mode = self._search_mode
-        if source_filter == "ocr":
+        if source_filter == "exact":
             mode = "text"
         elif source_filter == "semantic":
             mode = "vector"

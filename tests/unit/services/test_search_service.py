@@ -115,7 +115,7 @@ class TestSearchServiceSearch:
         mock_services["sqlite_manager"].search_memories.assert_called_once()
         mock_services["embedding_client"].get_embedding.assert_called_once()
 
-    def test_search_source_filter_ocr(self, mock_services):
+    def test_search_source_filter_exact(self, mock_services):
         from services.search_service import SearchService
         from db.sqlite_manager import MemoryRecord
         ss = SearchService(**mock_services)
@@ -123,7 +123,7 @@ class TestSearchServiceSearch:
         mock_memory = MemoryRecord(id="1", created_at="now", image_path="path", ai_summary="sum", app_name="app")
         mock_services["sqlite_manager"].search_memories.return_value = [mock_memory]
         
-        results = ss.search("test", source_filter="ocr")
+        results = ss.search("test", source_filter="exact")
         assert len(results) == 1
         assert "精确" in results[0].match_sources
         assert "语义" not in results[0].match_sources

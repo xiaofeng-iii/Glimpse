@@ -12,7 +12,7 @@
     "screenshot": "Screenshot",
     "search_placeholder": "Search memories...",
     "source_all": "All Results",
-    "source_ocr": "Exact Only",
+    "source_exact": "Exact Only",
     "source_semantic": "Semantic Only"
   },
   "status": {
@@ -118,7 +118,7 @@
     "confirm_delete_msg": "Are you sure you want to delete this memory? This action cannot be undone."
   },
   "badges": {
-    "ocr": "Exact",
+    "exact": "Exact",
     "semantic": "Semantic"
   },
   "tooltips": {
@@ -126,7 +126,7 @@
     "settings": "Open application settings",
     "search": "Search saved memories",
     "source_all": "Show exact and semantic results",
-    "source_ocr": "Show text-matched results only",
+    "source_exact": "Show text-matched results only",
     "source_semantic": "Show semantically similar results only",
     "memory_item": "Double-click to view details",
     "cluster_submit": "Submit collected screenshots for analysis",

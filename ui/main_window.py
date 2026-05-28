@@ -127,9 +127,9 @@ class MemoryListItemWidget(QWidget):
         # Add styled badge labels
         match_sources = getattr(memory, "match_sources", [])
         if "精确" in match_sources:
-            ocr_badge = QLabel(t("badges.ocr"))
-            ocr_badge.setObjectName("ocrBadge")
-            top_row.addWidget(ocr_badge)
+            exact_badge = QLabel(t("badges.exact"))
+            exact_badge.setObjectName("exactBadge")
+            top_row.addWidget(exact_badge)
         if "语义" in match_sources:
             semantic_badge = QLabel(t("badges.semantic"))
             semantic_badge.setObjectName("semanticBadge")
@@ -271,12 +271,12 @@ class MainWindow(QMainWindow):
         self.source_filter_group.set_labels(
             {
                 "all": t("toolbar.source_all"),
-                "ocr": t("toolbar.source_ocr"),
+                "exact": t("toolbar.source_exact"),
                 "semantic": t("toolbar.source_semantic"),
             },
             {
                 "all": t("tooltips.source_all"),
-                "ocr": t("tooltips.source_ocr"),
+                "exact": t("tooltips.source_exact"),
                 "semantic": t("tooltips.source_semantic"),
             },
         )
@@ -511,12 +511,12 @@ class MainWindow(QMainWindow):
         self.source_filter_group.set_labels(
             {
                 "all": t("toolbar.source_all"),
-                "ocr": t("toolbar.source_ocr"),
+                "exact": t("toolbar.source_exact"),
                 "semantic": t("toolbar.source_semantic"),
             },
             {
                 "all": t("tooltips.source_all"),
-                "ocr": t("tooltips.source_ocr"),
+                "exact": t("tooltips.source_exact"),
                 "semantic": t("tooltips.source_semantic"),
             },
         )
