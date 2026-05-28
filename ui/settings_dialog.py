@@ -103,7 +103,12 @@ class SettingsDialog(QDialog):
             },
             "ai": {"api_key": "", "model": "gpt-4o-mini", "timeout": 30},
             "ocr": {"engine": "rapidocr", "language": "ch"},
-            "ui": {"theme": "light", "auto_hide": False, "start_minimized": False},
+            "ui": {
+                "theme": "light",
+                "auto_hide": False,
+                "start_minimized": False,
+                "close_action": "ask",
+            },
         }
 
     def _get_screenshot_callback(self) -> Callable:
@@ -299,6 +304,12 @@ class SettingsDialog(QDialog):
         self._ui_start_minimized = QCheckBox(t("settings.start_minimized"))
         layout.addRow("", self._ui_start_minimized)
 
+        self._ui_close_action = QComboBox()
+        self._ui_close_action.addItem(t("settings.close_action_ask"), "ask")
+        self._ui_close_action.addItem(t("settings.close_action_minimize"), "minimize")
+        self._ui_close_action.addItem(t("settings.close_action_exit"), "exit")
+        layout.addRow(t("settings.close_action"), self._ui_close_action)
+
         # Preview theme immediately button
         self._preview_btn = QPushButton(t("settings.preview_theme"))
         self._preview_btn.setObjectName("secondaryBtn")
@@ -353,6 +364,8 @@ class SettingsDialog(QDialog):
             self._ui_theme.setCurrentIndex(idx)
         self._ui_auto_hide.setChecked(ui.get("auto_hide", False))
         self._ui_start_minimized.setChecked(ui.get("start_minimized", False))
+        idx = self._ui_close_action.findData(ui.get("close_action", "ask"))
+        self._ui_close_action.setCurrentIndex(idx if idx >= 0 else 0)
         self._original_settings = self._collect_settings_from_ui()
         self._pending_settings = copy.deepcopy(self._original_settings)
 
@@ -386,6 +399,7 @@ class SettingsDialog(QDialog):
                 "theme": self._ui_theme.currentText(),
                 "auto_hide": self._ui_auto_hide.isChecked(),
                 "start_minimized": self._ui_start_minimized.isChecked(),
+                "close_action": self._ui_close_action.currentData() or "ask",
             },
         }
 

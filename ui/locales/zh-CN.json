@@ -42,6 +42,14 @@
     "minimized_title": "Glimpse",
     "minimized_msg": "应用已最小化到托盘，点击托盘图标可重新打开"
   },
+  "close": {
+    "title": "关闭 Glimpse",
+    "message": "你想要退出应用，还是最小化到托盘？",
+    "detail": "最小化到托盘后，截图快捷键和托盘菜单仍然可用。",
+    "minimize": "最小化到托盘",
+    "exit": "退出应用",
+    "remember": "记住我的选择"
+  },
   "settings": {
     "title": "设置",
     "hotkeys": "快捷键",
@@ -70,6 +78,10 @@
     "theme": "主题:",
     "auto_hide": "自动隐藏",
     "start_minimized": "启动时最小化",
+    "close_action": "关闭窗口时:",
+    "close_action_ask": "每次询问",
+    "close_action_minimize": "最小化到托盘",
+    "close_action_exit": "退出应用",
     "preview_theme": "立即预览主题",
     "reset_default": "恢复默认",
     "cancel": "取消",

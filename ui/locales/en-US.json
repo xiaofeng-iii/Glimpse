@@ -42,6 +42,14 @@
     "minimized_title": "Glimpse",
     "minimized_msg": "App minimized to tray. Click the tray icon to restore."
   },
+  "close": {
+    "title": "Close Glimpse",
+    "message": "Do you want to exit the app or minimize it to the tray?",
+    "detail": "When minimized to tray, screenshot hotkeys and the tray menu remain available.",
+    "minimize": "Minimize to Tray",
+    "exit": "Exit App",
+    "remember": "Remember my choice"
+  },
   "settings": {
     "title": "Settings",
     "hotkeys": "Hotkeys",
@@ -70,6 +78,10 @@
     "theme": "Theme:",
     "auto_hide": "Auto Hide",
     "start_minimized": "Start Minimized",
+    "close_action": "When Closing Window:",
+    "close_action_ask": "Ask Every Time",
+    "close_action_minimize": "Minimize to Tray",
+    "close_action_exit": "Exit App",
     "preview_theme": "Preview Theme Now",
     "reset_default": "Reset Default",
     "cancel": "Cancel",

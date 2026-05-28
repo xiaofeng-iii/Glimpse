@@ -9,7 +9,8 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLineEdit, QLabel, QListWidget, QListWidgetItem,
     QTextEdit, QSystemTrayIcon, QMenu, QApplication, QComboBox,
-    QFrame, QSizePolicy, QSpacerItem, QStackedWidget
+    QFrame, QSizePolicy, QSpacerItem, QStackedWidget, QMessageBox,
+    QCheckBox
 )
 from PySide6.QtCore import Qt, QTimer, QSize
 from PySide6.QtGui import (
@@ -185,6 +186,7 @@ class MainWindow(QMainWindow):
         self._current_memories = []
         self._theme_manager = theme_manager
         self._current_theme = "light"
+        self._quitting = False
 
         # Search debounce timer
         self._search_timer = QTimer()
@@ -884,6 +886,7 @@ class MainWindow(QMainWindow):
             self.activateWindow()
 
     def _on_quit(self):
+        self._quitting = True
         if self.tray_icon is not None:
             self.tray_icon.hide()
         try:
@@ -901,14 +904,74 @@ class MainWindow(QMainWindow):
             self._loading_spinner.setGeometry(self.centralWidget().rect())
 
     def closeEvent(self, event):
+        if self._quitting:
+            event.accept()
+            return
+
         if self.tray_icon is None:
             self._on_quit()
+            event.accept()
             return
+
+        action = self._get_close_action()
+        if action == "ask":
+            action = self._ask_close_action()
+
+        if action == "exit":
+            event.accept()
+            self._on_quit()
+            return
+
+        if action == "minimize":
+            event.ignore()
+            self.hide()
+            return
+
         event.ignore()
-        self.hide()
-        self.tray_icon.showMessage(
-            t("tray.minimized_title"),
-            t("tray.minimized_msg"),
-            self._app_icon,
-            2000,
-        )
+
+    def _get_close_action(self) -> str:
+        try:
+            settings_manager = container.get("settings_manager")
+            action = settings_manager.get("ui.close_action", "ask")
+        except Exception:
+            action = "ask"
+        return action if action in {"ask", "minimize", "exit"} else "ask"
+
+    def _set_close_action(self, action: str) -> None:
+        if action not in {"ask", "minimize", "exit"}:
+            return
+        try:
+            container.get("settings_manager").set("ui.close_action", action)
+        except Exception:
+            pass
+
+    def _ask_close_action(self) -> str | None:
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle(t("close.title"))
+        dialog.setWindowIcon(self._app_icon)
+        dialog.setIcon(QMessageBox.Icon.Question)
+        dialog.setText(t("close.message"))
+        dialog.setInformativeText(t("close.detail"))
+
+        minimize_btn = dialog.addButton(t("close.minimize"), QMessageBox.ButtonRole.AcceptRole)
+        exit_btn = dialog.addButton(t("close.exit"), QMessageBox.ButtonRole.DestructiveRole)
+        cancel_btn = dialog.addButton(t("settings.cancel"), QMessageBox.ButtonRole.RejectRole)
+        dialog.setDefaultButton(minimize_btn)
+
+        remember_checkbox = QCheckBox(t("close.remember"))
+        dialog.setCheckBox(remember_checkbox)
+
+        dialog.exec()
+        clicked = dialog.clickedButton()
+        if clicked == minimize_btn:
+            action = "minimize"
+        elif clicked == exit_btn:
+            action = "exit"
+        elif clicked == cancel_btn:
+            return None
+        else:
+            return None
+
+        if remember_checkbox.isChecked():
+            self._set_close_action(action)
+        return action

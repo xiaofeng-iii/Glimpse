@@ -25,7 +25,12 @@ class FakeSettingsManager:
                 "timeout": 30,
             },
             "ocr": {"engine": "rapidocr", "language": "ch"},
-            "ui": {"theme": "light", "auto_hide": False, "start_minimized": False},
+            "ui": {
+                "theme": "light",
+                "auto_hide": False,
+                "start_minimized": False,
+                "close_action": "ask",
+            },
         }
 
     def get_all(self):
@@ -85,6 +90,16 @@ class TestOnSave:
             "cluster_max_images": 7,
             "cluster_timeout": 4,
         }
+
+    def test_save_close_action_setting(self, settings_dialog, qtbot):
+        """Close behavior can be changed from the Interface settings tab."""
+        idx = settings_dialog._ui_close_action.findData("exit")
+        settings_dialog._ui_close_action.setCurrentIndex(idx)
+
+        result = settings_dialog._on_save()
+
+        assert result is True
+        assert settings_dialog._settings_manager._settings["ui"]["close_action"] == "exit"
 
 
 class TestOnApply:
