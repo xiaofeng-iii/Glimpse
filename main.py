@@ -1,70 +1,108 @@
 """
-Glimpse Frontend Preview - standalone entry point (no backend required).
+Glimpse - AI 驱动的桌面级记忆检索系统
+程序唯一入口，初始化 UI、数据库与全局路径
 
-Usage:
-    python main.py           # light theme
-    python main.py dark      # dark theme
-    python main.py system    # follow OS theme
-
-This launches the complete styled frontend with demo memory data.
-No backend services required.
+启动顺序：
+1. 加载环境变量（.env）
+2. 初始化容器（container）
+3. 初始化路径（path_manager）
+4. 初始化数据库（sqlite + chroma）
+5. 初始化服务（ocr、embedding、ai）
+6. 配置 AI 客户端
+7. 初始化任务队列
+8. 启动 UI
 """
 import sys
+import os
 from pathlib import Path
 
-# Ensure project root is importable
-project_root = Path(__file__).parent / "Glimpse"
-sys.path.insert(0, str(project_root))
+project_root = Path(__file__).parent.resolve()
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
+# 加载 .env 环境变量
+try:
+    from dotenv import load_dotenv
+    env_path = project_root / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+        print(f"Loaded .env from {env_path}")
+except ImportError:
+    pass
+
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 
 def main():
-    # Parse theme argument
-    initial_theme = "light"
-    if len(sys.argv) > 1:
-        initial_theme = sys.argv[1]
-    print(f"Starting Glimpse Frontend Preview (theme: {initial_theme})...")
-
-    # Bootstrap: init locale manager (defaults to en-US)
-    from ui.locale_manager import init_locale
-    import locale
-    try:
-        sys_locale, _ = locale.getdefaultlocale()
-        if sys_locale and sys_locale.startswith("zh"):
-            init_locale("zh-CN")
-        else:
-            init_locale()  # use default (en-US)
-    except Exception:
-        init_locale()  # use default (en-US)
-
-    # Initialize DI container in preview mode (mock services)
     from container import container
-    container.initialize_preview_mode()
+    from services.bootstrap import configure_ai_client
+    from ui.app_icon import create_app_icon, set_windows_app_user_model_id
 
-    # Create QApplication (with High-DPI support)
+    print("Initializing container...")
+    container.initialize_defaults()
+
+    print("Initializing path manager...")
+    path_manager = container.get("path_manager")
+    settings_manager = container.get("settings_manager")
+
+    print("Initializing databases...")
+    sqlite_manager = container.get("sqlite_manager")
+    chroma_manager = container.get("chroma_manager")
+
+    print("Initializing services...")
+    ocr_engine = container.get("ocr_engine")
+    ai_client = container.get("ai_client")
+
+    # 配置 AI 客户端
+    configure_ai_client(ai_client, settings_manager)
+
+    print("Initializing task queue...")
+    task_queue = container.get("task_queue")
+
+    print("Initializing keyboard manager...")
+    keyboard_manager = container.get("keyboard_manager")
+
+    from ui.locale_manager import init_locale
+    init_locale()
+
+    screenshot_hotkey = settings_manager.get("hotkeys.screenshot", "<ctrl>+<shift>+g")
+
+    def on_screenshot():
+        from ui.signals import signals
+        print("Global screenshot shortcut pressed!")
+        signals.screenshot_requested.emit()
+
+    print("Starting UI...")
+    set_windows_app_user_model_id()
     app = QApplication(sys.argv)
     app.setApplicationName("Glimpse")
     app.setOrganizationName("Glimpse")
+    app.setWindowIcon(create_app_icon())
 
-    # Init theme manager
-    from ui.theme_manager import ThemeManager
-    theme_manager = ThemeManager(app)
-
-    # Build main window with theme manager
     from ui.main_window import MainWindow
-    window = MainWindow(theme_manager=theme_manager)
+    from ui.theme_manager import ThemeManager
 
-    # Apply theme
-    theme_manager.apply_theme(initial_theme)
-    window._current_theme = initial_theme
+    try:
+        theme_manager = ThemeManager(app)
+        window = MainWindow(theme_manager=theme_manager)
+        window.show()
 
-    # Show window
-    window.show()
+        # 在 Qt 消息泵启动后注册全局热键，避免 Windows 钩子初始化冲突
+        keyboard_manager.register_hotkey(screenshot_hotkey, on_screenshot)
+        keyboard_manager.start_listening()
+        print(f"Global hotkey registered: {screenshot_hotkey}")
 
-    print("Frontend preview running. Close the window to exit.")
-    sys.exit(app.exec())
+        sys.exit(app.exec())
+    except Exception as e:
+        QMessageBox.critical(
+            None,
+            "启动失败",
+            f"应用启动时发生错误：\n{str(e)}",
+            QMessageBox.Ok
+        )
+        raise
+    finally:
+        container.shutdown()
 
 
 if __name__ == "__main__":

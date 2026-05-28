@@ -16,7 +16,7 @@ from typing import Any
 _LOCALES_DIR = Path(__file__).parent / "locales"
 
 SUPPORTED_LOCALES = ["zh-CN", "en-US"]
-DEFAULT_LOCALE = "en-US"
+DEFAULT_LOCALE = "zh-CN"
 
 _translations: dict[str, dict] = {}
 _current_locale: str = DEFAULT_LOCALE
@@ -101,6 +101,9 @@ class LocaleManager:
         Returns:
             Translated string, or the key itself if not found
         """
+        if not self._translations:
+            self.init()
+
         keys = key.split(".")
         value: Any = self._translations.get(self._current, {})
 

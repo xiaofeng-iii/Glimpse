@@ -1,0 +1,43 @@
+# Core UI
+PySide6==6.11.0
+
+# Database & Embedding
+chromadb==0.4.18
+sentence-transformers==2.2.2
+transformers==4.32.1
+huggingface-hub==0.17.3
+tokenizers==0.13.3
+numpy==1.26.4
+
+# Capture & Processing
+mss==9.0.1
+Pillow==10.2.0
+pynput==1.7.6
+rapidocr-onnxruntime==1.4.4
+
+# API
+openai==1.13.3
+httpx==0.27.2
+requests==2.33.1
+python-dotenv==1.2.2
+
+# Utilities
+psutil==5.9.8
+python-dateutil==2.9.0.post0
+
+# API Layer (for Tauri frontend)
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+websockets==12.0
+pydantic==2.5.3
+
+# Testing
+pytest==7.4.4
+pytest-qt==4.2.0
+pytest-cov==4.1.0
+
+# Compatibility
+certifi==2026.2.25
+charset-normalizer==3.4.7
+idna==3.11
+urllib3==2.6.3

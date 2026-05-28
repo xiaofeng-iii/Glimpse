@@ -1,4 +1,4 @@
-"""
+﻿"""
 LoadingSpinner - animated loading overlay with spinner and status text.
 Inspired by Floral Notepaper's animation patterns (shimmer, fade-up).
 """

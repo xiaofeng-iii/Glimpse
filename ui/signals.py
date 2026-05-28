@@ -1,29 +1,37 @@
 """
-UI Signals - 跨线程通信的全局信号总线
+UI Signals - pure Python global event bus.
 """
-from PySide6.QtCore import QObject, Signal
+import threading
+
+from event_bus import EventSignal
 
 
-class UISignals(QObject):
-    """全局信号总线 - 单例模式"""
+class UISignals:
+    """Global signal bus exposed with a Qt-like API."""
 
     _instance = None
+    _lock = threading.Lock()
+
+    def __init__(self):
+        self.screenshot_requested = EventSignal("screenshot_requested")
+        self.screenshot_completed = EventSignal("screenshot_completed")
+        self.memory_saved = EventSignal("memory_saved")
+        self.memory_deleted = EventSignal("memory_deleted")
+        self.search_requested = EventSignal("search_requested")
+        self.search_completed = EventSignal("search_completed")
+        self.error_occurred = EventSignal("error_occurred")
+        self.status_updated = EventSignal("status_updated")
+        self.progress_updated = EventSignal("progress_updated")
 
     @classmethod
     def get_instance(cls):
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
         return cls._instance
-
-    screenshot_requested = Signal()
-    screenshot_completed = Signal(str)
-    memory_saved = Signal(str)
-    memory_deleted = Signal(str)
-    search_requested = Signal(str)
-    search_completed = Signal(list)
-    error_occurred = Signal(str)
-    status_updated = Signal(str)
-    progress_updated = Signal(int, str)
 
 
 signals = UISignals.get_instance()
+
+__all__ = ["UISignals", "signals"]

@@ -1,0 +1,88 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { memoriesApi, searchApi, type Memory } from '@/api/client'
+
+export const useMemoriesStore = defineStore('memories', () => {
+  const memories = ref<Memory[]>([])
+  const selectedMemory = ref<Memory | null>(null)
+  const searchQuery = ref('')
+  const searchSource = ref('all')
+  const isLoading = ref(false)
+  const total = ref(0)
+
+  const hasMemories = computed(() => memories.value.length > 0)
+
+  const load = async (limit = 100) => {
+    isLoading.value = true
+    try {
+      const result = await memoriesApi.list(limit)
+      memories.value = result.memories
+      total.value = result.total
+    } catch (error) {
+      console.error('Failed to load memories:', error)
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const search = async (query: string, source = 'all') => {
+    if (!query.trim()) {
+      await load()
+      return
+    }
+
+    isLoading.value = true
+    searchQuery.value = query
+    searchSource.value = source
+
+    try {
+      const result = await searchApi.search(query, source)
+      memories.value = result.memories
+      total.value = result.memories.length
+    } catch (error) {
+      console.error('Search failed:', error)
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const select = (memory: Memory | null) => {
+    selectedMemory.value = memory
+  }
+
+  const remove = async (id: string) => {
+    try {
+      await memoriesApi.delete(id)
+      memories.value = memories.value.filter(m => m.id !== id)
+      if (selectedMemory.value?.id === id) {
+        selectedMemory.value = null
+      }
+    } catch (error) {
+      console.error('Failed to delete memory:', error)
+      throw error
+    }
+  }
+
+  const refresh = async () => {
+    if (searchQuery.value) {
+      await search(searchQuery.value, searchSource.value)
+    } else {
+      await load()
+    }
+  }
+
+  return {
+    memories,
+    selectedMemory,
+    searchQuery,
+    searchSource,
+    isLoading,
+    total,
+    hasMemories,
+    load,
+    search,
+    select,
+    remove,
+    refresh,
+  }
+})

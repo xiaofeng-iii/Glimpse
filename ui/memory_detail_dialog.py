@@ -14,6 +14,14 @@ from PySide6.QtGui import QFont, QPixmap, QIcon, QPainter, QColor, QPen
 from ui.locale_manager import t
 
 
+def _display_app_name(memory) -> str:
+    """Return a displayable app name, hiding placeholder values."""
+    app_name = (getattr(memory, "app_name", "") or "").strip()
+    if not app_name or app_name.lower() == "unknown":
+        return ""
+    return app_name
+
+
 def _make_placeholder_image(size: int = 160) -> QPixmap:
     """Generate a placeholder image when screenshot is unavailable."""
     pixmap = QPixmap(size, int(size * 0.6))
@@ -88,14 +96,15 @@ class MemoryDetailDialog(QDialog):
         header = QHBoxLayout()
         header.setSpacing(10)
 
-        app_name = getattr(self._memory, "app_name", "") or "unknown"
-        app_chip = QLabel(app_name)
-        app_chip.setObjectName("appChip")
-        app_chip.setProperty("appName", True)
-        font = app_chip.font()
-        font.setPointSize(12)
-        app_chip.setFont(font)
-        header.addWidget(app_chip)
+        app_name = _display_app_name(self._memory)
+        if app_name:
+            app_chip = QLabel(app_name)
+            app_chip.setObjectName("appChip")
+            app_chip.setProperty("appName", True)
+            font = app_chip.font()
+            font.setPointSize(12)
+            app_chip.setFont(font)
+            header.addWidget(app_chip)
 
         header.addStretch()
 

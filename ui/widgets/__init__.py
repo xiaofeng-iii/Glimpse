@@ -1,1 +1,1 @@
-"""UI widget components for Glimpse."""
+﻿"""UI widget components for Glimpse."""

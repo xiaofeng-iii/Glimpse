@@ -1,4 +1,4 @@
-"""
+﻿"""
 MainWindow - 主窗体与布局
 Polished with QSS theming, i18n, and modern card-based layout.
 Inspired by Floral Notepaper's MainWindow component.
@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer, QSize
 from PySide6.QtGui import (
-    QAction, QShortcut, QKeySequence, QIcon, QPixmap, QFont, QColor, QPainter
+    QAction, QShortcut, QKeySequence, QPixmap, QFont, QColor, QPainter
 )
 
 from ui.signals import signals
@@ -21,40 +21,11 @@ from ui.settings_dialog import SettingsDialog
 from ui.locale_manager import t, locale_manager
 from ui.theme_manager import ThemeManager
 from ui.memory_detail_dialog import MemoryDetailDialog
+from ui.qt_event_bridge import QtEventBridge
 from ui.widgets.loading_spinner import LoadingSpinner
+from ui.widgets.segmented_filter import SegmentedFilterControl
+from ui.app_icon import create_app_icon
 from container import container
-
-
-# ============================================================
-# Tray Icon Generator
-# ============================================================
-
-def _generate_tray_icon(size: int = 24) -> QIcon:
-    """Generate a polished tray icon (indigo circle with 'G' letter).
-
-    Falls back to a simple colored square if rendering fails.
-    """
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.transparent)
-
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-    # Circle background
-    painter.setBrush(QColor("#6366F1"))
-    painter.setPen(Qt.PenStyle.NoPen)
-    margin = 2
-    painter.drawEllipse(margin, margin, size - 2 * margin, size - 2 * margin)
-
-    # Letter 'G'
-    font = QFont("Segoe UI", int(size * 0.5))
-    font.setBold(True)
-    painter.setFont(font)
-    painter.setPen(QColor("white"))
-    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "G")
-
-    painter.end()
-    return QIcon(pixmap)
 
 
 # ============================================================
@@ -107,6 +78,14 @@ def _make_thumbnail_placeholder() -> QPixmap:
     return pixmap
 
 
+def _display_app_name(memory) -> str:
+    """Return a displayable app name, hiding placeholder values."""
+    app_name = (getattr(memory, "app_name", "") or "").strip()
+    if not app_name or app_name.lower() == "unknown":
+        return ""
+    return app_name
+
+
 class MemoryListItemWidget(QWidget):
     """Custom widget for each memory list item with styled badges and thumbnail."""
 
@@ -147,11 +126,11 @@ class MemoryListItemWidget(QWidget):
 
         # Add styled badge labels
         match_sources = getattr(memory, "match_sources", [])
-        if "OCR" in match_sources:
+        if "精确" in match_sources:
             ocr_badge = QLabel(t("badges.ocr"))
             ocr_badge.setObjectName("ocrBadge")
             top_row.addWidget(ocr_badge)
-        if "Semantic" in match_sources:
+        if "语义" in match_sources:
             semantic_badge = QLabel(t("badges.semantic"))
             semantic_badge.setObjectName("semanticBadge")
             top_row.addWidget(semantic_badge)
@@ -181,7 +160,7 @@ class MemoryListItemWidget(QWidget):
         layout.addLayout(content_layout, 1)
 
         # Right: app name chip
-        app_name = getattr(memory, "app_name", "") or "unknown"
+        app_name = _display_app_name(memory)
         if app_name:
             app_chip = QLabel(app_name)
             app_chip.setObjectName("appChip")
@@ -199,6 +178,8 @@ class MainWindow(QMainWindow):
     def __init__(self, theme_manager: ThemeManager | None = None):
         super().__init__()
         self.setWindowTitle(t("app.title"))
+        self._app_icon = create_app_icon()
+        self.setWindowIcon(self._app_icon)
         self.setMinimumSize(960, 640)
         self.resize(1100, 720)
 
@@ -285,34 +266,20 @@ class MainWindow(QMainWindow):
         search_row = QHBoxLayout()
         search_row.setSpacing(8)
 
-        # Sliding button group for source filter
-        self.source_filter_group = QWidget()
-        self.source_filter_group.setObjectName("slidingButtonGroup")
-        filter_layout = QHBoxLayout(self.source_filter_group)
-        filter_layout.setContentsMargins(3, 3, 3, 3)
-        filter_layout.setSpacing(0)
-
-        self.filter_btn_all = QPushButton(t("toolbar.source_all"))
-        self.filter_btn_all.setCheckable(True)
-        self.filter_btn_all.setChecked(True)
-        self.filter_btn_all.setObjectName("ghostBtn")
-        self.filter_btn_all.setToolTip(t("tooltips.source_all"))
-        self.filter_btn_all.clicked.connect(lambda: self._on_filter_clicked("all"))
-        filter_layout.addWidget(self.filter_btn_all)
-
-        self.filter_btn_ocr = QPushButton(t("toolbar.source_ocr"))
-        self.filter_btn_ocr.setCheckable(True)
-        self.filter_btn_ocr.setObjectName("ghostBtn")
-        self.filter_btn_ocr.setToolTip(t("tooltips.source_ocr"))
-        self.filter_btn_ocr.clicked.connect(lambda: self._on_filter_clicked("ocr"))
-        filter_layout.addWidget(self.filter_btn_ocr)
-
-        self.filter_btn_semantic = QPushButton(t("toolbar.source_semantic"))
-        self.filter_btn_semantic.setCheckable(True)
-        self.filter_btn_semantic.setObjectName("ghostBtn")
-        self.filter_btn_semantic.setToolTip(t("tooltips.source_semantic"))
-        self.filter_btn_semantic.clicked.connect(lambda: self._on_filter_clicked("semantic"))
-        filter_layout.addWidget(self.filter_btn_semantic)
+        self.source_filter_group = SegmentedFilterControl()
+        self.source_filter_group.set_labels(
+            {
+                "all": t("toolbar.source_all"),
+                "ocr": t("toolbar.source_ocr"),
+                "semantic": t("toolbar.source_semantic"),
+            },
+            {
+                "all": t("tooltips.source_all"),
+                "ocr": t("tooltips.source_ocr"),
+                "semantic": t("tooltips.source_semantic"),
+            },
+        )
+        self.source_filter_group.source_selected.connect(self._on_filter_clicked)
 
         search_row.addWidget(self.source_filter_group)
 
@@ -429,12 +396,10 @@ class MainWindow(QMainWindow):
             settings_manager = container.get("settings_manager")
             screenshot_pynput = settings_manager.get("hotkeys.screenshot", "<ctrl>+<shift>+g")
             search_pynput = settings_manager.get("hotkeys.search", "<ctrl>+f")
-            clear_pynput = settings_manager.get("hotkeys.clear", "<escape>")
 
             from services.hotkey_utils import pynput_to_qkeysequence
             screenshot_qt = pynput_to_qkeysequence(screenshot_pynput)
             search_qt = pynput_to_qkeysequence(search_pynput)
-            clear_qt = pynput_to_qkeysequence(clear_pynput)
 
             self.screenshot_btn.setText(f"{t('toolbar.screenshot')} ({screenshot_qt})")
             self.search_input.setPlaceholderText(
@@ -446,7 +411,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, "search_shortcut"):
                 self.search_shortcut.setKey(QKeySequence(search_qt))
             if hasattr(self, "clear_shortcut"):
-                self.clear_shortcut.setKey(QKeySequence(clear_qt))
+                self.clear_shortcut.setKey(QKeySequence("Esc"))
         except Exception:
             pass  # Backend not wired yet; use defaults
 
@@ -457,7 +422,7 @@ class MainWindow(QMainWindow):
             self.tray_icon = None
             return
 
-        icon = _generate_tray_icon()
+        icon = self._app_icon
         self.tray_icon = QSystemTrayIcon(icon, self)
         self.tray_icon.setToolTip(t("app.title"))
         self.tray_icon.activated.connect(self._on_tray_activated)
@@ -493,21 +458,25 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self):
         """Wire global signals to slots."""
-        signals.screenshot_requested.connect(self._on_screenshot)
-        signals.screenshot_completed.connect(self._on_screenshot_complete)
-        signals.memory_saved.connect(self._on_memory_saved)
-        signals.search_completed.connect(self._on_search_completed)
-        signals.error_occurred.connect(self._on_error)
-        signals.status_updated.connect(self._on_status_updated)
-
+        cluster_buffer = None
         try:
             cluster_buffer = container.get("cluster_buffer")
-            cluster_buffer.state_changed.connect(self._on_cluster_state_changed)
-            cluster_buffer.countdown_changed.connect(self._on_cluster_countdown)
-            cluster_buffer.flushed.connect(self._on_cluster_flushed)
-            cluster_buffer.discarded.connect(self._on_cluster_discarded)
         except Exception:
-            pass  # Cluster mode not wired yet
+            pass
+
+        self._event_bridge = QtEventBridge(cluster_buffer=cluster_buffer, parent=self)
+        self._event_bridge.screenshot_requested.connect(self._on_screenshot)
+        self._event_bridge.screenshot_completed.connect(self._on_screenshot_complete)
+        self._event_bridge.memory_saved.connect(self._on_memory_saved)
+        self._event_bridge.search_completed.connect(self._on_search_completed)
+        self._event_bridge.error_occurred.connect(self._on_error)
+        self._event_bridge.status_updated.connect(self._on_status_updated)
+
+        if cluster_buffer is not None:
+            self._event_bridge.cluster_state_changed.connect(self._on_cluster_state_changed)
+            self._event_bridge.cluster_countdown_changed.connect(self._on_cluster_countdown)
+            self._event_bridge.cluster_flushed.connect(self._on_cluster_flushed)
+            self._event_bridge.cluster_discarded.connect(self._on_cluster_discarded)
 
     # ============================================================
     # Theme
@@ -533,7 +502,7 @@ class MainWindow(QMainWindow):
 
         # Refresh tray icon for theme
         if self.tray_icon:
-            self.tray_icon.setIcon(_generate_tray_icon())
+            self.tray_icon.setIcon(self._app_icon)
 
     # ============================================================
     # i18n
@@ -542,16 +511,24 @@ class MainWindow(QMainWindow):
     def _refresh_i18n(self):
         """Refresh all UI strings after locale change."""
         self.setWindowTitle(t("app.title"))
-        self.screenshot_btn.setText(t('toolbar.screenshot'))
-        self.search_input.setPlaceholderText(t("toolbar.search_placeholder"))
-        self.filter_btn_all.setText(t("toolbar.source_all"))
-        self.filter_btn_ocr.setText(t("toolbar.source_ocr"))
-        self.filter_btn_semantic.setText(t("toolbar.source_semantic"))
+        self.source_filter_group.set_labels(
+            {
+                "all": t("toolbar.source_all"),
+                "ocr": t("toolbar.source_ocr"),
+                "semantic": t("toolbar.source_semantic"),
+            },
+            {
+                "all": t("tooltips.source_all"),
+                "ocr": t("tooltips.source_ocr"),
+                "semantic": t("tooltips.source_semantic"),
+            },
+        )
         self.status_label.setText(t("status.ready"))
         self.settings_btn.setText(t("menu.settings"))
         self._cluster_submit_btn.setText(t("status.cluster_submit"))
         self._cluster_cancel_btn.setText(t("status.cluster_cancel"))
         self._update_memory_list()
+        self._update_shortcut_hints()
 
     # ============================================================
     # Memory List
@@ -590,14 +567,21 @@ class MainWindow(QMainWindow):
         index = self.memory_list.row(item)
         if 0 <= index < len(self._current_memories):
             memory = self._current_memories[index]
+            app_name = _display_app_name(memory)
+            app_row = (
+                f"""
+                <p style="color: #64748B; margin-bottom: 4px;">
+                    <b>{t('detail.app')}:</b> {app_name}
+                </p>
+                """
+                if app_name else ""
+            )
             detail_html = f"""
             <div style="font-family: 'Segoe UI', 'PingFang SC', sans-serif;">
                 <p style="color: #64748B; margin-bottom: 4px;">
                     <b>{t('detail.time')}:</b> {memory.created_at}
                 </p>
-                <p style="color: #64748B; margin-bottom: 4px;">
-                    <b>{t('detail.app')}:</b> {memory.app_name}
-                </p>
+                {app_row}
                 <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 8px 0;">
                 <p style="line-height: 1.8; margin-top: 8px;">
                     {memory.ai_summary}
@@ -644,9 +628,6 @@ class MainWindow(QMainWindow):
 
     def _on_filter_clicked(self, source: str):
         """Handle filter button toggle."""
-        self.filter_btn_all.setChecked(source == "all")
-        self.filter_btn_ocr.setChecked(source == "ocr")
-        self.filter_btn_semantic.setChecked(source == "semantic")
         self._active_source_filter = source
         self._show_loading(t("status.searching"))
         self._do_search()
@@ -658,7 +639,7 @@ class MainWindow(QMainWindow):
             if not query:
                 self._current_memories = search_service.get_recent_memories(limit=100)
             else:
-                source_filter = getattr(self, "_active_source_filter", "all")
+                source_filter = self.source_filter_group.active_source()
                 self._current_memories = search_service.search(query, source_filter=source_filter)
         except Exception:
             self._current_memories = []
@@ -846,10 +827,17 @@ class MainWindow(QMainWindow):
     # ============================================================
 
     def _on_open_settings(self):
+        keyboard_manager = None
+        try:
+            keyboard_manager = container.get("keyboard_manager")
+            keyboard_manager.stop_listening()
+        except Exception:
+            pass
+
         try:
             dialog = SettingsDialog(
                 container.get("settings_manager"),
-                container.get("keyboard_manager"),
+                keyboard_manager,
                 container.get("capture_manager"),
                 container.get("task_queue"),
                 self,
@@ -861,17 +849,33 @@ class MainWindow(QMainWindow):
                 None, None, None, None, self,
                 theme_manager=self._theme_manager,
             )
-        if dialog.exec():
-            self._update_shortcut_hints()
+        try:
+            dialog.exec()
+        finally:
+            self._reload_global_screenshot_hotkey(keyboard_manager)
             self._refresh_i18n()
 
-            # Reload theme from settings
-            try:
-                settings_manager = container.get("settings_manager")
-                theme = settings_manager.get("ui.theme", "light")
-                self._apply_theme(theme)
-            except Exception:
-                pass
+        # Reload theme from settings
+        try:
+            settings_manager = container.get("settings_manager")
+            theme = settings_manager.get("ui.theme", "light")
+            self._apply_theme(theme)
+        except Exception:
+            pass
+
+    def _reload_global_screenshot_hotkey(self, keyboard_manager=None):
+        try:
+            if keyboard_manager is None:
+                keyboard_manager = container.get("keyboard_manager")
+            settings_manager = container.get("settings_manager")
+            screenshot_hotkey = settings_manager.get("hotkeys.screenshot", "<ctrl>+<shift>+g")
+
+            def on_screenshot():
+                signals.screenshot_requested.emit()
+
+            keyboard_manager.reload_hotkeys({screenshot_hotkey: on_screenshot})
+        except Exception:
+            pass
 
     # ============================================================
     # Window & Tray
@@ -910,6 +914,6 @@ class MainWindow(QMainWindow):
         self.tray_icon.showMessage(
             t("tray.minimized_title"),
             t("tray.minimized_msg"),
-            QSystemTrayIcon.MessageIcon.Information,
+            self._app_icon,
             2000,
         )
