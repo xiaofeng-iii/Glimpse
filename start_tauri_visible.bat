@@ -10,4 +10,4 @@ if errorlevel 1 (
 )
 
 cd /d "%~dp0glimpse-frontend"
-npm run tauri:dev
+npm.cmd run tauri:dev -- --config tauri.dev.conf.json

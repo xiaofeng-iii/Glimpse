@@ -41,6 +41,6 @@ if (-not (Test-GlimpseBackendHealth)) {
   }
 }
 
-$command = "cd /d `"$root`" && call scripts\setup_tauri_env.bat && cd /d `"$root\glimpse-frontend`" && npm run tauri:dev > `"$tauriLog`" 2>&1"
+$command = "cd /d `"$root`" && call scripts\setup_tauri_env.bat && cd /d `"$root\glimpse-frontend`" && npm.cmd run tauri:dev -- --config tauri.dev.conf.json > `"$tauriLog`" 2>&1"
 
 Start-Process -WindowStyle Hidden -FilePath "cmd.exe" -ArgumentList "/c", $command | Out-Null
