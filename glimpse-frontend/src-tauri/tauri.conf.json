@@ -49,10 +49,6 @@
           ]
         }
       ]
-    },
-    "trayIcon": {
-      "iconPath": "../../assets/icons/glimpse_64.png",
-      "iconAsTemplate": false
     }
   },
   "bundle": {
