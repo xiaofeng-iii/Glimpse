@@ -25,6 +25,12 @@ python-dotenv==1.2.2
 psutil==5.9.8
 python-dateutil==2.9.0.post0
 
+# API Layer (for Tauri frontend)
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+websockets==12.0
+pydantic==2.5.3
+
 # Testing
 pytest==7.4.4
 pytest-qt==4.2.0

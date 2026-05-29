@@ -1,135 +1,240 @@
 # Glimpse
 
-Glimpse 是一款桌面记忆助手。可以把记录屏幕内容，让 AI 自动生成摘要；之后需要找回某个页面、资料、代码片段或操作记录时，直接搜索即可。
+AI 驱动的桌面记忆检索系统。支持截图、OCR、AI 摘要、精确检索、语义检索，以及基于 `Vue 3 + Tauri` 的桌面弹窗界面。
 
-它可以用来记录任何东西
+当前仓库包含两套入口：
 
-## 它能做什么
+- `python main.py`：默认启动当前主用的 `FastAPI + Vue 3 + Tauri` 桌面界面
+- `python main_legacy_qt.py`：保留的旧版 `PySide6` 桌面界面，主要用于回退和调试
+- `python main_api.py` + `glimpse-frontend/`：分别启动 API 和网页开发页的底层入口
 
-- 一键截图，把当前屏幕保存为一条记忆
-- 自动生成截图摘要，方便之后快速浏览
-- 支持精确搜索和语义搜索
-- 支持连续截图，把多张截图合并成一条记忆
-- 所有记忆默认保存在本机
-- 支持系统托盘，关闭窗口时可选择退出或最小化
+## 1. 环境要求
 
-> 当前版本已屏蔽图片文字 OCR 识别。搜索里的“精确”指摘要等文本内容的匹配，不是图片内文字识别。
+基础要求：
 
-## 安装与启动
+- Python `3.10+`
+- Node.js `18+`
 
-如果你下载的是发布版安装包或压缩包：
+如果要运行 Tauri 弹窗，还需要：
 
-1. 解压或安装 Glimpse
-2. 双击启动程序
-3. 首次使用时打开“设置”，填写 AI 服务配置
+- Rust 工具链：`rustup` / `cargo`
+- Windows 下的 MSVC C++ 工具链
+  - 推荐安装 `Visual Studio 2022 Build Tools`
+  - 需要包含 `Desktop development with C++` 或等价的 `MSVC x64/x86 build tools`
 
-如果你拿到的是源码版本：
+## 2. 安装依赖
+
+### Python
+
+```bash
+pip install -r requirements.txt
+```
+
+### 前端
+
+```bash
+cd glimpse-frontend
+npm install
+```
+
+### 发布版打包依赖
+
+仅在构建安装包时需要：
+
+```bash
+pip install -r requirements-packaging.txt
+```
+
+## 3. 配置 `.env`
+
+复制 `.env.example` 为 `.env`，至少填写：
+
+```env
+OPENAI_API_KEY=your_api_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+如果使用 OpenAI 兼容平台（例如豆包 / Ark），请同时确认：
+
+- `OPENAI_BASE_URL` 指向兼容接口地址
+- `MODEL` 填写的是“实际可调用的模型 / endpoint id”
+- 不要把控制台展示名称直接填进 `MODEL`
+
+示例见 [`.env.example`](./.env.example)。
+
+## 4. 启动方式
+
+### 方式 A：只启动后端 API
+
+```bash
+python main_api.py
+```
+
+启动后可访问：
+
+- API 健康检查：`http://127.0.0.1:8000/api/health`
+- API 文档：`http://127.0.0.1:8000/docs`
+
+### 方式 B：启动网页开发页
+
+先启动后端：
+
+```bash
+python main_api.py
+```
+
+再启动前端：
+
+```bash
+cd glimpse-frontend
+npm run dev
+```
+
+浏览器访问：
+
+- `http://localhost:1420`
+
+### 方式 C：启动 Tauri 桌面版
+
+源码环境下推荐直接运行：
 
 ```powershell
-conda create -n glimpse python=3.10
-conda activate glimpse
-pip install -r requirements.txt
 python main.py
 ```
 
-## 配置 AI 服务
+`main.py` 会启动 Tauri/Vue 前端，并让 Tauri shell 在需要时自动启动 Python API。
 
-Glimpse 需要一个 OpenAI 兼容的 AI 接口来生成截图摘要。
+### 方式 D：启动 Tauri 弹窗开发版脚本
 
-打开“设置”后，在“AI 服务”里填写：
+推荐优先使用“可见模式”，便于排错：
 
-| 项目 | 说明 |
-|------|------|
-| API Key | 你的 AI 服务密钥 |
-| Base URL | AI 服务接口地址 |
-| 模型 | 用于分析截图的模型名称 |
-| 超时时间 | 请求等待时间 |
-
-常见 OpenAI 兼容接口格式：
-
-```text
-Base URL: https://api.openai.com/v1
-Model: gpt-4o-mini
+```powershell
+cd D:\path\to\Glimpse
+.\start_tauri_visible.bat
 ```
 
-如果暂时不配置 AI 服务，应用仍可启动，但无法完成截图内容总结。
+如果要静默启动，只保留弹窗窗口：
 
-## 基本使用
-
-### 截图保存记忆
-
-点击主界面的“截图”按钮，或使用默认快捷键：
-
-```text
-Ctrl + Shift + G
+```powershell
+cd D:\path\to\Glimpse
+.\start_tauri.bat
 ```
 
-截图完成后，Glimpse 会保存图片并生成摘要。
+说明：
 
-### 搜索记忆
+- `start_tauri_visible.bat`
+  - 会显示终端
+  - 适合开发和排错
+- `start_tauri.bat`
+  - 会隐藏控制台
+  - 适合日常调试
+  - 如果启动失败，请查看 `.logs/tauri-dev.log`
 
-在搜索框输入关键词，可以选择三种搜索方式：
+注意：
 
-| 选项 | 说明 |
-|------|------|
-| 综合结果 | 同时使用精确搜索和语义搜索 |
-| 仅看精确 | 只看文本匹配结果 |
-| 仅看语义 | 只看语义相似结果 |
+- 在 PowerShell 中运行批处理脚本要写成 `.\start_tauri.bat`，不能直接写 `start_tauri.bat`
+- Tauri 会占用前端开发端口 `1420`
+- 如果 `1420` 已被已有的 `npm run dev` 占用，Tauri 会启动失败
 
-如果你记得具体词语，用“精确”更直接；如果只记得大概意思，用“语义”更适合。
+## 5. 常用脚本
 
-### 集群截图
+### Windows 一键启动 API + 网页开发页
 
-在设置中开启集群截图后，可以连续截多张图。Glimpse 会把这些截图作为同一组内容处理，适合记录一段连续操作、一个多步骤问题或一组相关页面。
+```powershell
+.\start.bat
+```
 
-### 关闭窗口
+### Windows 可见模式启动 Tauri
 
-关闭主窗口时，你可以选择：
+```powershell
+.\start_tauri_visible.bat
+```
 
-- 退出应用
-- 最小化到托盘
-- 记住本次选择
+### Windows 静默模式启动 Tauri
 
-如果最小化到托盘，截图快捷键仍然可用。
+```powershell
+.\start_tauri.bat
+```
 
-## 数据保存在哪里
+### 构建 Windows 安装包
 
-Glimpse 的运行数据默认保存在本机的 `GlimpseData` 目录中，包括：
+```powershell
+.\build_release.bat
+```
 
-- 截图图片
-- 记忆记录
-- 搜索索引
-- 应用设置
+## 6. 常见问题
 
-这些数据不会自动上传到项目服务器。使用 AI 摘要时，截图内容会发送给你配置的 AI 服务提供方进行分析。
+### 1. `cargo` / `rustup` 找不到
 
-## 快捷键
+如果你机器上已经装过 Rust，但 PowerShell 里仍然提示找不到：
 
-| 功能 | 默认快捷键 |
-|------|------------|
-| 截图 | `Ctrl + Shift + G` |
-| 聚焦搜索 | `Ctrl + F` |
+- 先关闭当前终端，重新打开
+- 再执行 `cargo --version`
+- 如果仍然找不到，确认用户目录下存在：
+  - `C:\Users\<用户名>\.cargo\bin\cargo.exe`
 
-快捷键可以在“设置”中修改，也可以恢复默认。
+项目自带的 `start_tauri_visible.bat` 和 `scripts/setup_tauri_env.bat` 会优先尝试把该目录加入 `PATH`。
 
-## 常见问题
+### 2. `Port 1420 is already in use`
 
-### 没有配置 AI 服务还能用吗？
+说明已有前端开发服务器在运行。先关闭旧的 `npm run dev` 终端，或结束对应进程，再重新启动 Tauri。
 
-可以启动应用，也可以保存基础记忆；但 AI 摘要和语义搜索效果会受影响。建议配置 AI 服务后使用。
+### 3. Tauri 启动“没反应”
 
-### 为什么搜索不到图片里的字？
+多数情况是：
 
-当前版本暂无图片文字 OCR 识别功能，不会直接识别图片中的文字。搜索依赖 AI 返回的内容。
+- 用的是静默脚本 `start_tauri.bat`
+- 实际已经报错，但控制台被隐藏
 
-### 我的数据会上传吗？
+优先改用：
 
-记忆数据默认保存在本机。只有在调用 AI 生成摘要时，截图内容会发送到你配置的 AI 服务。
+```powershell
+.\start_tauri_visible.bat
+```
 
-## 适合谁使用
+如果仍有问题，查看：
 
-- 经常查资料、对照页面、处理多窗口任务的人
-- 需要临时记录操作现场的开发者、学生和研究人员
-- 想把桌面截图变成可搜索资料库的人
+- [`.logs/tauri-dev.log`](./.logs/tauri-dev.log)
+- [`.logs/backend-dev.log`](./.logs/backend-dev.log)
 
-Glimpse 的目标不是替你记录一切，而是让你主动保存那些之后可能会有用的瞬间。
+### 4. 快捷键、截图或图片预览没有反应
+
+先确认：
+
+- 后端状态是否为“已连接”
+- `http://127.0.0.1:8000/api/health` 是否返回 `healthy`
+- WebSocket 未被浏览器插件或代理拦截
+
+## 7. 发布版说明
+
+构建脚本 [build_release.bat](./build_release.bat) 会做两步：
+
+1. 用 `PyInstaller` 构建 Python 后端 sidecar
+2. 用 `Tauri` 构建 NSIS 安装包
+
+安装包输出目录：
+
+- `glimpse-frontend/src-tauri/target/release/bundle/nsis/`
+
+发布版运行时：
+
+- 数据默认写入 `%LOCALAPPDATA%\Glimpse\GlimpseData`
+- 可将 `.env` 放在应用根目录，或放在 `%LOCALAPPDATA%\Glimpse\GlimpseData\.env`
+
+## 8. 目录结构
+
+```text
+Glimpse/
+├── api/                      # FastAPI API 层
+├── config/                   # 配置管理
+├── core/                     # 截图、任务、集群缓冲
+├── db/                       # SQLite / ChromaDB
+├── services/                 # 业务服务
+├── ui/                       # 旧 PySide6 UI
+├── glimpse-frontend/         # Vue 3 + Tauri 前端
+├── main.py                   # 旧桌面入口
+├── main_api.py               # 新 API 入口
+├── start.bat                 # 启动 API + 网页开发页
+├── start_tauri.bat           # 静默启动 Tauri
+└── start_tauri_visible.bat   # 可见模式启动 Tauri
+```

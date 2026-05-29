@@ -5,6 +5,7 @@ CaptureManager 单元测试
 覆盖: CaptureResult, CaptureManager 初始化/截图/防抖/设置
 """
 import time
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
@@ -43,15 +44,12 @@ class TestCaptureResult:
 class TestCaptureManagerInit:
     """CaptureManager 初始化测试"""
 
-    @patch("core.capture.mss.mss")
-    def test_init_stores_path_manager(self, mock_mss, mock_path_manager):
-        """验证: __init__ 存储 path_manager 并初始化 mss"""
+    def test_init_stores_path_manager(self, mock_path_manager):
+        """验证: __init__ 存储 path_manager"""
         mgr = CaptureManager(mock_path_manager)
         assert mgr._path_manager is mock_path_manager
-        mock_mss.assert_called_once()
 
-    @patch("core.capture.mss.mss")
-    def test_default_settings(self, mock_mss, mock_path_manager):
+    def test_default_settings(self, mock_path_manager):
         """验证: 默认防抖/窗口设置"""
         mgr = CaptureManager(mock_path_manager)
         settings = mgr.get_settings()
@@ -102,7 +100,7 @@ class TestCaptureManagerDebounce:
         mgr._fullscreen_debounce_time = time.time()  # 刚截过全屏，防抖应该生效
 
         # 模拟 mss.monitors 和 grab
-        mock_mss_instance = mock_mss.return_value
+        mock_mss_instance = mock_mss.return_value.__enter__.return_value
         mock_mss_instance.monitors = [{}, {"width": 1920, "height": 1080}]
         mock_screenshot = MagicMock()
         mock_screenshot.size = (1920, 1080)
@@ -119,6 +117,28 @@ class TestCaptureManagerDebounce:
         res = mgr.capture_fullscreen(force_bypass_debounce=True)
         assert res is not None
         assert "screenshot_" in res.image_path
+
+    @patch("core.capture.mss.mss")
+    def test_capture_fullscreen_works_from_worker_thread(self, mock_mss, mock_path_manager):
+        """验证: 在线程池中使用同一个管理器也能截图"""
+        mgr = CaptureManager(mock_path_manager)
+
+        mock_mss_instance = mock_mss.return_value.__enter__.return_value
+        mock_mss_instance.monitors = [{}, {"width": 1920, "height": 1080}]
+        mock_screenshot = MagicMock()
+        mock_screenshot.size = (1920, 1080)
+        mock_screenshot.rgb = b"\x00" * (1920 * 1080 * 3)
+        mock_screenshot.width = 1920
+        mock_screenshot.height = 1080
+        mock_mss_instance.grab.return_value = mock_screenshot
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            result = executor.submit(
+                lambda: mgr.capture_fullscreen(force_bypass_debounce=True)
+            ).result()
+
+        assert result is not None
+        assert "screenshot_" in result.image_path
 
 
 class TestCaptureManagerForceSplit:
@@ -211,13 +231,10 @@ class TestCaptureManagerSettings:
 class TestCaptureManagerClose:
     """CaptureManager.close 测试"""
 
-    @patch("core.capture.mss.mss")
-    def test_close_calls_sct_close(self, mock_mss, mock_path_manager):
-        """验证: close() 调用 mss.close()"""
-        mock_mss_instance = mock_mss.return_value
+    def test_close_is_noop(self, mock_path_manager):
+        """验证: close() 在按次创建 mss 会话后保持幂等"""
         mgr = CaptureManager(mock_path_manager)
-        mgr.close()
-        mock_mss_instance.close.assert_called_once()
+        assert mgr.close() is None
 
 
 class TestCaptureManagerGlobal:

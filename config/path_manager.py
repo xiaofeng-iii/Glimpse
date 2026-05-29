@@ -3,8 +3,7 @@ Path Manager - 核心路径路由中心
 强制所有数据写入 ./GlimpseData 目录
 """
 from pathlib import Path
-from typing import Union
-import os
+from runtime_env import get_data_root, get_runtime_root
 
 
 class PathManager:
@@ -23,8 +22,9 @@ class PathManager:
             return
         self._initialized = True
 
-        self._project_root = Path(__file__).parent.parent.resolve()
-        self._data_root = self._project_root / "GlimpseData"
+        default_root = Path(__file__).parent.parent
+        self._project_root = get_runtime_root(default_root)
+        self._data_root = get_data_root(self._project_root)
 
         self._create_directories()
 

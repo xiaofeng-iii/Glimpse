@@ -64,6 +64,7 @@ class TestSettingsManagerInit:
                 "theme": "light",
                 "auto_hide": False,
                 "start_minimized": False,
+                "close_action": "exit",
             },
         }
         settings_file.write_text(json.dumps(old_settings), encoding="utf-8")
@@ -76,8 +77,8 @@ class TestSettingsManagerInit:
         assert sm.get("ai.api_key") == "sk-existing"
         assert sm.get("ai.model") == "custom-model"
         assert sm.get("ai.timeout") == 45
+        assert sm.get("ui.close_action") == "exit"
         assert sm.get("hotkeys.clear") is None
-        assert sm.get("ui.close_action") == "ask"
 
         persisted = json.loads(settings_file.read_text(encoding="utf-8"))
         assert persisted["ai"]["provider"] == "OpenAI"

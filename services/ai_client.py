@@ -2,7 +2,7 @@
 AI Client - 负责打包数据并与云端大模型交互
 支持构造函数注入SettingsManager依赖
 """
-from typing import Optional, Callable, TYPE_CHECKING, List
+from typing import Optional, Callable, TYPE_CHECKING, List, Tuple
 
 import openai
 
@@ -17,7 +17,7 @@ class AIClient:
     DEFAULT_PROVIDER = "OpenAI"
     DEFAULT_PROVIDER_TYPE = "openai_compatible"
     DEFAULT_BASE_URL = "https://api.openai.com/v1"
-    DEFAULT_TIMEOUT = 30
+    DEFAULT_TIMEOUT = 60
 
     def __init__(self, settings_manager: Optional["SettingsManager"] = None):
         self._settings_manager = settings_manager
@@ -88,13 +88,22 @@ class AIClient:
         return self._client is not None
 
     def test_connection(self) -> bool:
+        success, _ = self.test_model_connection()
+        return success
+
+    def test_model_connection(self) -> Tuple[bool, str]:
         if not self._client:
-            return False
+            return False, "AI client not configured"
         try:
-            self._client.models.list()
-            return True
-        except Exception:
-            return False
+            self._client.chat.completions.create(
+                model=self._model,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=1,
+                temperature=0,
+            )
+            return True, "Connection successful!"
+        except Exception as exc:
+            return False, str(exc)
 
     def analyze_image(
         self,

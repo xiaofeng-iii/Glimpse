@@ -18,6 +18,7 @@ class TestChromaManagerInit:
     def test_init_creates_client(self, mock_path_manager):
         from db.chroma_manager import ChromaManager
         mgr = ChromaManager(mock_path_manager)
+        assert mgr.available is True
         assert mgr._client is not None
         assert mgr._collection is not None
         mgr.close()

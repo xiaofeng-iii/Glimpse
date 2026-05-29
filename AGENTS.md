@@ -31,14 +31,17 @@ conda run -n glimpse python -m pytest tests/unit -v
 conda run -n glimpse python -m py_compile main.py container.py
 ```
 
-The project is developed on Windows with PySide6. The configured Python is expected to be `Python 3.10.x` inside the `glimpse` environment.
+The project is developed on Windows with a Tauri/Vue desktop shell and a Python API backend. The configured Python is expected to be `Python 3.10.x` inside the `glimpse` environment.
 
 ## Runtime Entry Points
 
-- `main.py`: application entry. Loads `.env`, initializes the DI container, creates the Qt app, registers the global screenshot hotkey after the window is shown, and shuts the container down on exit.
+- `main.py`: default source launcher. Loads `.env`, points Tauri at the current Python interpreter, and starts the Vue + Tauri desktop shell.
+- `main_legacy_qt.py`: legacy PySide6 desktop entry kept for fallback/debugging.
+- `main_api.py`: FastAPI backend entry used by the Tauri shell and browser development flow.
 - `container.py`: service registry and lifecycle owner. Add shared services here instead of constructing them ad hoc from UI code.
-- `ui/main_window.py`: main desktop experience, memory list, search box, screenshot actions, tray/window behavior.
-- `ui/settings_dialog.py`: editable app settings, including AI, OCR, screenshot, cluster, and hotkeys.
+- `glimpse-frontend/`: Vue 3 + Tauri desktop frontend.
+- `ui/main_window.py`: legacy Qt desktop experience, memory list, search box, screenshot actions, tray/window behavior.
+- `ui/settings_dialog.py`: legacy Qt settings dialog, including AI, OCR, screenshot, cluster, and hotkeys.
 
 ## Core Flow
 

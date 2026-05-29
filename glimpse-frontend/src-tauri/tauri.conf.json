@@ -1,0 +1,74 @@
+{
+  "productName": "Glimpse",
+  "version": "0.1.0",
+  "identifier": "com.glimpse.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Glimpse - AI 桌面记忆助手",
+        "width": 1024,
+        "height": 720,
+        "minWidth": 820,
+        "minHeight": 560,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": false,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "maximizable": true,
+        "minimizable": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "desktop-shell",
+          "description": "Allow the main desktop window to use core APIs and open external links.",
+          "windows": [
+            "main"
+          ],
+          "permissions": [
+            "core:default",
+            "core:window:allow-hide",
+            "core:window:allow-show",
+            "core:window:allow-set-focus",
+            "core:window:allow-minimize",
+            "core:window:allow-is-maximized",
+            "core:window:allow-toggle-maximize",
+            "core:window:allow-start-dragging",
+            "shell:allow-open"
+          ]
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "../../assets/icons/glimpse.ico",
+      "../../assets/icons/glimpse_1024.png",
+      "../../assets/icons/glimpse_256.png",
+      "../../assets/icons/glimpse_128.png",
+      "../../assets/icons/glimpse_64.png",
+      "../../assets/icons/glimpse_48.png",
+      "../../assets/icons/glimpse_32.png",
+      "../../assets/icons/glimpse_24.png",
+      "../../assets/icons/glimpse_16.png"
+    ],
+    "externalBin": [
+      "binaries/python-backend"
+    ]
+  }
+}

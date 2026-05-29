@@ -15,6 +15,14 @@
     "source_exact": "Exact Only",
     "source_semantic": "Semantic Only"
   },
+  "close": {
+    "title": "Close Glimpse",
+    "message": "What should happen when you close the window?",
+    "detail": "When minimized to the tray, the app keeps running in the background and can be reopened from the tray icon.",
+    "minimize": "Minimize to Tray",
+    "exit": "Exit App",
+    "remember": "Remember my choice"
+  },
   "status": {
     "ready": "Ready",
     "capturing": "Capturing...",

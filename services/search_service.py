@@ -43,11 +43,12 @@ class SearchService:
 
         # source_filter overrides internal _search_mode if provided
         mode = self._search_mode
-        if source_filter == "exact":
+        normalized_source = (source_filter or "").strip().lower()
+        if normalized_source in {"exact", "ocr"}:
             mode = "text"
-        elif source_filter == "semantic":
+        elif normalized_source == "semantic":
             mode = "vector"
-        elif source_filter == "all":
+        elif normalized_source == "all":
             mode = "hybrid"
 
         if mode == "text":

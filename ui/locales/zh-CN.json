@@ -15,6 +15,14 @@
     "source_exact": "仅看精确",
     "source_semantic": "仅看语义"
   },
+  "close": {
+    "title": "关闭 Glimpse",
+    "message": "关闭窗口时，你希望执行什么操作？",
+    "detail": "最小化到托盘后，程序仍会在后台运行，可通过托盘图标重新打开。",
+    "minimize": "最小化到托盘",
+    "exit": "退出应用",
+    "remember": "记住我的选择"
+  },
   "status": {
     "ready": "就绪",
     "capturing": "正在截图...",

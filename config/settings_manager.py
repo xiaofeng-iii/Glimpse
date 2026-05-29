@@ -83,7 +83,7 @@ class SettingsManager:
                 "base_url": "https://api.openai.com/v1",
                 "api_key": "",
                 "model": "gpt-4o-mini",
-                "timeout": 30
+                "timeout": 60
             },
             "ocr": {
                 "engine": "rapidocr",
@@ -97,7 +97,7 @@ class SettingsManager:
                 "theme": "light",
                 "auto_hide": False,
                 "start_minimized": False,
-                "close_action": "ask"
+                "close_action": "ask",
             },
             "cluster": {
                 "cluster_mode": False,
@@ -270,7 +270,7 @@ class SettingsManager:
         if not isinstance(section, dict):
             return False
         if required_keys:
-            required = {"theme", "auto_hide", "start_minimized"}
+            required = {"theme", "auto_hide", "start_minimized", "close_action"}
             missing = required - set(section.keys())
             if missing:
                 return False
@@ -281,9 +281,10 @@ class SettingsManager:
         if "start_minimized" in section and not isinstance(section["start_minimized"], bool):
             return False
         if "close_action" in section:
-            if not isinstance(section["close_action"], str):
+            close_action = section["close_action"]
+            if not isinstance(close_action, str):
                 return False
-            if section["close_action"] not in {"ask", "minimize", "exit"}:
+            if close_action not in {"ask", "minimize", "exit"}:
                 return False
         return True
 
