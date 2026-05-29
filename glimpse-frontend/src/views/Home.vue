@@ -20,6 +20,7 @@ import MemoryList from '@/components/MemoryList.vue'
 import DetailPanel from '@/components/DetailPanel.vue'
 import ClusterBar from '@/components/ClusterBar.vue'
 import CloseActionDialog from '@/components/CloseActionDialog.vue'
+import glimpseLogo from '@/assets/glimpse.svg'
 
 type SearchBarExpose = {
   focus: () => void
@@ -42,6 +43,9 @@ const closeAction = ref<CloseAction>('ask')
 const closeDialogOpen = ref(false)
 const isDesktop = isDesktopShell()
 const isWindowMaximized = ref(false)
+const screenshotShortcutLabel = ref('Ctrl+Shift+G')
+const searchShortcutLabel = ref('Ctrl+F')
+const clusterModeEnabled = ref(false)
 let removeDesktopCloseListener: (() => void) | null = null
 
 type ScreenshotTriggerOptions = {
@@ -52,6 +56,48 @@ const wait = (ms: number) =>
   new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms)
   })
+
+const formatShortcutLabel = (hotkey?: string, fallback = '') => {
+  if (!hotkey) {
+    return fallback
+  }
+
+  const labels: Record<string, string> = {
+    ctrl: 'Ctrl',
+    shift: 'Shift',
+    alt: 'Alt',
+    cmd: 'Win',
+    escape: 'Esc',
+    enter: 'Enter',
+    tab: 'Tab',
+    space: 'Space',
+    backspace: 'Backspace',
+    delete: 'Delete',
+    insert: 'Insert',
+    home: 'Home',
+    end: 'End',
+    page_up: 'Page Up',
+    page_down: 'Page Down',
+    up: 'Up',
+    down: 'Down',
+    left: 'Left',
+    right: 'Right',
+  }
+
+  return hotkey
+    .split('+')
+    .map((part) => {
+      const normalized = part.trim().replace(/^<|>$/g, '').toLowerCase()
+      if (labels[normalized]) {
+        return labels[normalized]
+      }
+      if (/^f([1-9]|1[0-9]|2[0-4])$/.test(normalized)) {
+        return normalized.toUpperCase()
+      }
+      return normalized.length === 1 ? normalized.toUpperCase() : normalized
+    })
+    .join('+')
+}
 
 const focusSearch = async () => {
   await nextTick()
@@ -72,6 +118,16 @@ const loadUiSettings = async () => {
     if (configuredCloseAction === 'ask' || configuredCloseAction === 'minimize' || configuredCloseAction === 'exit') {
       closeAction.value = configuredCloseAction
     }
+
+    screenshotShortcutLabel.value = formatShortcutLabel(
+      settings.hotkeys?.screenshot,
+      'Ctrl+Shift+G',
+    )
+    searchShortcutLabel.value = formatShortcutLabel(
+      settings.hotkeys?.search,
+      'Ctrl+F',
+    )
+    clusterModeEnabled.value = Boolean(settings.cluster?.cluster_mode)
   } catch (error) {
     console.error('Failed to load UI settings:', error)
   }
@@ -105,7 +161,7 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
 
   const healthy = await checkBackendHealth()
   if (!healthy) {
-    notificationStore.show(
+      notificationStore.show(
       options.initiatedByHotkey
         ? '快捷键截图失败：后端未连接，请先启动 Python API 服务。'
         : '后端未连接，请先启动 Python API 服务。',
@@ -115,7 +171,9 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
     return
   }
 
+  await loadUiSettings()
   isCapturing.value = true
+  if (!clusterModeEnabled.value) {
   notificationStore.show(
     options.initiatedByHotkey
       ? '快捷键已触发，正在截图并提交分析...'
@@ -123,6 +181,7 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
     'info',
     1800,
   )
+  }
 
   try {
     if (isDesktop) {
@@ -142,13 +201,15 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
       return
     }
 
-    notificationStore.show(
+    if (!result.clustered && !clusterModeEnabled.value) {
+      notificationStore.show(
       options.initiatedByHotkey
         ? `快捷键截图成功：${result.message || '已提交分析请求，等待结果。'}`
         : '截图已提交，等待分析完成。',
       'success',
-      2400,
-    )
+        2400,
+      )
+    }
   } catch (error) {
     console.error('Screenshot failed:', error)
     notificationStore.show(
@@ -363,25 +424,27 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen shell-frame p-4">
-    <div class="shell-card mx-auto flex min-h-[calc(100vh-2rem)] max-w-6xl flex-col overflow-hidden rounded-[28px]">
-      <header class="shell-header flex items-center justify-between gap-4 px-5 py-4">
+  <div class="min-h-screen shell-frame">
+    <div class="shell-card flex min-h-screen w-full flex-col overflow-hidden">
+      <header class="shell-header relative flex items-center justify-between gap-4 px-5 py-4">
+        <div class="shell-titlebar-drag-layer" data-tauri-drag-region></div>
         <div class="shell-drag-zone flex items-center gap-3" data-tauri-drag-region>
-          <div class="logo-badge flex h-11 w-11 items-center justify-center rounded-2xl text-lg font-bold text-white">
-            G
+          <div class="logo-badge flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl">
+            <img class="h-full w-full object-cover" :src="glimpseLogo" alt="Glimpse" draggable="false" />
           </div>
           <div data-tauri-drag-region>
             <h1 class="text-lg font-semibold text-slate-900">Glimpse</h1>
             <p class="text-xs text-slate-500">
               桌面记忆弹窗
               <span class="mx-2 text-slate-300">·</span>
-              Ctrl+Shift+G 截图
+              {{ screenshotShortcutLabel }} 截图
             </p>
           </div>
         </div>
 
         <div class="flex items-center gap-2">
           <span
+            data-tauri-drag-region
             :class="[
               'status-pill',
               backendReady ? 'status-pill-ready' : 'status-pill-offline',
@@ -389,7 +452,9 @@ onUnmounted(() => {
           >
             {{ backendReady ? '后端已连接' : '后端未连接' }}
           </span>
+        </div>
 
+        <div class="shell-window-controls flex items-center gap-2">
           <button
             class="shell-icon-button"
             :disabled="isCheckingBackend || memoriesStore.isLoading"
@@ -412,7 +477,7 @@ onUnmounted(() => {
             </svg>
             <span v-else class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/35 border-t-white"></span>
             <span>{{ isCapturing ? '处理中...' : '截图' }}</span>
-            <kbd>Ctrl+Shift+G</kbd>
+            <kbd>{{ screenshotShortcutLabel }}</kbd>
           </button>
 
           <button
@@ -479,7 +544,7 @@ onUnmounted(() => {
 
       <main class="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
         <div class="mx-auto flex min-h-full max-w-6xl flex-col gap-4">
-          <SearchBar ref="searchBar" />
+          <SearchBar ref="searchBar" :shortcut-label="searchShortcutLabel" />
 
           <ClusterBar
             v-if="clusterStore.state === 'COLLECTING'"
@@ -487,7 +552,7 @@ onUnmounted(() => {
             @cancel="handleClusterCancel"
           />
 
-          <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(360px,5fr)]">
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(300px,3fr)_minmax(0,5fr)]">
             <MemoryList
               :memories="memoriesStore.memories"
               :is-loading="memoriesStore.isLoading"

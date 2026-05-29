@@ -13,8 +13,20 @@ interface Notification {
 export const useNotificationStore = defineStore('notification', () => {
   const notifications = ref<Notification[]>([])
   let nextId = 0
+  let lastMessage = ''
+  let lastType: NotificationType = 'info'
+  let lastShownAt = 0
 
   const show = (message: string, type: NotificationType = 'info', duration = 3000) => {
+    const now = Date.now()
+    if (message === lastMessage && type === lastType && now - lastShownAt < 1200) {
+      return -1
+    }
+
+    lastMessage = message
+    lastType = type
+    lastShownAt = now
+
     const id = nextId++
     const notification: Notification = {
       id,

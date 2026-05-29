@@ -15,7 +15,7 @@ const maxCaptures = ref(10)
 const aiApiKey = ref('')
 const aiBaseUrl = ref('https://api.openai.com/v1')
 const aiModel = ref('gpt-4o-mini')
-const aiTimeout = ref(30)
+const aiTimeout = ref(60)
 const uiTheme = ref('light')
 const closeAction = ref<'ask' | 'minimize' | 'exit'>('ask')
 const clusterMode = ref(false)
@@ -26,6 +26,124 @@ const clusterTimeout = ref(5)
 // Test connection state
 const isTestingAi = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
+const recordingHotkey = ref<'screenshot' | 'search' | null>(null)
+
+const hotkeyLabels: Record<string, string> = {
+  ctrl: 'Ctrl',
+  shift: 'Shift',
+  alt: 'Alt',
+  cmd: 'Win',
+  escape: 'Esc',
+  enter: 'Enter',
+  tab: 'Tab',
+  space: 'Space',
+  backspace: 'Backspace',
+  delete: 'Delete',
+  insert: 'Insert',
+  home: 'Home',
+  end: 'End',
+  page_up: 'Page Up',
+  page_down: 'Page Down',
+  up: 'Up',
+  down: 'Down',
+  left: 'Left',
+  right: 'Right',
+}
+
+const specialKeyMap: Record<string, string> = {
+  Escape: 'escape',
+  Enter: 'enter',
+  Tab: 'tab',
+  ' ': 'space',
+  Spacebar: 'space',
+  Backspace: 'backspace',
+  Delete: 'delete',
+  Insert: 'insert',
+  Home: 'home',
+  End: 'end',
+  PageUp: 'page_up',
+  PageDown: 'page_down',
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+}
+
+const modifierKeys = new Set(['Control', 'Shift', 'Alt', 'Meta'])
+
+const normalizeMainKey = (event: KeyboardEvent) => {
+  if (modifierKeys.has(event.key)) return ''
+  if (specialKeyMap[event.key]) return specialKeyMap[event.key]
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(event.key)) return event.key.toLowerCase()
+  if (event.key.length === 1 && event.key !== '+') return event.key.toLowerCase()
+  return ''
+}
+
+const formatHotkeyForPynput = (event: KeyboardEvent) => {
+  const mainKey = normalizeMainKey(event)
+  if (!mainKey) return ''
+
+  const parts: string[] = []
+  if (event.ctrlKey) parts.push('<ctrl>')
+  if (event.shiftKey) parts.push('<shift>')
+  if (event.altKey) parts.push('<alt>')
+  if (event.metaKey) parts.push('<cmd>')
+
+  const wrappedKey = mainKey.length === 1 ? mainKey : `<${mainKey}>`
+  return [...parts, wrappedKey].join('+')
+}
+
+const formatHotkeyForDisplay = (hotkey: string) => {
+  if (!hotkey) return '点击后按下快捷键'
+  return hotkey
+    .split('+')
+    .map((part) => {
+      const normalized = part.trim().replace(/^<|>$/g, '').toLowerCase()
+      if (hotkeyLabels[normalized]) return hotkeyLabels[normalized]
+      if (/^f([1-9]|1[0-9]|2[0-4])$/.test(normalized)) return normalized.toUpperCase()
+      return normalized.length === 1 ? normalized.toUpperCase() : normalized
+    })
+    .join(' + ')
+}
+
+const startHotkeyRecording = (target: 'screenshot' | 'search') => {
+  recordingHotkey.value = target
+}
+
+const clearHotkey = (target: 'screenshot' | 'search') => {
+  if (target === 'screenshot') {
+    screenshotHotkey.value = ''
+  } else {
+    searchHotkey.value = ''
+  }
+}
+
+const handleHotkeyKeydown = (event: KeyboardEvent, target: 'screenshot' | 'search') => {
+  event.preventDefault()
+  event.stopPropagation()
+
+  if (event.key === 'Escape') {
+    recordingHotkey.value = null
+    return
+  }
+
+  const noModifier = !event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey
+  if ((event.key === 'Backspace' || event.key === 'Delete') && noModifier) {
+    clearHotkey(target)
+    recordingHotkey.value = null
+    return
+  }
+
+  const hotkey = formatHotkeyForPynput(event)
+  if (!hotkey) return
+
+  if (target === 'screenshot') {
+    screenshotHotkey.value = hotkey
+  } else {
+    searchHotkey.value = hotkey
+  }
+  recordingHotkey.value = null
+}
 
 const loadSettings = async () => {
   await settingsStore.load()
@@ -39,7 +157,7 @@ const loadSettings = async () => {
     aiApiKey.value = s.ai?.api_key || ''
     aiBaseUrl.value = s.ai?.base_url || 'https://api.openai.com/v1'
     aiModel.value = s.ai?.model || 'gpt-4o-mini'
-    aiTimeout.value = s.ai?.timeout || 30
+    aiTimeout.value = s.ai?.timeout || 60
     uiTheme.value = s.ui?.theme || 'light'
     closeAction.value = s.ui?.close_action || 'ask'
     clusterMode.value = s.cluster?.cluster_mode || false
@@ -55,6 +173,15 @@ onMounted(async () => {
 
 const handleSave = async () => {
   try {
+    const aiSettings: Record<string, string | number> = {
+      base_url: aiBaseUrl.value,
+      model: aiModel.value,
+      timeout: aiTimeout.value,
+    }
+    if (aiApiKey.value.trim()) {
+      aiSettings.api_key = aiApiKey.value
+    }
+
     await settingsStore.update({
       hotkeys: {
         screenshot: screenshotHotkey.value,
@@ -65,12 +192,7 @@ const handleSave = async () => {
         cluster_threshold: clusterThreshold.value,
         max_captures_per_window: maxCaptures.value,
       },
-      ai: {
-        api_key: aiApiKey.value,
-        base_url: aiBaseUrl.value,
-        model: aiModel.value,
-        timeout: aiTimeout.value,
-      },
+      ai: aiSettings,
       ui: {
         theme: uiTheme.value,
         close_action: closeAction.value,
@@ -138,11 +260,47 @@ const handleCancel = () => {
           <div class="space-y-4">
             <div>
               <label class="block text-sm text-gray-600 mb-2">截图快捷键</label>
-              <input v-model="screenshotHotkey" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+              <button
+                type="button"
+                :class="[
+                  'w-full min-h-11 px-4 py-2 rounded-lg border text-left outline-none transition-colors',
+                  recordingHotkey === 'screenshot'
+                    ? 'border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
+                    : 'border-gray-200 bg-white text-gray-800 hover:border-violet-300 focus:border-violet-400',
+                ]"
+                @click="startHotkeyRecording('screenshot')"
+                @keydown="handleHotkeyKeydown($event, 'screenshot')"
+                @blur="recordingHotkey = null"
+              >
+                <span class="font-medium">
+                  {{ recordingHotkey === 'screenshot' ? '请按下快捷键...' : formatHotkeyForDisplay(screenshotHotkey) }}
+                </span>
+                <span class="ml-2 text-xs text-gray-400">
+                  {{ recordingHotkey === 'screenshot' ? 'Esc 取消，Backspace 清空' : '点击录入' }}
+                </span>
+              </button>
             </div>
             <div>
               <label class="block text-sm text-gray-600 mb-2">搜索快捷键</label>
-              <input v-model="searchHotkey" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+              <button
+                type="button"
+                :class="[
+                  'w-full min-h-11 px-4 py-2 rounded-lg border text-left outline-none transition-colors',
+                  recordingHotkey === 'search'
+                    ? 'border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
+                    : 'border-gray-200 bg-white text-gray-800 hover:border-violet-300 focus:border-violet-400',
+                ]"
+                @click="startHotkeyRecording('search')"
+                @keydown="handleHotkeyKeydown($event, 'search')"
+                @blur="recordingHotkey = null"
+              >
+                <span class="font-medium">
+                  {{ recordingHotkey === 'search' ? '请按下快捷键...' : formatHotkeyForDisplay(searchHotkey) }}
+                </span>
+                <span class="ml-2 text-xs text-gray-400">
+                  {{ recordingHotkey === 'search' ? 'Esc 取消，Backspace 清空' : '点击录入' }}
+                </span>
+              </button>
             </div>
           </div>
         </div>

@@ -83,7 +83,7 @@ class SettingsManager:
                 "base_url": "https://api.openai.com/v1",
                 "api_key": "",
                 "model": "gpt-4o-mini",
-                "timeout": 30
+                "timeout": 60
             },
             "ocr": {
                 "engine": "rapidocr",

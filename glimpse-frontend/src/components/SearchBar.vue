@@ -4,6 +4,7 @@ import { useMemoriesStore } from '@/stores/memories'
 
 const props = defineProps<{
   modelValue?: string
+  shortcutLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -75,7 +76,7 @@ defineExpose({ focus })
 
       <!-- Keyboard Shortcut -->
       <kbd class="mr-4 px-2 py-1 rounded-lg bg-gray-100 text-gray-500 text-xs">
-        Ctrl+F
+        {{ shortcutLabel || 'Ctrl+F' }}
       </kbd>
     </div>
 

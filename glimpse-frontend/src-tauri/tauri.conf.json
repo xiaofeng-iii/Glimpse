@@ -51,8 +51,8 @@
       ]
     },
     "trayIcon": {
-      "iconPath": "../../assets/icons/glimpse_32.png",
-      "iconAsTemplate": true
+      "iconPath": "../../assets/icons/glimpse_64.png",
+      "iconAsTemplate": false
     }
   },
   "bundle": {
@@ -61,10 +61,15 @@
       "nsis"
     ],
     "icon": [
-      "../../assets/icons/glimpse_32.png",
-      "../../assets/icons/glimpse_128.png",
+      "../../assets/icons/glimpse.ico",
+      "../../assets/icons/glimpse_1024.png",
       "../../assets/icons/glimpse_256.png",
-      "../../assets/icons/glimpse.ico"
+      "../../assets/icons/glimpse_128.png",
+      "../../assets/icons/glimpse_64.png",
+      "../../assets/icons/glimpse_48.png",
+      "../../assets/icons/glimpse_32.png",
+      "../../assets/icons/glimpse_24.png",
+      "../../assets/icons/glimpse_16.png"
     ],
     "externalBin": [
       "binaries/python-backend"

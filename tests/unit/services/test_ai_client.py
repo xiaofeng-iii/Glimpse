@@ -55,7 +55,7 @@ class TestAIClientConfigure:
             mock_openai.assert_called_once_with(
                 api_key="test-key",
                 base_url="https://api.openai.com/v1",
-                timeout=30,
+                timeout=60,
             )
 
     def test_configure_custom_base_url(self):
@@ -66,7 +66,7 @@ class TestAIClientConfigure:
             mock_openai.assert_called_once_with(
                 api_key="test-key",
                 base_url="https://custom.api.com/v1",
-                timeout=30,
+                timeout=60,
             )
 
     def test_configure_custom_base_url_and_timeout(self):

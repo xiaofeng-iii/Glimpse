@@ -303,7 +303,7 @@ class SettingsDialog(QDialog):
         self._ai_api_key.setText(ai.get("api_key", ""))
         self._ai_base_url.setText(ai.get("base_url", "https://api.openai.com/v1"))
         self._ai_model.setText(ai.get("model", "gpt-4o-mini"))
-        self._ai_timeout.setValue(ai.get("timeout", 30))
+        self._ai_timeout.setValue(ai.get("timeout", 60))
 
         ui = merged.get("ui", {})
         idx = self._ui_theme.findText(ui.get("theme", "light"))

@@ -3,7 +3,7 @@ import { getApiBaseUrl } from '@/config/runtime'
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
-  timeout: 30000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -73,6 +73,8 @@ export const screenshotApi = {
     message?: string
     image_path?: string
     source?: string
+    clustered?: boolean
+    cluster_count?: number
   }> => {
     const response = await api.post('/screenshot/analyze', { force })
     return response.data

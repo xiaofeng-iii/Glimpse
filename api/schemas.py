@@ -59,7 +59,7 @@ class SettingsResponse(BaseModel):
         "base_url": "https://api.openai.com/v1",
         "api_key": "",
         "model": "gpt-4o-mini",
-        "timeout": 30,
+        "timeout": 60,
     })
     ocr: Dict[str, str] = Field(default_factory=lambda: {
         "engine": "rapidocr",

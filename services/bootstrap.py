@@ -8,7 +8,7 @@ DEFAULT_PROVIDER = "OpenAI"
 DEFAULT_PROVIDER_TYPE = "openai_compatible"
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-4o-mini"
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 60
 
 
 def _prefer_non_default_setting(settings_value: str, env_value: str, default_value: str) -> str:

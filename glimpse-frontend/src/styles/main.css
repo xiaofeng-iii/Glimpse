@@ -40,16 +40,13 @@ textarea {
 }
 
 .shell-frame {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0)),
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.52), transparent 45%);
+  background: rgba(255, 252, 248, 0.92);
 }
 
 .shell-card {
   background: rgba(255, 252, 248, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.68);
+  border: 0;
   box-shadow:
-    0 22px 64px rgba(44, 37, 31, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(26px);
   -webkit-backdrop-filter: blur(26px);
@@ -58,6 +55,36 @@ textarea {
 .shell-header {
   border-bottom: 1px solid var(--shell-line);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.14));
+  cursor: grab;
+  user-select: none;
+}
+
+.shell-header:active {
+  cursor: grabbing;
+}
+
+.shell-titlebar-drag-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.shell-header > :not(.shell-titlebar-drag-layer) {
+  position: relative;
+  z-index: 1;
+}
+
+.shell-window-controls {
+  cursor: default;
+}
+
+.shell-header button,
+.shell-header input,
+.shell-header select,
+.shell-header textarea,
+.shell-header a,
+.shell-header [role='button'] {
+  user-select: auto;
 }
 
 .shell-drag-zone {
@@ -65,6 +92,11 @@ textarea {
   flex: 1 1 auto;
   cursor: grab;
   user-select: none;
+  pointer-events: none;
+}
+
+.shell-drag-zone * {
+  pointer-events: none;
 }
 
 .shell-drag-zone:active {
@@ -72,7 +104,7 @@ textarea {
 }
 
 .logo-badge {
-  background: linear-gradient(135deg, #d96b31 0%, #235d67 100%);
+  background: transparent;
   box-shadow: 0 10px 22px rgba(35, 93, 103, 0.22);
 }
 
@@ -293,9 +325,5 @@ kbd {
 @media (max-width: 1024px) {
   body {
     overflow: auto;
-  }
-
-  .shell-frame {
-    padding: 0.75rem;
   }
 }

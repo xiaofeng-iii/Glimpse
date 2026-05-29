@@ -9,6 +9,7 @@ use std::sync::{
     Mutex,
 };
 use std::time::Duration;
+use tauri::image::Image;
 use tauri::menu::MenuBuilder;
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
@@ -19,6 +20,7 @@ use std::os::windows::process::CommandExt;
 const API_HOST: &str = "127.0.0.1:8000";
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+const APP_ICON_PNG: &[u8] = include_bytes!("../../../assets/icons/glimpse_256.png");
 
 struct AppState {
     backend_child: Mutex<Option<Child>>,
@@ -230,6 +232,10 @@ fn is_window_maximized(window: tauri::WebviewWindow) -> Result<bool, String> {
     window.is_maximized().map_err(|error| error.to_string())
 }
 
+fn load_app_icon() -> Option<Image<'static>> {
+    Image::from_bytes(APP_ICON_PNG).ok().map(Image::to_owned)
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
@@ -252,6 +258,11 @@ fn main() {
                 }
             }
 
+            let app_icon = load_app_icon();
+            if let (Some(window), Some(icon)) = (app.get_webview_window("main"), app_icon.clone()) {
+                let _ = window.set_icon(icon);
+            }
+
             let tray_menu = MenuBuilder::new(app)
                 .text("show", "显示主窗口")
                 .text("hide", "隐藏到托盘")
@@ -263,7 +274,9 @@ fn main() {
                 .tooltip("Glimpse")
                 .menu(&tray_menu);
 
-            if let Some(icon) = app.default_window_icon().cloned() {
+            if let Some(icon) = app_icon {
+                tray_builder.icon(icon).build(app)?;
+            } else if let Some(icon) = app.default_window_icon().cloned() {
                 tray_builder.icon(icon).build(app)?;
             } else {
                 tray_builder.build(app)?;

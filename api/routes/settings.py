@@ -31,7 +31,7 @@ def get_default_settings() -> dict:
             "base_url": "https://api.openai.com/v1",
             "api_key": "",
             "model": "gpt-4o-mini",
-            "timeout": 30,
+            "timeout": 60,
         },
         "ocr": {
             "engine": "rapidocr",
@@ -63,9 +63,24 @@ def get_effective_settings(settings_manager) -> dict:
     ai["model"] = resolved["model"]
     ai["timeout"] = resolved["timeout"]
 
-    # Never expose the env API key back to the frontend.
-    ai["api_key"] = ""
+    # Show locally saved keys in the password field, but never expose env-only keys.
+    ai["api_key"] = settings.get("ai", {}).get("api_key", "")
     return effective
+
+
+def preserve_existing_api_key(current: dict, updates: dict) -> None:
+    """Do not erase a saved API key when the frontend sends a blank masked field."""
+    ai_updates = updates.get("ai")
+    if not isinstance(ai_updates, dict) or "api_key" not in ai_updates:
+        return
+
+    incoming_key = ai_updates.get("api_key")
+    if isinstance(incoming_key, str) and incoming_key.strip():
+        return
+
+    current_key = current.get("ai", {}).get("api_key", "")
+    if isinstance(current_key, str) and current_key.strip():
+        ai_updates.pop("api_key", None)
 
 
 @router.get("", response_model=SettingsResponse)
@@ -92,6 +107,7 @@ async def update_settings(settings: SettingsUpdate):
 
         # Merge updates
         update_dict = settings.model_dump(exclude_unset=True)
+        preserve_existing_api_key(current, update_dict)
         for key, value in update_dict.items():
             if value is not None:
                 if key in current and isinstance(current[key], dict):

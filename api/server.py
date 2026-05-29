@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 import asyncio
 
 from api.routes import memories, search, screenshot, settings, cluster, images
+from api.desktop_actions import setup_cluster_processing
 from api.hotkeys import setup_global_hotkeys, shutdown_global_hotkeys
 from api.websocket import websocket_endpoint, setup_signal_forwarding, manager
 from container import container
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     # Initialize signal forwarding for WebSocket
     loop = asyncio.get_running_loop()
     setup_signal_forwarding(loop)
+    setup_cluster_processing(loop)
     setup_global_hotkeys(loop)
 
     print("API Server ready!")

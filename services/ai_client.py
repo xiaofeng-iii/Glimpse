@@ -17,7 +17,7 @@ class AIClient:
     DEFAULT_PROVIDER = "OpenAI"
     DEFAULT_PROVIDER_TYPE = "openai_compatible"
     DEFAULT_BASE_URL = "https://api.openai.com/v1"
-    DEFAULT_TIMEOUT = 30
+    DEFAULT_TIMEOUT = 60
 
     def __init__(self, settings_manager: Optional["SettingsManager"] = None):
         self._settings_manager = settings_manager
