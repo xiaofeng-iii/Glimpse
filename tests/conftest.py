@@ -136,6 +136,7 @@ def mock_settings_manager():
             "theme": "light",
             "auto_hide": False,
             "start_minimized": False,
+            "close_action": "ask",
         },
     }
 

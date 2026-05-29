@@ -3,6 +3,7 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useClusterStore } from '@/stores/cluster'
 import { useNotificationStore } from '@/stores/notification'
 import { focusDesktopWindow } from '@/platform/desktop'
+import { getWsBaseUrl } from '@/config/runtime'
 
 type WebSocketEvent = {
   type: string
@@ -19,8 +20,8 @@ export function useWebSocket() {
   const connect = () => {
     if (ws?.readyState === WebSocket.OPEN) return
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws/events`
+    const wsBaseUrl = getWsBaseUrl().replace(/\/$/, '')
+    const wsUrl = `${wsBaseUrl}/events`
 
     ws = new WebSocket(wsUrl)
 
@@ -101,7 +102,10 @@ export function useWebSocket() {
         break
 
       case 'status_updated':
-        notificationStore.show(event.data.message || event.data.status, 'info')
+        notificationStore.show(
+          event.data.message || event.data.status,
+          event.data.level || 'info',
+        )
         break
 
       case 'error_occurred':
@@ -131,6 +135,10 @@ export function useWebSocket() {
           void focusDesktopWindow().then(() => {
             window.dispatchEvent(new CustomEvent('glimpse:focus-search'))
           })
+        } else if (event.data.action === 'trigger_screenshot') {
+          window.dispatchEvent(new CustomEvent('glimpse:shortcut-screenshot', {
+            detail: event.data,
+          }))
         }
         break
 

@@ -16,9 +16,8 @@ const aiApiKey = ref('')
 const aiBaseUrl = ref('https://api.openai.com/v1')
 const aiModel = ref('gpt-4o-mini')
 const aiTimeout = ref(30)
-const ocrEngine = ref('rapidocr')
-const ocrLanguage = ref('ch')
 const uiTheme = ref('light')
+const closeAction = ref<'ask' | 'minimize' | 'exit'>('ask')
 const clusterMode = ref(false)
 const clusterAutoSubmit = ref(true)
 const clusterMaxImages = ref(5)
@@ -41,9 +40,8 @@ const loadSettings = async () => {
     aiBaseUrl.value = s.ai?.base_url || 'https://api.openai.com/v1'
     aiModel.value = s.ai?.model || 'gpt-4o-mini'
     aiTimeout.value = s.ai?.timeout || 30
-    ocrEngine.value = s.ocr?.engine || 'rapidocr'
-    ocrLanguage.value = s.ocr?.language || 'ch'
     uiTheme.value = s.ui?.theme || 'light'
+    closeAction.value = s.ui?.close_action || 'ask'
     clusterMode.value = s.cluster?.cluster_mode || false
     clusterAutoSubmit.value = s.cluster?.cluster_auto_submit ?? true
     clusterMaxImages.value = s.cluster?.cluster_max_images || 5
@@ -73,12 +71,9 @@ const handleSave = async () => {
         model: aiModel.value,
         timeout: aiTimeout.value,
       },
-      ocr: {
-        engine: ocrEngine.value,
-        language: ocrLanguage.value,
-      },
       ui: {
         theme: uiTheme.value,
+        close_action: closeAction.value,
       },
       cluster: {
         cluster_mode: clusterMode.value,
@@ -198,39 +193,26 @@ const handleCancel = () => {
           </div>
         </div>
 
-        <!-- OCR Settings -->
-        <div class="card p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">OCR 设置</h2>
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm text-gray-600 mb-2">引擎</label>
-              <select v-model="ocrEngine" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none">
-                <option value="rapidocr">RapidOCR</option>
-                <option value="tesseract">Tesseract</option>
-                <option value="easyocr">EasyOCR</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm text-gray-600 mb-2">语言</label>
-              <select v-model="ocrLanguage" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none">
-                <option value="ch">中文</option>
-                <option value="en">英文</option>
-                <option value="ch+en">中英文</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
         <!-- UI Settings -->
         <div class="card p-6">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">界面</h2>
-          <div>
-            <label class="block text-sm text-gray-600 mb-2">主题</label>
-            <select v-model="uiTheme" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none">
-              <option value="light">浅色</option>
-              <option value="dark">深色</option>
-              <option value="system">跟随系统</option>
-            </select>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm text-gray-600 mb-2">主题</label>
+              <select v-model="uiTheme" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none">
+                <option value="light">浅色</option>
+                <option value="dark">深色</option>
+                <option value="system">跟随系统</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 mb-2">关闭窗口时</label>
+              <select v-model="closeAction" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none">
+                <option value="ask">每次询问</option>
+                <option value="minimize">最小化到托盘</option>
+                <option value="exit">退出应用</option>
+              </select>
+            </div>
           </div>
         </div>
 

@@ -524,7 +524,7 @@ QLabel#successLabel {
 }
 
 /* --- Badge Labels for memory list --- */
-QLabel#ocrBadge {
+QLabel#exactBadge {
     background-color: #1E3A5F;
     color: #93C5FD;
     border-radius: 4px;

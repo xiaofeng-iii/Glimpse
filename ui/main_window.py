@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLineEdit, QLabel, QListWidget, QListWidgetItem,
     QTextEdit, QSystemTrayIcon, QMenu, QApplication, QComboBox,
-    QFrame, QSizePolicy, QSpacerItem, QStackedWidget
+    QFrame, QSizePolicy, QSpacerItem, QStackedWidget, QCheckBox
 )
 from PySide6.QtCore import Qt, QTimer, QSize
 from PySide6.QtGui import (
@@ -127,9 +127,9 @@ class MemoryListItemWidget(QWidget):
         # Add styled badge labels
         match_sources = getattr(memory, "match_sources", [])
         if "精确" in match_sources:
-            ocr_badge = QLabel(t("badges.ocr"))
-            ocr_badge.setObjectName("ocrBadge")
-            top_row.addWidget(ocr_badge)
+            exact_badge = QLabel(t("badges.exact"))
+            exact_badge.setObjectName("exactBadge")
+            top_row.addWidget(exact_badge)
         if "语义" in match_sources:
             semantic_badge = QLabel(t("badges.semantic"))
             semantic_badge.setObjectName("semanticBadge")
@@ -270,12 +270,12 @@ class MainWindow(QMainWindow):
         self.source_filter_group.set_labels(
             {
                 "all": t("toolbar.source_all"),
-                "ocr": t("toolbar.source_ocr"),
+                "exact": t("toolbar.source_exact"),
                 "semantic": t("toolbar.source_semantic"),
             },
             {
                 "all": t("tooltips.source_all"),
-                "ocr": t("tooltips.source_ocr"),
+                "exact": t("tooltips.source_exact"),
                 "semantic": t("tooltips.source_semantic"),
             },
         )
@@ -514,12 +514,12 @@ class MainWindow(QMainWindow):
         self.source_filter_group.set_labels(
             {
                 "all": t("toolbar.source_all"),
-                "ocr": t("toolbar.source_ocr"),
+                "exact": t("toolbar.source_exact"),
                 "semantic": t("toolbar.source_semantic"),
             },
             {
                 "all": t("tooltips.source_all"),
-                "ocr": t("tooltips.source_ocr"),
+                "exact": t("tooltips.source_exact"),
                 "semantic": t("tooltips.source_semantic"),
             },
         )
@@ -888,6 +888,96 @@ class MainWindow(QMainWindow):
             self.showNormal()
             self.activateWindow()
 
+    def _get_close_action(self) -> str:
+        try:
+            settings_manager = container.get("settings_manager")
+            close_action = settings_manager.get("ui.close_action", "ask")
+            if close_action in {"ask", "minimize", "exit"}:
+                return close_action
+        except Exception:
+            pass
+        return "ask"
+
+    def _persist_close_action(self, close_action: str) -> None:
+        if close_action not in {"ask", "minimize", "exit"}:
+            return
+        try:
+            settings_manager = container.get("settings_manager")
+            settings_manager.set("ui.close_action", close_action)
+        except Exception:
+            pass
+
+    def _minimize_to_tray(self, show_message: bool = True) -> None:
+        self.hide()
+        if self.tray_icon is not None and show_message:
+            self.tray_icon.showMessage(
+                t("tray.minimized_title"),
+                t("tray.minimized_msg"),
+                self._app_icon,
+                2000,
+            )
+
+    def _prompt_close_action(self) -> tuple[str | None, bool]:
+        dialog = QMessageBox(self)
+        dialog.setIcon(QMessageBox.Icon.Question)
+        dialog.setWindowTitle(t("close.title"))
+        dialog.setText(t("close.message"))
+        dialog.setInformativeText(t("close.detail"))
+
+        minimize_button = dialog.addButton(
+            t("close.minimize"),
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        exit_button = dialog.addButton(
+            t("close.exit"),
+            QMessageBox.ButtonRole.DestructiveRole,
+        )
+        cancel_button = dialog.addButton(
+            t("settings.cancel"),
+            QMessageBox.ButtonRole.RejectRole,
+        )
+
+        remember_checkbox = QCheckBox(t("close.remember"))
+        dialog.setCheckBox(remember_checkbox)
+        dialog.exec()
+
+        clicked_button = dialog.clickedButton()
+        if clicked_button == minimize_button:
+            return "minimize", remember_checkbox.isChecked()
+        if clicked_button == exit_button:
+            return "exit", remember_checkbox.isChecked()
+        if clicked_button == cancel_button:
+            return None, False
+        return None, False
+
+    def _handle_window_close_request(self) -> bool:
+        if self.tray_icon is None:
+            self._on_quit()
+            return True
+
+        close_action = self._get_close_action()
+        if close_action == "exit":
+            self._on_quit()
+            return True
+
+        if close_action == "minimize":
+            self._minimize_to_tray()
+            return False
+
+        selected_action, remember = self._prompt_close_action()
+        if selected_action is None:
+            return False
+
+        if remember:
+            self._persist_close_action(selected_action)
+
+        if selected_action == "exit":
+            self._on_quit()
+            return True
+
+        self._minimize_to_tray()
+        return False
+
     def _on_quit(self):
         if self.tray_icon is not None:
             self.tray_icon.hide()
@@ -906,14 +996,8 @@ class MainWindow(QMainWindow):
             self._loading_spinner.setGeometry(self.centralWidget().rect())
 
     def closeEvent(self, event):
-        if self.tray_icon is None:
-            self._on_quit()
+        if self._handle_window_close_request():
+            event.accept()
             return
+
         event.ignore()
-        self.hide()
-        self.tray_icon.showMessage(
-            t("tray.minimized_title"),
-            t("tray.minimized_msg"),
-            self._app_icon,
-            2000,
-        )

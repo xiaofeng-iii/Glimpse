@@ -11,16 +11,17 @@ import sys
 import os
 import argparse
 from pathlib import Path
+from runtime_env import get_env_file, get_runtime_root
 
 # Ensure project root is in path
-project_root = Path(__file__).parent.resolve()
+project_root = get_runtime_root(Path(__file__).parent)
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Load .env environment variables
 try:
     from dotenv import load_dotenv
-    env_path = project_root / ".env"
+    env_path = get_env_file(project_root)
     if env_path.exists():
         load_dotenv(env_path)
         print(f"Loaded .env from {env_path}")

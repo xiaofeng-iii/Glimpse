@@ -4,21 +4,28 @@ import { useRouter } from 'vue-router'
 import { useMemoriesStore } from '@/stores/memories'
 import { useClusterStore } from '@/stores/cluster'
 import { useNotificationStore } from '@/stores/notification'
-import { screenshotApi, clusterApi, healthApi, type Memory } from '@/api/client'
+import { screenshotApi, clusterApi, healthApi, settingsApi, type Memory } from '@/api/client'
 import {
   closeDesktopWindow,
+  getDesktopWindowMaximized,
   focusDesktopWindow,
   hideDesktopWindow,
   isDesktopShell,
+  listenForDesktopCloseRequests,
+  minimizeDesktopWindow,
+  toggleDesktopMaximize,
 } from '@/platform/desktop'
 import SearchBar from '@/components/SearchBar.vue'
 import MemoryList from '@/components/MemoryList.vue'
 import DetailPanel from '@/components/DetailPanel.vue'
 import ClusterBar from '@/components/ClusterBar.vue'
+import CloseActionDialog from '@/components/CloseActionDialog.vue'
 
 type SearchBarExpose = {
   focus: () => void
 }
+
+type CloseAction = 'ask' | 'minimize' | 'exit'
 
 const router = useRouter()
 const memoriesStore = useMemoriesStore()
@@ -30,7 +37,16 @@ const searchBar = ref<SearchBarExpose | null>(null)
 const isCapturing = ref(false)
 const backendReady = ref(false)
 const isCheckingBackend = ref(false)
+const deletingMemoryId = ref<string | null>(null)
+const closeAction = ref<CloseAction>('ask')
+const closeDialogOpen = ref(false)
 const isDesktop = isDesktopShell()
+const isWindowMaximized = ref(false)
+let removeDesktopCloseListener: (() => void) | null = null
+
+type ScreenshotTriggerOptions = {
+  initiatedByHotkey?: boolean
+}
 
 const wait = (ms: number) =>
   new Promise<void>((resolve) => {
@@ -46,6 +62,18 @@ const loadMemories = async () => {
   await memoriesStore.load()
   if (!memoriesStore.selectedMemory && memoriesStore.memories.length > 0) {
     memoriesStore.select(memoriesStore.memories[0])
+  }
+}
+
+const loadUiSettings = async () => {
+  try {
+    const settings = await settingsApi.get()
+    const configuredCloseAction = settings.ui?.close_action
+    if (configuredCloseAction === 'ask' || configuredCloseAction === 'minimize' || configuredCloseAction === 'exit') {
+      closeAction.value = configuredCloseAction
+    }
+  } catch (error) {
+    console.error('Failed to load UI settings:', error)
   }
 }
 
@@ -67,19 +95,34 @@ const checkBackendHealth = async () => {
   return backendReady.value
 }
 
-const handleScreenshot = async () => {
+const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
   if (isCapturing.value) {
+    if (options.initiatedByHotkey) {
+      notificationStore.show('快捷键截图失败：当前已有截图任务正在处理中。', 'warning', 2800)
+    }
     return
   }
 
   const healthy = await checkBackendHealth()
   if (!healthy) {
-    notificationStore.show('后端未连接，请先启动 Python API 服务。', 'error', 4500)
+    notificationStore.show(
+      options.initiatedByHotkey
+        ? '快捷键截图失败：后端未连接，请先启动 Python API 服务。'
+        : '后端未连接，请先启动 Python API 服务。',
+      'error',
+      4500,
+    )
     return
   }
 
   isCapturing.value = true
-  notificationStore.show('正在截图并提交分析...', 'info', 1800)
+  notificationStore.show(
+    options.initiatedByHotkey
+      ? '快捷键已触发，正在截图并提交分析...'
+      : '正在截图并提交分析...',
+    'info',
+    1800,
+  )
 
   try {
     if (isDesktop) {
@@ -89,20 +132,42 @@ const handleScreenshot = async () => {
 
     const result = await screenshotApi.triggerAndAnalyze(true)
     if (!result.success) {
-      notificationStore.show(result.message || '截图请求失败。', 'error', 4500)
+      notificationStore.show(
+        options.initiatedByHotkey
+          ? `快捷键截图失败：${result.message || '截图请求失败。'}`
+          : result.message || '截图请求失败。',
+        'error',
+        4500,
+      )
       return
     }
 
-    notificationStore.show('截图已提交，等待分析完成。', 'success', 2200)
+    notificationStore.show(
+      options.initiatedByHotkey
+        ? `快捷键截图成功：${result.message || '已提交分析请求，等待结果。'}`
+        : '截图已提交，等待分析完成。',
+      'success',
+      2400,
+    )
   } catch (error) {
     console.error('Screenshot failed:', error)
-    notificationStore.show('截图请求失败，请检查后端日志。', 'error', 4500)
+    notificationStore.show(
+      options.initiatedByHotkey
+        ? '快捷键截图失败：请检查后端日志。'
+        : '截图请求失败，请检查后端日志。',
+      'error',
+      4500,
+    )
   } finally {
     if (isDesktop) {
       await focusDesktopWindow()
     }
     isCapturing.value = false
   }
+}
+
+const handleCaptureButtonClick = () => {
+  void handleScreenshot()
 }
 
 const handleSelectMemory = (memory: Memory) => {
@@ -129,13 +194,108 @@ const handleHideWindow = async () => {
   await hideDesktopWindow()
 }
 
-const handleCloseWindow = async () => {
+const handleMinimizeWindow = async () => {
+  await minimizeDesktopWindow()
+}
+
+const syncDesktopWindowState = async () => {
+  if (!isDesktop) {
+    isWindowMaximized.value = false
+    return
+  }
+
+  isWindowMaximized.value = await getDesktopWindowMaximized()
+}
+
+const handleToggleMaximizeWindow = async () => {
+  await toggleDesktopMaximize()
+  await syncDesktopWindowState()
+}
+
+const performCloseAction = async (action: Exclude<CloseAction, 'ask'>) => {
+  if (action === 'minimize') {
+    await hideDesktopWindow()
+    return
+  }
+
   await closeDesktopWindow()
+}
+
+const requestWindowClose = async () => {
+  if (closeDialogOpen.value) {
+    return
+  }
+
+  if (closeAction.value === 'ask') {
+    closeDialogOpen.value = true
+    return
+  }
+
+  try {
+    await performCloseAction(closeAction.value)
+  } catch (error) {
+    console.error('Close window failed:', error)
+    notificationStore.show('退出失败，请查看日志。', 'error', 3200)
+  }
+}
+
+const handleCloseWindow = async () => {
+  await requestWindowClose()
+}
+
+const handleCloseDialogChoice = async (payload: {
+  action: 'minimize' | 'exit'
+  remember: boolean
+}) => {
+  closeDialogOpen.value = false
+
+  try {
+    if (payload.remember) {
+      try {
+        await settingsApi.update({
+          ui: {
+            close_action: payload.action,
+          },
+        })
+        closeAction.value = payload.action
+      } catch (error) {
+        console.error('Saving close action failed:', error)
+        notificationStore.show('关闭偏好保存失败，但本次操作会继续执行。', 'warning', 3200)
+      }
+    }
+
+    await performCloseAction(payload.action)
+  } catch (error) {
+    console.error('Applying close action failed:', error)
+    notificationStore.show('关闭操作失败，请查看日志。', 'error', 3200)
+  }
 }
 
 const handleRefresh = async () => {
   await checkBackendHealth()
   await memoriesStore.refresh()
+}
+
+const handleDeleteMemory = async (memory: Memory) => {
+  if (deletingMemoryId.value) {
+    return
+  }
+
+  const confirmed = window.confirm('确定要删除这条记忆吗？')
+  if (!confirmed) {
+    return
+  }
+
+  deletingMemoryId.value = memory.id
+  try {
+    await memoriesStore.remove(memory.id)
+    notificationStore.show('记忆已删除', 'success', 2200)
+  } catch (error) {
+    console.error('Delete memory failed:', error)
+    notificationStore.show('删除失败，请稍后重试。', 'error', 3200)
+  } finally {
+    deletingMemoryId.value = null
+  }
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
@@ -165,13 +325,29 @@ const handleFocusSearchEvent = async () => {
   await focusSearch()
 }
 
+const handleShortcutScreenshotEvent = async () => {
+  if (!isDesktop) {
+    return
+  }
+
+  await handleScreenshot({
+    initiatedByHotkey: true,
+  })
+}
+
 onMounted(async () => {
   if (isDesktop) {
     await focusDesktopWindow()
+    await syncDesktopWindowState()
+    removeDesktopCloseListener = await listenForDesktopCloseRequests(() => {
+      void requestWindowClose()
+    })
   }
 
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('glimpse:focus-search', handleFocusSearchEvent)
+  window.addEventListener('glimpse:shortcut-screenshot', handleShortcutScreenshotEvent)
+  await loadUiSettings()
   await checkBackendHealth()
   await loadMemories()
   await focusSearch()
@@ -180,6 +356,9 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('glimpse:focus-search', handleFocusSearchEvent)
+  window.removeEventListener('glimpse:shortcut-screenshot', handleShortcutScreenshotEvent)
+  removeDesktopCloseListener?.()
+  removeDesktopCloseListener = null
 })
 </script>
 
@@ -187,7 +366,7 @@ onUnmounted(() => {
   <div class="min-h-screen shell-frame p-4">
     <div class="shell-card mx-auto flex min-h-[calc(100vh-2rem)] max-w-6xl flex-col overflow-hidden rounded-[28px]">
       <header class="shell-header flex items-center justify-between gap-4 px-5 py-4">
-        <div class="flex items-center gap-3" data-tauri-drag-region>
+        <div class="shell-drag-zone flex items-center gap-3" data-tauri-drag-region>
           <div class="logo-badge flex h-11 w-11 items-center justify-center rounded-2xl text-lg font-bold text-white">
             G
           </div>
@@ -225,7 +404,7 @@ onUnmounted(() => {
           <button
             class="capture-button"
             :disabled="isCapturing"
-            @click="handleScreenshot"
+            @click="handleCaptureButtonClick"
           >
             <svg v-if="!isCapturing" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -250,11 +429,38 @@ onUnmounted(() => {
           <button
             v-if="isDesktop"
             class="shell-icon-button"
-            @click="handleHideWindow"
-            title="隐藏"
+            @click="handleMinimizeWindow"
+            title="最小化"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+            </svg>
+          </button>
+
+          <button
+            v-if="isDesktop"
+            class="shell-icon-button"
+            @click="handleToggleMaximizeWindow"
+            :title="isWindowMaximized ? '恢复' : '最大化'"
+          >
+            <svg
+              v-if="!isWindowMaximized"
+              class="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <rect x="5" y="5" width="14" height="14" rx="1.5" stroke-width="2" />
+            </svg>
+            <svg
+              v-else
+              class="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9h10v10H9z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15V5h10" />
             </svg>
           </button>
 
@@ -281,13 +487,15 @@ onUnmounted(() => {
             @cancel="handleClusterCancel"
           />
 
-          <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,5fr)]">
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(360px,5fr)]">
             <MemoryList
               :memories="memoriesStore.memories"
               :is-loading="memoriesStore.isLoading"
               :selected-id="selectedMemory?.id"
+              :deleting-id="deletingMemoryId"
               @select="handleSelectMemory"
               @open="handleOpenMemoryDetail($event.id)"
+              @delete="handleDeleteMemory"
             />
 
             <DetailPanel
@@ -297,11 +505,17 @@ onUnmounted(() => {
               @open="handleOpenMemoryDetail"
             />
             <div v-else class="card flex items-center justify-center p-8 text-sm text-slate-500">
-              选择一条记忆后，可在这里查看摘要与 OCR 文本。
+              选择一条记忆后，可在这里查看摘要与识别文本。
             </div>
           </div>
         </div>
       </main>
     </div>
+
+    <CloseActionDialog
+      :open="closeDialogOpen"
+      @close="closeDialogOpen = false"
+      @choose="handleCloseDialogChoice"
+    />
   </div>
 </template>

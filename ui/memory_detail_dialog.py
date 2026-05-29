@@ -150,8 +150,8 @@ class MemoryDetailDialog(QDialog):
         self._summary_text.setObjectName("detailText")
         layout.addWidget(self._summary_text)
 
-        # --- OCR Text ---
-        ocr_label = QLabel(t("detail.ocr_text"))
+        # --- Extracted Text ---
+        ocr_label = QLabel(t("detail.extracted_text"))
         ocr_label.setObjectName("sectionTitle")
         layout.addWidget(ocr_label)
 

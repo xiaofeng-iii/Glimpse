@@ -7,7 +7,7 @@ from typing import Callable, Dict, Optional
 
 from api.dependencies import get_keyboard_manager, get_settings_manager
 from api.desktop_actions import capture_and_analyze
-from api.websocket import broadcast_event
+from api.websocket import broadcast_event, has_active_connections
 
 _hotkey_loop: Optional[asyncio.AbstractEventLoop] = None
 
@@ -46,6 +46,28 @@ async def _handle_search_hotkey() -> None:
     )
 
 
+async def _handle_screenshot_hotkey() -> None:
+    if has_active_connections():
+        await broadcast_event(
+            "desktop_action",
+            {
+                "action": "trigger_screenshot",
+                "source": "global_hotkey",
+            },
+        )
+        return
+
+    result = await capture_and_analyze(source="global_hotkey")
+    if not result.get("success"):
+        await broadcast_event(
+            "error_occurred",
+            {
+                "message": result.get("message", "Screenshot hotkey failed"),
+                "source": "global_hotkey",
+            },
+        )
+
+
 def _build_hotkey_handlers() -> Dict[str, Callable[[], None]]:
     settings_manager = get_settings_manager()
     configured_hotkeys = settings_manager.get("hotkeys", {})
@@ -53,9 +75,7 @@ def _build_hotkey_handlers() -> Dict[str, Callable[[], None]]:
 
     screenshot_hotkey = (configured_hotkeys.get("screenshot") or "").strip()
     if screenshot_hotkey:
-        handlers[screenshot_hotkey] = lambda: _schedule(
-            capture_and_analyze(source="global_hotkey")
-        )
+        handlers[screenshot_hotkey] = lambda: _schedule(_handle_screenshot_hotkey())
 
     search_hotkey = (configured_hotkeys.get("search") or "").strip()
     if search_hotkey:

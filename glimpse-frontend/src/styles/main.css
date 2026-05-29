@@ -60,6 +60,17 @@ textarea {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.14));
 }
 
+.shell-drag-zone {
+  min-width: 0;
+  flex: 1 1 auto;
+  cursor: grab;
+  user-select: none;
+}
+
+.shell-drag-zone:active {
+  cursor: grabbing;
+}
+
 .logo-badge {
   background: linear-gradient(135deg, #d96b31 0%, #235d67 100%);
   box-shadow: 0 10px 22px rgba(35, 93, 103, 0.22);
@@ -227,7 +238,7 @@ kbd {
   font-weight: 700;
 }
 
-.badge-ocr {
+.badge-exact {
   background: rgba(35, 93, 103, 0.1);
   color: #235d67;
 }

@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { memoriesApi, type Memory } from '@/api/client'
+import { getImageUrl } from '@/config/runtime'
+import { openExternalTarget } from '@/platform/desktop'
 import { useNotificationStore } from '@/stores/notification'
+import { getMemoryImageUrls } from '@/utils/memory-images'
+import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -10,6 +14,9 @@ const notificationStore = useNotificationStore()
 
 const memory = ref<Memory | null>(null)
 const isLoading = ref(true)
+const previewOpen = ref(false)
+const previewIndex = ref(0)
+const failedImages = ref<Record<string, boolean>>({})
 
 onMounted(async () => {
   const id = route.params.id as string
@@ -50,7 +57,27 @@ const handleOpenImage = () => {
   if (!memory.value) {
     return
   }
-  window.open(`/api/images?path=${encodeURIComponent(memory.value.image_path)}`, '_blank')
+  void openExternalTarget(getImageUrl(memory.value.image_path))
+}
+
+const imageUrls = computed(() => {
+  if (!memory.value) {
+    return []
+  }
+
+  return getMemoryImageUrls(memory.value)
+})
+
+const openPreview = (index = 0) => {
+  previewIndex.value = index
+  previewOpen.value = true
+}
+
+const markImageError = (url: string) => {
+  failedImages.value = {
+    ...failedImages.value,
+    [url]: true,
+  }
 }
 </script>
 
@@ -81,6 +108,45 @@ const handleOpenImage = () => {
 
         <!-- Content Card -->
         <div class="card p-8">
+          <!-- Image Preview -->
+          <div v-if="imageUrls.length" class="mb-8 space-y-3">
+            <button
+              class="block w-full overflow-hidden rounded-3xl border border-slate-200 bg-slate-100"
+              @click="openPreview(0)"
+            >
+              <img
+                v-if="!failedImages[imageUrls[0]]"
+                :src="imageUrls[0]"
+                :alt="memory.ai_summary"
+                class="h-[420px] w-full object-contain"
+                @error="markImageError(imageUrls[0])"
+              />
+              <div v-else class="flex h-[420px] items-center justify-center text-sm text-slate-500">
+                图片预览加载失败
+              </div>
+            </button>
+
+            <div v-if="imageUrls.length > 1" class="grid grid-cols-4 gap-3">
+              <button
+                v-for="(imageUrl, index) in imageUrls.slice(1)"
+                :key="imageUrl"
+                class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
+                @click="openPreview(index + 1)"
+              >
+                <img
+                  v-if="!failedImages[imageUrl]"
+                  :src="imageUrl"
+                  :alt="`${memory.ai_summary}-${index + 2}`"
+                  class="h-24 w-full object-cover"
+                  @error="markImageError(imageUrl)"
+                />
+                <div v-else class="flex h-24 items-center justify-center text-[11px] text-slate-400">
+                  加载失败
+                </div>
+              </button>
+            </div>
+          </div>
+
           <!-- Time -->
           <p class="text-sm text-gray-500 mb-4">{{ formatDate(memory.created_at) }}</p>
 
@@ -93,9 +159,9 @@ const handleOpenImage = () => {
           <h2 class="text-lg font-semibold text-gray-900 mb-3">AI 摘要</h2>
           <p class="text-gray-900 leading-relaxed mb-8">{{ memory.ai_summary }}</p>
 
-          <!-- OCR Text -->
+          <!-- Extracted Text -->
           <div v-if="memory.text_content">
-            <h2 class="text-lg font-semibold text-gray-900 mb-3">OCR 文本</h2>
+            <h2 class="text-lg font-semibold text-gray-900 mb-3">识别文本</h2>
             <p class="text-gray-600 leading-relaxed bg-gray-50 p-4 rounded-xl">{{ memory.text_content }}</p>
           </div>
 
@@ -113,5 +179,14 @@ const handleOpenImage = () => {
         记忆不存在或已删除
       </div>
     </div>
+
+    <ImagePreviewModal
+      v-if="memory"
+      :open="previewOpen"
+      :images="imageUrls"
+      :start-index="previewIndex"
+      @close="previewOpen = false"
+      @update:start-index="previewIndex = $event"
+    />
   </div>
 </template>

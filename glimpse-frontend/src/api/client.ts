@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { getApiBaseUrl } from '@/config/runtime'
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getApiBaseUrl(),
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -63,7 +64,16 @@ export const screenshotApi = {
     return response.data
   },
 
-  triggerAndAnalyze: async (force = false): Promise<{ success: boolean, memory_id?: string, message?: string }> => {
+  triggerAndAnalyze: async (
+    force = false,
+  ): Promise<{
+    success: boolean
+    accepted?: boolean
+    memory_id?: string
+    message?: string
+    image_path?: string
+    source?: string
+  }> => {
     const response = await api.post('/screenshot/analyze', { force })
     return response.data
   },
@@ -121,7 +131,9 @@ export const statsApi = {
 // Health check
 export const healthApi = {
   check: async (): Promise<{ status: string }> => {
-    const response = await api.get('/health')
+    const response = await api.get('/health', {
+      timeout: 2000,
+    })
     return response.data
   },
 }

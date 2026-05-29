@@ -52,6 +52,10 @@ _broadcast_loop: Optional[asyncio.AbstractEventLoop] = None
 _signal_forwarding_initialized = False
 
 
+def has_active_connections() -> bool:
+    return bool(manager.active_connections)
+
+
 async def broadcast_event(event_type: str, data: Dict[str, Any]):
     """Broadcast an event to all connected WebSocket clients"""
     event = WebSocketEvent(

@@ -1,102 +1,164 @@
-# Glimpse 环境配置指南
+# Glimpse 快速启动指南
 
-## 环境要求
+本文档面向第一次拉取仓库的开发成员。
 
-- Python 3.10+
-- Node.js 18+
-- Windows / macOS / Linux
-- 可选：Rust（Tauri 开发 / 打包）
+## 1. 安装前确认
 
-## Python 依赖安装
+必须具备：
 
-```bash
+- Python `3.10+`
+- Node.js `18+`
+
+如果要运行桌面弹窗，还需要：
+
+- Rust / Cargo
+- Windows 下可用的 MSVC C++ 工具链
+
+## 2. 安装依赖
+
+在仓库根目录执行：
+
+```powershell
 pip install -r requirements.txt
 ```
 
-## 前端依赖安装
+安装前端依赖：
 
-```bash
+```powershell
 cd glimpse-frontend
 npm install
+cd ..
 ```
 
-## 配置
+如果需要打包发布版，再执行：
 
-创建 `.env` 文件：
+```powershell
+pip install -r requirements-packaging.txt
+```
+
+## 3. 配置环境变量
+
+复制 `.env.example` 为 `.env`，至少填写：
 
 ```env
 OPENAI_API_KEY=your_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
 ```
 
-## 运行方式
+如果使用 OpenAI 兼容平台，请同时确认：
 
-### 1. 旧版 PySide6 界面
+- `OPENAI_BASE_URL` 正确
+- `MODEL` 填的是实际可调用的模型 / endpoint id
 
-```bash
-python main.py
-```
+## 4. 启动方式
 
-### 2. 新版 FastAPI + Vue 3 + Tauri 开发模式
+### A. 只跑后端
 
-启动 API：
-
-```bash
+```powershell
 python main_api.py
 ```
 
-启动前端：
+### B. 跑网页开发页
 
-```bash
+先启动后端：
+
+```powershell
+python main_api.py
+```
+
+再启动前端：
+
+```powershell
 cd glimpse-frontend
 npm run dev
 ```
 
-一键启动：
+访问：
 
-```bat
-start.bat
+- `http://localhost:1420`
+
+### C. 跑 Tauri 弹窗
+
+推荐可见模式：
+
+```powershell
+.\start_tauri_visible.bat
 ```
 
-桌面弹窗模式调试：
+如果只是想静默弹出桌面窗口：
 
-```bat
+```powershell
+.\start_tauri.bat
+```
+
+## 5. PowerShell 注意事项
+
+在 PowerShell 中运行仓库内脚本时，要加 `.\`：
+
+```powershell
+.\start.bat
+.\start_tauri.bat
+.\start_tauri_visible.bat
+.\build_release.bat
+```
+
+不要直接写：
+
+```powershell
 start_tauri.bat
 ```
 
-## 依赖说明
+否则 PowerShell 可能提示“命令不存在”。
 
-| 类别 | 依赖 | 说明 |
-|------|------|------|
-| Legacy UI | `PySide6==6.11.0` | 旧 Qt for Python 桌面界面 |
-| API | `fastapi`, `uvicorn`, `websockets`, `pydantic` | 新前后端分离接口层 |
-| 数据库 | `chromadb==0.4.18` | 向量数据库 |
-| Embedding | `sentence-transformers==2.2.2` | 文本嵌入模型 |
-| 截图 | `mss==9.0.1`, `Pillow==10.2.0` | 屏幕截图处理 |
-| OCR | `rapidocr-onnxruntime==1.4.4` | 文字识别 |
-| 输入 | `pynput==1.7.6` | 全局热键监听 |
-| AI | `openai==1.13.3` | AI 接口调用 |
-| 工具 | `psutil==5.9.8`, `python-dateutil==2.9.0` | 系统工具 |
+## 6. 常见问题
 
-## 故障排除
+### 1. `cargo` 找不到
 
-### Python 依赖安装失败
+优先确认：
 
-```bash
-pip install --upgrade pip setuptools wheel
-pip install -r requirements.txt
+```powershell
+cargo --version
+rustup --version
 ```
 
-### 前端依赖安装失败
+如果机器已经装过 Rust，但当前终端识别不到，先关闭终端再重新打开。
 
-```bash
-cd glimpse-frontend
-npm cache clean --force
-npm install
+### 2. Tauri 启动没反应
+
+优先使用：
+
+```powershell
+.\start_tauri_visible.bat
 ```
 
-### Tauri 无法启动
+因为 `start_tauri.bat` 是静默模式，失败时不直接显示终端报错。
 
-- 先确认 `python main_api.py` 已经启动
-- 确认本机已安装 Rust 工具链
-- 确认前端目录下已执行 `npm install`
+### 3. `Port 1420 is already in use`
+
+说明已有前端开发服务器在运行。请先关掉旧的 `npm run dev` 进程，再重新启动 Tauri。
+
+### 4. 后端已启动但前端显示未连接
+
+先检查：
+
+```powershell
+http://127.0.0.1:8000/api/health
+```
+
+浏览器或接口工具中应返回：
+
+```json
+{"status":"healthy", ...}
+```
+
+## 7. 推荐启动顺序
+
+团队开发时建议优先按下面顺序：
+
+1. 配置 `.env`
+2. `pip install -r requirements.txt`
+3. `cd glimpse-frontend && npm install`
+4. 先跑 `python main_api.py`
+5. 再根据需要选择：
+   - 网页开发页：`cd glimpse-frontend && npm run dev`
+   - 桌面弹窗：`.\start_tauri_visible.bat`

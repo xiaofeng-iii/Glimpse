@@ -82,6 +82,9 @@ docker-compose.*.yml
 glimpse-frontend/node_modules/
 glimpse-frontend/dist/
 glimpse-frontend/src-tauri/target/
+glimpse-frontend/src-tauri/binaries/
+build/backend-sidecar/
+release/
 
 # Testing
 .pytest_cache/

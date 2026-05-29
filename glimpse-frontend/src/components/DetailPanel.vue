@@ -1,7 +1,12 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import type { Memory } from '@/api/client'
+import { getImageUrl } from '@/config/runtime'
+import { openExternalTarget } from '@/platform/desktop'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
+import { getMemoryImageUrls } from '@/utils/memory-images'
+import ImagePreviewModal from './ImagePreviewModal.vue'
 
 const props = defineProps<{
   memory: Memory
@@ -14,6 +19,11 @@ const emit = defineEmits<{
 
 const memoriesStore = useMemoriesStore()
 const notificationStore = useNotificationStore()
+const previewOpen = ref(false)
+const previewIndex = ref(0)
+const failedImages = ref<Record<string, boolean>>({})
+
+const imageUrls = computed(() => getMemoryImageUrls(props.memory))
 
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleString('zh-CN')
@@ -36,12 +46,23 @@ const handleCopy = async () => {
 }
 
 const handleOpenImage = () => {
-  // Open image in system viewer
-  window.open(`/api/images?path=${encodeURIComponent(props.memory.image_path)}`, '_blank')
+  void openExternalTarget(getImageUrl(props.memory.image_path))
 }
 
 const handleOpenDetail = () => {
   emit('open', props.memory.id)
+}
+
+const openPreview = (index = 0) => {
+  previewIndex.value = index
+  previewOpen.value = true
+}
+
+const markImageError = (url: string) => {
+  failedImages.value = {
+    ...failedImages.value,
+    [url]: true,
+  }
 }
 </script>
 
@@ -71,15 +92,53 @@ const handleOpenDetail = () => {
       {{ memory.app_name }}
     </div>
 
+    <div v-if="imageUrls.length" class="mb-6 space-y-3">
+      <button
+        class="block w-full overflow-hidden rounded-3xl border border-slate-200 bg-slate-100"
+        @click="openPreview(0)"
+      >
+        <img
+          v-if="!failedImages[imageUrls[0]]"
+          :src="imageUrls[0]"
+          :alt="memory.ai_summary"
+          class="h-64 w-full object-cover"
+          @error="markImageError(imageUrls[0])"
+        />
+        <div v-else class="flex h-64 items-center justify-center text-sm text-slate-500">
+          图片预览加载失败
+        </div>
+      </button>
+
+      <div v-if="imageUrls.length > 1" class="grid grid-cols-4 gap-2">
+        <button
+          v-for="(imageUrl, index) in imageUrls.slice(1)"
+          :key="imageUrl"
+          class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
+          @click="openPreview(index + 1)"
+        >
+          <img
+            v-if="!failedImages[imageUrl]"
+            :src="imageUrl"
+            :alt="`${memory.ai_summary}-${index + 2}`"
+            class="h-20 w-full object-cover"
+            @error="markImageError(imageUrl)"
+          />
+          <div v-else class="flex h-20 items-center justify-center text-[11px] text-slate-400">
+            加载失败
+          </div>
+        </button>
+      </div>
+    </div>
+
     <!-- AI Summary -->
     <div class="mb-4">
       <h4 class="text-sm font-semibold text-gray-700 mb-2">AI 摘要</h4>
       <p class="text-gray-900 leading-relaxed">{{ memory.ai_summary }}</p>
     </div>
 
-    <!-- OCR Text -->
+    <!-- Extracted Text -->
     <div v-if="memory.text_content" class="mb-4">
-      <h4 class="text-sm font-semibold text-gray-700 mb-2">OCR 文本</h4>
+      <h4 class="text-sm font-semibold text-gray-700 mb-2">识别文本</h4>
       <p class="text-gray-600 text-sm leading-relaxed max-h-32 overflow-y-auto">{{ memory.text_content }}</p>
     </div>
 
@@ -117,4 +176,12 @@ const handleOpenDetail = () => {
       删除记忆
     </button>
   </div>
+
+  <ImagePreviewModal
+    :open="previewOpen"
+    :images="imageUrls"
+    :start-index="previewIndex"
+    @close="previewOpen = false"
+    @update:start-index="previewIndex = $event"
+  />
 </template>

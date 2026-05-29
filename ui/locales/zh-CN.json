@@ -12,8 +12,16 @@
     "screenshot": "截图",
     "search_placeholder": "搜索记忆...",
     "source_all": "综合结果",
-    "source_ocr": "仅看精确",
+    "source_exact": "仅看精确",
     "source_semantic": "仅看语义"
+  },
+  "close": {
+    "title": "关闭 Glimpse",
+    "message": "关闭窗口时，你希望执行什么操作？",
+    "detail": "最小化到托盘后，程序仍会在后台运行，可通过托盘图标重新打开。",
+    "minimize": "最小化到托盘",
+    "exit": "退出应用",
+    "remember": "记住我的选择"
   },
   "status": {
     "ready": "就绪",
@@ -47,7 +55,6 @@
     "hotkeys": "快捷键",
     "screenshot": "截图",
     "ai_service": "AI 服务",
-    "ocr": "精确",
     "ui": "界面",
     "hotkey_desc": "点击输入框后直接按下组合键，设置全局快捷键以快速触发功能",
     "hotkey_screenshot": "截图快捷键:",
@@ -60,11 +67,13 @@
     "model": "模型:",
     "base_url": "Base URL:",
     "timeout": "超时时间:",
-    "ocr_engine": "OCR 引擎:",
-    "language": "语言:",
     "theme": "主题:",
     "auto_hide": "自动隐藏",
     "start_minimized": "启动时最小化",
+    "close_action": "关闭窗口时:",
+    "close_action_ask": "每次询问",
+    "close_action_minimize": "最小化到托盘",
+    "close_action_exit": "退出应用",
     "preview_theme": "立即预览主题",
     "reset_default": "恢复默认",
     "cancel": "取消",
@@ -92,7 +101,7 @@
     "summary": "AI 摘要",
     "image": "图片",
     "image_path": "图片路径",
-    "ocr_text": "OCR 文本",
+    "extracted_text": "识别文本",
     "no_memories": "暂无记忆，按截图快捷键开始记录",
     "no_results": "未找到匹配结果",
     "items_count": "{count} 条记忆",
@@ -103,7 +112,7 @@
     "confirm_delete_msg": "确定要删除这条记忆吗？此操作不可撤销。"
   },
   "badges": {
-    "ocr": "OCR",
+    "exact": "精确",
     "semantic": "语义"
   },
   "tooltips": {
@@ -111,7 +120,7 @@
     "settings": "打开应用设置",
     "search": "搜索已保存的记忆",
     "source_all": "显示精确和语义搜索结果",
-    "source_ocr": "仅显示文本匹配结果",
+    "source_exact": "仅显示文本匹配结果",
     "source_semantic": "仅显示语义相似结果",
     "memory_item": "双击查看详情",
     "cluster_submit": "立即提交收集的截图进行分析",

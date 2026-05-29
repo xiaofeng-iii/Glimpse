@@ -41,6 +41,7 @@ def get_default_settings() -> dict:
             "theme": "light",
             "auto_hide": False,
             "start_minimized": False,
+            "close_action": "ask",
         },
         "cluster": {
             "cluster_mode": False,
@@ -99,7 +100,9 @@ async def update_settings(settings: SettingsUpdate):
                     current[key] = value
 
         # Save settings
-        settings_manager.update(current)
+        saved = settings_manager.update(current)
+        if not saved:
+            raise HTTPException(status_code=400, detail="Invalid settings payload")
 
         # Apply runtime settings
         if settings.screenshot:

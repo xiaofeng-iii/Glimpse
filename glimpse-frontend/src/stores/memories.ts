@@ -53,9 +53,11 @@ export const useMemoriesStore = defineStore('memories', () => {
   const remove = async (id: string) => {
     try {
       await memoriesApi.delete(id)
-      memories.value = memories.value.filter(m => m.id !== id)
+      const remainingMemories = memories.value.filter(m => m.id !== id)
+      memories.value = remainingMemories
+      total.value = Math.max(0, total.value - 1)
       if (selectedMemory.value?.id === id) {
-        selectedMemory.value = null
+        selectedMemory.value = remainingMemories[0] ?? null
       }
     } catch (error) {
       console.error('Failed to delete memory:', error)
