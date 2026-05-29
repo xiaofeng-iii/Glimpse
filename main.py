@@ -56,7 +56,8 @@ def main() -> int:
     print("The Tauri shell will start the Python API automatically if needed.")
 
     completed = subprocess.run(
-        ["cmd.exe", "/c", _build_tauri_command()],
+        _build_tauri_command(),
+        shell=True,
         cwd=PROJECT_ROOT,
         env=env,
     )
