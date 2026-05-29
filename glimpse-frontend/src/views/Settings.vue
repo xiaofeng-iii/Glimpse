@@ -16,7 +16,6 @@ const aiApiKey = ref('')
 const aiBaseUrl = ref('https://api.openai.com/v1')
 const aiModel = ref('gpt-4o-mini')
 const aiTimeout = ref(60)
-const uiTheme = ref('light')
 const closeAction = ref<'ask' | 'minimize' | 'exit'>('ask')
 const clusterMode = ref(false)
 const clusterAutoSubmit = ref(true)
@@ -158,7 +157,6 @@ const loadSettings = async () => {
     aiBaseUrl.value = s.ai?.base_url || 'https://api.openai.com/v1'
     aiModel.value = s.ai?.model || 'gpt-4o-mini'
     aiTimeout.value = s.ai?.timeout || 60
-    uiTheme.value = s.ui?.theme || 'light'
     closeAction.value = s.ui?.close_action || 'ask'
     clusterMode.value = s.cluster?.cluster_mode || false
     clusterAutoSubmit.value = s.cluster?.cluster_auto_submit ?? true
@@ -194,7 +192,6 @@ const handleSave = async () => {
       },
       ai: aiSettings,
       ui: {
-        theme: uiTheme.value,
         close_action: closeAction.value,
       },
       cluster: {
@@ -355,14 +352,6 @@ const handleCancel = () => {
         <div class="card p-6">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">界面</h2>
           <div class="space-y-4">
-            <div>
-              <label class="block text-sm text-gray-600 mb-2">主题</label>
-              <select v-model="uiTheme" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none">
-                <option value="light">浅色</option>
-                <option value="dark">深色</option>
-                <option value="system">跟随系统</option>
-              </select>
-            </div>
             <div>
               <label class="block text-sm text-gray-600 mb-2">关闭窗口时</label>
               <select v-model="closeAction" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none">

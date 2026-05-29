@@ -14,7 +14,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen">
+  <div class="h-screen min-h-0 overflow-hidden">
     <RouterView />
     <NotificationToast />
   </div>

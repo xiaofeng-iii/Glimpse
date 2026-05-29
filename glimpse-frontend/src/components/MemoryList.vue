@@ -52,7 +52,7 @@ const markImageError = (memoryId: string) => {
 </script>
 
 <template>
-  <div class="card flex h-full max-h-[calc(100vh-11rem)] min-h-[420px] flex-col overflow-hidden p-4 xl:sticky xl:top-24">
+  <div class="card flex h-full min-h-0 flex-col overflow-hidden p-4">
     <!-- Loading State -->
     <div v-if="isLoading" class="flex justify-center py-12">
       <LoadingSpinner />

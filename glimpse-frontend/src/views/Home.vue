@@ -424,8 +424,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen shell-frame">
-    <div class="shell-card flex min-h-screen w-full flex-col overflow-hidden">
+  <div class="shell-frame flex h-screen min-h-0 flex-col overflow-hidden">
+    <div class="shell-card flex h-full min-h-0 w-full flex-col overflow-hidden">
       <header class="shell-header relative flex items-center justify-between gap-4 px-5 py-4">
         <div class="shell-titlebar-drag-layer" data-tauri-drag-region></div>
         <div class="shell-drag-zone flex items-center gap-3" data-tauri-drag-region>
@@ -542,8 +542,8 @@ onUnmounted(() => {
         </div>
       </header>
 
-      <main class="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
-        <div class="mx-auto flex min-h-full max-w-6xl flex-col gap-4">
+      <main class="min-h-0 flex-1 overflow-hidden px-5 pb-5">
+        <div class="mx-auto flex h-full min-h-0 max-w-6xl flex-col gap-4">
           <SearchBar ref="searchBar" :shortcut-label="searchShortcutLabel" />
 
           <ClusterBar
@@ -552,7 +552,7 @@ onUnmounted(() => {
             @cancel="handleClusterCancel"
           />
 
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(300px,3fr)_minmax(0,5fr)]">
+          <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden md:grid-cols-[minmax(300px,3fr)_minmax(0,5fr)]">
             <MemoryList
               :memories="memoriesStore.memories"
               :is-loading="memoriesStore.isLoading"
@@ -569,7 +569,7 @@ onUnmounted(() => {
               @close="memoriesStore.select(null)"
               @open="handleOpenMemoryDetail"
             />
-            <div v-else class="card flex items-center justify-center p-8 text-sm text-slate-500">
+            <div v-else class="card flex h-full min-h-0 items-center justify-center p-8 text-sm text-slate-500">
               选择一条记忆后，可在这里查看摘要与识别文本。
             </div>
           </div>
