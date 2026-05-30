@@ -133,6 +133,7 @@ where
 
 fn show_main_window(app: &AppHandle) {
     with_main_window(app, |window| {
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     });
@@ -167,11 +168,12 @@ fn quit_app(app: AppHandle) {
 
 #[tauri::command]
 fn hide_window(window: tauri::WebviewWindow) -> Result<(), String> {
-    window.hide().map_err(|error| error.to_string())
+    window.minimize().map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 fn focus_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.unminimize().map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())
 }

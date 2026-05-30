@@ -186,7 +186,7 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
   try {
     if (isDesktop) {
       await hideDesktopWindow()
-      await wait(180)
+      await wait(300)
     }
 
     const result = await screenshotApi.triggerAndAnalyze(true)
