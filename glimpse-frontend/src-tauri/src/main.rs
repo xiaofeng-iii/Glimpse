@@ -115,15 +115,27 @@ fn build_backend_command(app: &AppHandle) -> Option<Command> {
 
     #[cfg(not(debug_assertions))]
     {
-        let resource_dir = app.path().resource_dir().ok()?;
-        let sidecar_path = resource_dir.join(sidecar_filename());
+        let _ = app;
+        let exe_path = std::env::current_exe().ok()?;
+        let exe_dir = exe_path.parent()?;
+
+        let sidecar_path = exe_dir.join("python-backend.exe");
         if !sidecar_path.exists() {
-            eprintln!("Bundled backend sidecar not found: {}", sidecar_path.display());
-            return None;
+            let triple_path = exe_dir.join(sidecar_filename());
+            if !triple_path.exists() {
+                eprintln!(
+                    "Bundled backend sidecar not found in: {}",
+                    exe_dir.display()
+                );
+                return None;
+            }
+            let mut command = Command::new(triple_path);
+            command.current_dir(exe_dir);
+            return Some(command);
         }
 
         let mut command = Command::new(sidecar_path);
-        command.current_dir(resource_dir);
+        command.current_dir(exe_dir);
         Some(command)
     }
 }
