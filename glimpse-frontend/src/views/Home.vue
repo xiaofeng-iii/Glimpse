@@ -450,7 +450,7 @@ onUnmounted(() => {
               backendReady ? 'status-pill-ready' : 'status-pill-offline',
             ]"
           >
-            {{ backendReady ? '后端已连接' : '后端未连接' }}
+            {{ backendReady ? '服务正常' : '服务异常' }}
           </span>
         </div>
 
