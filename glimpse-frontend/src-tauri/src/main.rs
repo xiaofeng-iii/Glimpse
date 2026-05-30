@@ -168,7 +168,7 @@ fn quit_app(app: AppHandle) {
 
 #[tauri::command]
 fn hide_window(window: tauri::WebviewWindow) -> Result<(), String> {
-    window.minimize().map_err(|error| error.to_string())
+    window.hide().map_err(|error| error.to_string())
 }
 
 #[tauri::command]

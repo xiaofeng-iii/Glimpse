@@ -185,7 +185,7 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
 
   try {
     if (isDesktop) {
-      await hideDesktopWindow()
+      await minimizeDesktopWindow()
       await wait(300)
     }
 
