@@ -11,7 +11,7 @@ use std::sync::{
 use std::time::Duration;
 use tauri::image::Image;
 use tauri::menu::MenuBuilder;
-use tauri::tray::TrayIconBuilder;
+use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 
 #[cfg(target_os = "windows")]
@@ -243,7 +243,12 @@ fn main() {
 
             let tray_builder = TrayIconBuilder::with_id("main-tray")
                 .tooltip("Glimpse")
-                .menu(&tray_menu);
+                .menu(&tray_menu)
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
+                        show_main_window(tray.app_handle());
+                    }
+                });
 
             if let Some(icon) = app_icon {
                 tray_builder.icon(icon).build(app)?;
