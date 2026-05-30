@@ -67,8 +67,8 @@
       "../../assets/icons/glimpse_24.png",
       "../../assets/icons/glimpse_16.png"
     ],
-    "externalBin": [
-      "binaries/python-backend"
+    "resources": [
+      "binaries/python-backend/"
     ]
   }
 }

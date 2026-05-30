@@ -9,6 +9,12 @@ Default: http://localhost:8000
 """
 import sys
 import os
+
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
+
 import argparse
 from pathlib import Path
 from runtime_env import get_env_file, get_runtime_root

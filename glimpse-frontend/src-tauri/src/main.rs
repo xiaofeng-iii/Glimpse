@@ -59,46 +59,6 @@ fn backend_autostart_disabled() -> bool {
     )
 }
 
-#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-fn sidecar_filename() -> &'static str {
-    "python-backend-x86_64-pc-windows-msvc.exe"
-}
-
-#[cfg(all(target_os = "windows", target_arch = "aarch64"))]
-fn sidecar_filename() -> &'static str {
-    "python-backend-aarch64-pc-windows-msvc.exe"
-}
-
-#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-fn sidecar_filename() -> &'static str {
-    "python-backend-x86_64-apple-darwin"
-}
-
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-fn sidecar_filename() -> &'static str {
-    "python-backend-aarch64-apple-darwin"
-}
-
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-fn sidecar_filename() -> &'static str {
-    "python-backend-x86_64-unknown-linux-gnu"
-}
-
-#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-fn sidecar_filename() -> &'static str {
-    "python-backend-aarch64-unknown-linux-gnu"
-}
-
-#[cfg(not(any(
-    all(target_os = "windows", target_arch = "x86_64"),
-    all(target_os = "windows", target_arch = "aarch64"),
-    all(target_os = "macos", target_arch = "x86_64"),
-    all(target_os = "macos", target_arch = "aarch64"),
-    all(target_os = "linux", target_arch = "x86_64"),
-    all(target_os = "linux", target_arch = "aarch64")
-)))]
-compile_error!("Unsupported target for the bundled python-backend sidecar");
-
 fn build_backend_command(app: &AppHandle) -> Option<Command> {
     #[cfg(debug_assertions)]
     {
@@ -115,27 +75,24 @@ fn build_backend_command(app: &AppHandle) -> Option<Command> {
 
     #[cfg(not(debug_assertions))]
     {
-        let _ = app;
-        let exe_path = std::env::current_exe().ok()?;
-        let exe_dir = exe_path.parent()?;
+        let resource_dir = app.path().resource_dir().ok()?;
+        let sidecar_dir = resource_dir.join("binaries").join("python-backend");
 
-        let sidecar_path = exe_dir.join("python-backend.exe");
-        if !sidecar_path.exists() {
-            let triple_path = exe_dir.join(sidecar_filename());
-            if !triple_path.exists() {
-                eprintln!(
-                    "Bundled backend sidecar not found in: {}",
-                    exe_dir.display()
-                );
-                return None;
-            }
-            let mut command = Command::new(triple_path);
-            command.current_dir(exe_dir);
-            return Some(command);
+        #[cfg(target_os = "windows")]
+        let sidecar_exe = sidecar_dir.join("python-backend.exe");
+        #[cfg(not(target_os = "windows"))]
+        let sidecar_exe = sidecar_dir.join("python-backend");
+
+        if !sidecar_exe.exists() {
+            eprintln!(
+                "Bundled backend sidecar not found: {}",
+                sidecar_exe.display()
+            );
+            return None;
         }
 
-        let mut command = Command::new(sidecar_path);
-        command.current_dir(exe_dir);
+        let mut command = Command::new(sidecar_exe);
+        command.current_dir(&sidecar_dir);
         Some(command)
     }
 }

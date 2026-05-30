@@ -175,7 +175,7 @@ def collect_pyinstaller_resources() -> tuple[list[str], list[tuple[str, str]], l
 
 
 def main() -> int:
-    build_name = f"python-backend-{target_triple()}"
+    build_name = "python-backend"
     separator = resource_separator()
 
     try:
@@ -193,7 +193,7 @@ def main() -> int:
         str(ENTRYPOINT),
         "--noconfirm",
         "--clean",
-        "--onefile",
+        "--onedir",
         "--noconsole",
         f"--name={build_name}",
         f"--distpath={BINARIES_DIR}",
@@ -215,12 +215,13 @@ def main() -> int:
     PyInstaller.__main__.run(args)
 
     suffix = ".exe" if os.name == "nt" else ""
-    output_path = BINARIES_DIR / f"{build_name}{suffix}"
-    if not output_path.exists():
-        print(f"Expected sidecar output not found: {output_path}")
+    onedir_output = BINARIES_DIR / build_name
+    onedir_exe = onedir_output / f"{build_name}{suffix}"
+    if not onedir_exe.exists():
+        print(f"Expected sidecar output not found: {onedir_exe}")
         return 1
 
-    print(f"Backend sidecar ready: {output_path}")
+    print(f"Backend sidecar ready: {onedir_output}")
     return 0
 
 
