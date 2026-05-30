@@ -246,14 +246,14 @@ const handleCancel = () => {
 </script>
 
 <template>
-  <div class="h-screen flex flex-col bg-gray-50">
-    <div class="flex flex-1 min-h-0">
+  <div class="h-screen p-4 sm:p-6" style="background: radial-gradient(circle at top left, rgba(217, 107, 49, 0.12), transparent 28%), radial-gradient(circle at top right, rgba(35, 93, 103, 0.10), transparent 22%), linear-gradient(135deg, var(--shell-bg-a), var(--shell-bg-b) 50%, var(--shell-bg-c))">
+    <div class="flex h-full min-h-0 gap-4">
       <!-- Left Sidebar -->
-      <aside class="w-56 flex-shrink-0 flex flex-col border-r border-gray-200 bg-white">
-        <div class="px-5 py-5">
+      <aside class="card flex w-56 flex-shrink-0 flex-col overflow-hidden p-4">
+        <div data-tauri-drag-region class="mb-5">
           <h1 class="text-lg font-bold text-gray-900">设置</h1>
         </div>
-        <nav class="flex-1 px-3 space-y-1">
+        <nav class="flex-1 space-y-1">
           <button
             v-for="section in sections"
             :key="section.id"
@@ -271,157 +271,160 @@ const handleCancel = () => {
             {{ section.label }}
           </button>
         </nav>
+        <button @click="handleCancel" class="btn-secondary mt-4 w-full text-center">
+          返回
+        </button>
       </aside>
 
       <!-- Right Content -->
-      <main class="flex-1 overflow-y-auto p-8">
-        <div class="max-w-lg">
-          <!-- Hotkeys -->
-          <div v-if="activeSection === 'hotkeys'">
-            <h2 class="text-lg font-semibold text-gray-900 mb-6">快捷键设置</h2>
-            <div class="space-y-5">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">截图快捷键</label>
-                <button
-                  type="button"
-                  :class="[
-                    'w-full min-h-11 px-4 py-2.5 rounded-lg border text-left outline-none transition-colors',
-                    recordingHotkey === 'screenshot'
-                      ? 'border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
-                      : 'border-gray-300 bg-white text-gray-800 hover:border-violet-300 focus:border-violet-400',
-                  ]"
-                  @click="startHotkeyRecording('screenshot')"
-                  @keydown="handleHotkeyKeydown($event, 'screenshot')"
-                  @blur="recordingHotkey = null"
-                >
-                  <span class="font-medium">
-                    {{ recordingHotkey === 'screenshot' ? '请按下快捷键...' : formatHotkeyForDisplay(screenshotHotkey) }}
-                  </span>
-                  <span class="ml-2 text-xs text-gray-400">
-                    {{ recordingHotkey === 'screenshot' ? 'Esc 取消，Backspace 清空' : '点击录入' }}
-                  </span>
-                </button>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">搜索快捷键</label>
-                <button
-                  type="button"
-                  :class="[
-                    'w-full min-h-11 px-4 py-2.5 rounded-lg border text-left outline-none transition-colors',
-                    recordingHotkey === 'search'
-                      ? 'border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
-                      : 'border-gray-300 bg-white text-gray-800 hover:border-violet-300 focus:border-violet-400',
-                  ]"
-                  @click="startHotkeyRecording('search')"
-                  @keydown="handleHotkeyKeydown($event, 'search')"
-                  @blur="recordingHotkey = null"
-                >
-                  <span class="font-medium">
-                    {{ recordingHotkey === 'search' ? '请按下快捷键...' : formatHotkeyForDisplay(searchHotkey) }}
-                  </span>
-                  <span class="ml-2 text-xs text-gray-400">
-                    {{ recordingHotkey === 'search' ? 'Esc 取消，Backspace 清空' : '点击录入' }}
-                  </span>
-                </button>
+      <div class="flex min-h-0 flex-1 flex-col gap-4">
+        <main class="card flex-1 overflow-y-auto p-6">
+          <div class="max-w-xl">
+            <!-- Hotkeys -->
+            <div v-if="activeSection === 'hotkeys'">
+              <h2 class="text-lg font-semibold text-gray-900 mb-4">快捷键</h2>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">截图快捷键</label>
+                  <button
+                    type="button"
+                    :class="[
+                      'w-full min-h-11 px-4 py-2 rounded-lg border text-left outline-none transition-colors',
+                      recordingHotkey === 'screenshot'
+                        ? 'border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
+                        : 'border-gray-200 bg-white text-gray-800 hover:border-violet-300 focus:border-violet-400',
+                    ]"
+                    @click="startHotkeyRecording('screenshot')"
+                    @keydown="handleHotkeyKeydown($event, 'screenshot')"
+                    @blur="recordingHotkey = null"
+                  >
+                    <span class="font-medium">
+                      {{ recordingHotkey === 'screenshot' ? '请按下快捷键...' : formatHotkeyForDisplay(screenshotHotkey) }}
+                    </span>
+                    <span class="ml-2 text-xs text-gray-400">
+                      {{ recordingHotkey === 'screenshot' ? 'Esc 取消，Backspace 清空' : '点击录入' }}
+                    </span>
+                  </button>
+                </div>
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">搜索快捷键</label>
+                  <button
+                    type="button"
+                    :class="[
+                      'w-full min-h-11 px-4 py-2 rounded-lg border text-left outline-none transition-colors',
+                      recordingHotkey === 'search'
+                        ? 'border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
+                        : 'border-gray-200 bg-white text-gray-800 hover:border-violet-300 focus:border-violet-400',
+                    ]"
+                    @click="startHotkeyRecording('search')"
+                    @keydown="handleHotkeyKeydown($event, 'search')"
+                    @blur="recordingHotkey = null"
+                  >
+                    <span class="font-medium">
+                      {{ recordingHotkey === 'search' ? '请按下快捷键...' : formatHotkeyForDisplay(searchHotkey) }}
+                    </span>
+                    <span class="ml-2 text-xs text-gray-400">
+                      {{ recordingHotkey === 'search' ? 'Esc 取消，Backspace 清空' : '点击录入' }}
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Screenshot -->
-          <div v-if="activeSection === 'screenshot'">
-            <h2 class="text-lg font-semibold text-gray-900 mb-6">截图设置</h2>
-            <div class="space-y-5">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">防抖间隔（秒）</label>
-                <input v-model.number="debounceInterval" type="number" step="0.5" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-violet-400 focus:ring-1 focus:ring-violet-100 outline-none" />
+            <!-- Screenshot -->
+            <div v-if="activeSection === 'screenshot'">
+              <h2 class="text-lg font-semibold text-gray-900 mb-4">截图设置</h2>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">防抖间隔 (秒)</label>
+                  <input v-model.number="debounceInterval" type="number" step="0.5" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">最大截图数</label>
+                  <input v-model.number="maxCaptures" type="number" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                </div>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">最大截图数</label>
-                <input v-model.number="maxCaptures" type="number" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-violet-400 focus:ring-1 focus:ring-violet-100 outline-none" />
+
+              <h3 class="text-lg font-semibold text-gray-900 mt-6 mb-4">集群截图</h3>
+              <div class="space-y-4">
+                <label class="flex items-center gap-3">
+                  <input v-model="clusterMode" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
+                  <span class="text-gray-700">启用集群模式</span>
+                </label>
+                <label class="flex items-center gap-3">
+                  <input v-model="clusterAutoSubmit" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
+                  <span class="text-gray-700">自动提交</span>
+                </label>
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">最大图片数</label>
+                  <input v-model.number="clusterMaxImages" type="number" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">超时时间 (秒)</label>
+                  <input v-model.number="clusterTimeout" type="number" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                </div>
               </div>
-              <hr class="border-gray-200" />
-              <div>
-                <h3 class="text-base font-semibold text-gray-900 mb-4">集群截图</h3>
-                <div class="space-y-4">
-                  <label class="flex items-center gap-3 cursor-pointer">
-                    <input v-model="clusterMode" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
-                    <span class="text-gray-700">启用集群模式</span>
-                  </label>
-                  <label class="flex items-center gap-3 cursor-pointer">
-                    <input v-model="clusterAutoSubmit" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
-                    <span class="text-gray-700">自动提交</span>
-                  </label>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">最大图片数</label>
-                    <input v-model.number="clusterMaxImages" type="number" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-violet-400 focus:ring-1 focus:ring-violet-100 outline-none" />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">超时时间（秒）</label>
-                    <input v-model.number="clusterTimeout" type="number" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-violet-400 focus:ring-1 focus:ring-violet-100 outline-none" />
-                  </div>
+            </div>
+
+            <!-- AI -->
+            <div v-if="activeSection === 'ai'">
+              <h2 class="text-lg font-semibold text-gray-900 mb-4">AI 服务</h2>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">API Key</label>
+                  <input v-model="aiApiKey" type="password" placeholder="sk-..." class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">Base URL</label>
+                  <input v-model="aiBaseUrl" placeholder="https://api.openai.com/v1" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">模型</label>
+                  <input v-model="aiModel" placeholder="gpt-4o-mini" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">超时时间 (秒)</label>
+                  <input v-model.number="aiTimeout" type="number" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                </div>
+                <div class="flex items-center gap-4">
+                  <button @click="handleTestAi" :disabled="isTestingAi" class="btn-secondary">
+                    {{ isTestingAi ? '测试中...' : '测试连接' }}
+                  </button>
+                  <span v-if="aiTestResult" :class="['text-sm', aiTestResult.success ? 'text-green-600' : 'text-red-600']">
+                    {{ aiTestResult.message }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- UI -->
+            <div v-if="activeSection === 'ui'">
+              <h2 class="text-lg font-semibold text-gray-900 mb-4">界面</h2>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm text-gray-600 mb-2">关闭窗口时</label>
+                  <select v-model="closeAction" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none">
+                    <option value="ask">每次询问</option>
+                    <option value="minimize">最小化到托盘</option>
+                    <option value="exit">退出应用</option>
+                  </select>
                 </div>
               </div>
             </div>
           </div>
+        </main>
 
-          <!-- AI -->
-          <div v-if="activeSection === 'ai'">
-            <h2 class="text-lg font-semibold text-gray-900 mb-6">AI 服务设置</h2>
-            <div class="space-y-5">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
-                <input v-model="aiApiKey" type="password" placeholder="sk-..." class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-violet-400 focus:ring-1 focus:ring-violet-100 outline-none" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Base URL</label>
-                <input v-model="aiBaseUrl" placeholder="https://api.openai.com/v1" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-violet-400 focus:ring-1 focus:ring-violet-100 outline-none" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">模型</label>
-                <input v-model="aiModel" placeholder="gpt-4o-mini" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-violet-400 focus:ring-1 focus:ring-violet-100 outline-none" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">超时时间（秒）</label>
-                <input v-model.number="aiTimeout" type="number" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-violet-400 focus:ring-1 focus:ring-violet-100 outline-none" />
-              </div>
-              <div class="flex items-center gap-4 pt-1">
-                <button @click="handleTestAi" :disabled="isTestingAi" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                  {{ isTestingAi ? '测试中...' : '测试连接' }}
-                </button>
-                <span v-if="aiTestResult" :class="['text-sm', aiTestResult.success ? 'text-green-600' : 'text-red-600']">
-                  {{ aiTestResult.message }}
-                </span>
-              </div>
-            </div>
+        <!-- Footer -->
+        <footer class="card flex items-center justify-between p-4">
+          <button @click="handleReset" class="px-4 py-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+            恢复默认
+          </button>
+          <div class="flex gap-3">
+            <button @click="handleCancel" class="btn-secondary">取消</button>
+            <button @click="handleSave" class="btn-primary">保存</button>
           </div>
-
-          <!-- UI -->
-          <div v-if="activeSection === 'ui'">
-            <h2 class="text-lg font-semibold text-gray-900 mb-6">界面设置</h2>
-            <div class="space-y-5">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">关闭窗口时</label>
-                <select v-model="closeAction" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-violet-400 focus:ring-1 focus:ring-violet-100 outline-none bg-white">
-                  <option value="ask">每次询问</option>
-                  <option value="minimize">最小化到托盘</option>
-                  <option value="exit">退出应用</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-
-    <!-- Fixed Footer -->
-    <footer class="flex items-center justify-between bg-white border-t border-gray-200 px-8 py-4">
-      <button @click="handleReset" class="px-4 py-2.5 text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-        恢复默认
-      </button>
-      <div class="flex items-center gap-3">
-        <button @click="handleCancel" class="px-5 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">取消</button>
-        <button @click="handleSave" class="px-5 py-2.5 rounded-lg bg-violet-600 text-sm font-medium text-white hover:bg-violet-700 transition-colors">保存</button>
+        </footer>
       </div>
-    </footer>
+    </div>
   </div>
 </template>
