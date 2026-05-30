@@ -10,6 +10,7 @@ const props = defineProps<{
   isLoading: boolean
   selectedId?: string
   deletingId?: string | null
+  shortcutLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -59,7 +60,7 @@ const markImageError = (memoryId: string) => {
     </div>
 
     <!-- Empty State -->
-    <EmptyState v-else-if="!hasMemories" />
+    <EmptyState v-else-if="!hasMemories" :shortcut-label="shortcutLabel ?? 'Ctrl+Shift+G'" />
 
     <!-- Memory List -->
     <div v-else class="flex min-h-0 flex-1 flex-col">

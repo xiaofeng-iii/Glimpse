@@ -434,11 +434,7 @@ onUnmounted(() => {
           </div>
           <div data-tauri-drag-region>
             <h1 class="text-lg font-semibold text-slate-900">Glimpse</h1>
-            <p class="text-xs text-slate-500">
-              桌面记忆弹窗
-              <span class="mx-2 text-slate-300">·</span>
-              {{ screenshotShortcutLabel }} 截图
-            </p>
+            <p class="text-xs text-slate-500">桌面记忆弹窗</p>
           </div>
         </div>
 
@@ -558,6 +554,7 @@ onUnmounted(() => {
               :is-loading="memoriesStore.isLoading"
               :selected-id="selectedMemory?.id"
               :deleting-id="deletingMemoryId"
+              :shortcut-label="screenshotShortcutLabel"
               @select="handleSelectMemory"
               @open="handleOpenMemoryDetail($event.id)"
               @delete="handleDeleteMemory"
