@@ -4,15 +4,15 @@ This file is the shared starting point for new AI coding sessions. Keep it short
 
 ## Product In One Sentence
 
-Glimpse is a desktop memory assistant: a user captures the screen, the app extracts text and visual meaning, stores the result locally, and lets the user search those memories later.
+Glimpse is a desktop memory assistant: a user captures the screen, the app summarizes visual meaning, stores the result locally, and lets the user search those memories later.
 
 ## First Principles
 
-- Preserve the local-memory pipeline: capture -> OCR -> AI summary -> embedding -> SQLite + ChromaDB -> search/UI.
+- Preserve the current local-memory pipeline: capture -> AI summary -> embedding -> SQLite + ChromaDB -> search/UI.
 - Keep user data local by default. Runtime data belongs under `GlimpseData/`, not in the repo.
 - Prefer dependency injection through `container.get(...)`. Avoid introducing new module-level global instances.
 - Treat UI, services, storage, and capture as separate layers. Cross layers through existing services/signals instead of shortcut imports.
-- Make behavior robust when AI credentials are missing. Search/browse should still work with OCR text and saved data.
+- Make behavior robust when AI credentials are missing. Search/browse should still work with saved data.
 - Do not commit AI session artifacts. Keep only this guide as the repo-level instruction file for future sessions.
 
 ## Environment
@@ -47,11 +47,13 @@ The project is developed on Windows with a Tauri/Vue desktop shell and a Python 
 
 1. Screenshot is captured by `core/capture.py`.
 2. Cluster mode, if enabled, buffers multiple screenshots in `core/cluster_buffer.py`.
-3. `services/memory_service.py` orchestrates OCR, AI summary, embeddings, and persistence.
-4. `db/sqlite_manager.py` stores memory metadata, OCR text, summaries, and FTS search data.
+3. `services/memory_service.py` orchestrates AI summary, embeddings, and persistence.
+4. `db/sqlite_manager.py` stores memory metadata, summary text, optional recognized text, and FTS search data.
 5. `db/chroma_manager.py` stores vector-search data.
 6. `services/search_service.py` combines exact and semantic search results.
 7. UI renders list/detail state and hides placeholder app names such as empty strings or `unknown`.
+
+OCR engine code still exists in `services/ocr_engine.py` and is registered in `container.py`, but the current `MemoryService` implementation does not call it. If OCR is re-enabled, update this guide and the relevant memory-service tests together.
 
 ## Important Conventions
 
