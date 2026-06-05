@@ -46,11 +46,11 @@ const chooseAction = (action: 'minimize' | 'exit') => {
         </p>
       </div>
 
-      <label class="mt-5 flex items-center gap-3 rounded-2xl bg-white/70 px-4 py-3 text-sm text-slate-700">
+      <label class="close-action-remember mt-5 flex items-center gap-3 rounded-2xl bg-white/70 px-4 py-3 text-sm text-slate-700">
         <input
           v-model="rememberChoice"
           type="checkbox"
-          class="h-4 w-4 rounded border-slate-300 text-[var(--shell-highlight)] focus:ring-[var(--shell-highlight)]"
+          class="close-action-checkbox h-4 w-4 rounded border-slate-300 text-[var(--shell-highlight)] focus:ring-[var(--shell-highlight)]"
         />
         <span>记住我的选择</span>
       </label>

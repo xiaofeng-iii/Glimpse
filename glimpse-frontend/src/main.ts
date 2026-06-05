@@ -4,8 +4,10 @@ import router from './router'
 import App from './App.vue'
 import './styles/main.css'
 import { initializeBackendRuntime } from './config/runtime'
+import { applyThemePreference, getStoredThemePreference } from './utils/theme'
 
 const bootstrap = async () => {
+  applyThemePreference(getStoredThemePreference())
   await initializeBackendRuntime()
 
   const app = createApp(App)

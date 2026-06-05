@@ -538,7 +538,7 @@ onUnmounted(() => {
         </div>
       </header>
 
-      <main class="min-h-0 flex-1 overflow-hidden px-5 pb-5">
+      <main class="min-h-0 flex-1 overflow-hidden px-5 pb-5 pt-3">
         <div class="mx-auto flex h-full min-h-0 max-w-6xl flex-col gap-4">
           <SearchBar ref="searchBar" :shortcut-label="searchShortcutLabel" />
 

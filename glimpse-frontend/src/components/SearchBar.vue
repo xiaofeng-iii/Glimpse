@@ -87,10 +87,10 @@ defineExpose({ focus })
         :key="s.value"
         @click="source = s.value"
         :class="[
-          'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200',
+          'source-filter-button px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200',
           source === s.value
-            ? 'bg-gradient-to-r from-violet-500 to-pink-500 text-white shadow-lg shadow-violet-500/25'
-            : 'bg-white/80 text-gray-600 hover:bg-gray-100'
+            ? 'source-filter-button-active'
+            : ''
         ]"
       >
         {{ s.label }}
