@@ -3,10 +3,13 @@
 
 #[cfg(not(debug_assertions))]
 use std::fmt::Write as FmtWrite;
+#[cfg(debug_assertions)]
 use std::io::{Read, Write};
 #[cfg(not(debug_assertions))]
 use std::net::TcpListener;
-use std::net::{SocketAddr, TcpStream};
+use std::net::SocketAddr;
+#[cfg(debug_assertions)]
+use std::net::TcpStream;
 #[cfg(not(debug_assertions))]
 use std::path::Path;
 use std::path::PathBuf;
@@ -15,6 +18,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
 };
+#[cfg(debug_assertions)]
 use std::time::Duration;
 use serde::Serialize;
 use tauri::image::Image;
@@ -28,6 +32,7 @@ use std::os::windows::process::CommandExt;
 const DEV_API_ORIGIN: &str = "http://127.0.0.1:8000";
 #[cfg(not(debug_assertions))]
 const LOOPBACK_HOST: &str = "127.0.0.1";
+#[cfg(debug_assertions)]
 const BACKEND_IDENTITY_MARKER: &str = "Glimpse API";
 #[cfg(all(target_os = "windows", not(debug_assertions)))]
 const BACKEND_PROCESS_NAME: &str = "python-backend.exe";
@@ -71,6 +76,7 @@ fn api_addr(origin: &str) -> Option<SocketAddr> {
     origin.strip_prefix("http://")?.parse().ok()
 }
 
+#[cfg(debug_assertions)]
 fn connect_api_port(origin: &str) -> Option<TcpStream> {
     let addr: SocketAddr = match api_addr(origin) {
         Some(addr) => addr,
@@ -80,10 +86,12 @@ fn connect_api_port(origin: &str) -> Option<TcpStream> {
     TcpStream::connect_timeout(&addr, Duration::from_millis(300)).ok()
 }
 
+#[cfg(debug_assertions)]
 fn backend_port_is_open(origin: &str) -> bool {
     connect_api_port(origin).is_some()
 }
 
+#[cfg(debug_assertions)]
 fn glimpse_backend_is_running(runtime: &BackendRuntime) -> bool {
     let mut stream = match connect_api_port(&runtime.origin) {
         Some(stream) => stream,
@@ -162,6 +170,7 @@ fn backend_runtime_for_launch() -> BackendRuntime {
     }
 }
 
+#[cfg(debug_assertions)]
 fn project_root() -> Option<PathBuf> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
