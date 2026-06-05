@@ -6,6 +6,7 @@ import { getImageUrl } from '@/config/runtime'
 import { openExternalTarget } from '@/platform/desktop'
 import { useNotificationStore } from '@/stores/notification'
 import { getMemoryImageUrls } from '@/utils/memory-images'
+import { t } from '@/utils/i18n'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 
 const route = useRoute()
@@ -34,7 +35,7 @@ const formatDate = (dateStr: string) => {
 }
 
 const handleDelete = async () => {
-  if (memory.value && confirm('确定要删除这条记忆吗？')) {
+  if (memory.value && confirm(t('message.deleteConfirm'))) {
     await memoriesApi.delete(memory.value.id)
     router.push('/')
   }
@@ -47,9 +48,9 @@ const handleCopy = async () => {
 
   try {
     await navigator.clipboard.writeText(memory.value.ai_summary)
-    notificationStore.show('已复制成功', 'success', 2200)
+    notificationStore.show(t('message.copied'), 'success', 2200)
   } catch (error) {
-    notificationStore.show('复制失败，请重试。', 'error', 3000)
+    notificationStore.show(t('message.copyFailed'), 'error', 3000)
   }
 }
 
@@ -97,12 +98,12 @@ const markImageError = (url: string) => {
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            返回
+            {{ t('action.back') }}
           </button>
           <div class="flex gap-2">
-            <button @click="handleCopy" class="btn-secondary">复制摘要</button>
-            <button @click="handleOpenImage" class="btn-secondary">查看图片</button>
-            <button @click="handleDelete" class="px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">删除</button>
+            <button @click="handleCopy" class="btn-secondary">{{ t('action.copySummary') }}</button>
+            <button @click="handleOpenImage" class="btn-secondary">{{ t('action.viewImage') }}</button>
+            <button @click="handleDelete" class="px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">{{ t('action.delete') }}</button>
           </div>
         </div>
 
@@ -122,7 +123,7 @@ const markImageError = (url: string) => {
                 @error="markImageError(imageUrls[0])"
               />
               <div v-else class="flex h-[420px] items-center justify-center text-sm text-slate-500">
-                图片预览加载失败
+                {{ t('memory.previewFailed') }}
               </div>
             </button>
 
@@ -141,7 +142,7 @@ const markImageError = (url: string) => {
                   @error="markImageError(imageUrl)"
                 />
                 <div v-else class="flex h-24 items-center justify-center text-[11px] text-slate-400">
-                  加载失败
+                  {{ t('memory.loadFailed') }}
                 </div>
               </button>
             </div>
@@ -156,19 +157,19 @@ const markImageError = (url: string) => {
           </div>
 
           <!-- AI Summary -->
-          <h2 class="text-lg font-semibold text-gray-900 mb-3">AI 摘要</h2>
+          <h2 class="text-lg font-semibold text-gray-900 mb-3">{{ t('memory.summary') }}</h2>
           <p class="text-gray-900 leading-relaxed mb-8">{{ memory.ai_summary }}</p>
 
           <!-- Extracted Text -->
           <div v-if="memory.text_content">
-            <h2 class="text-lg font-semibold text-gray-900 mb-3">识别文本</h2>
+            <h2 class="text-lg font-semibold text-gray-900 mb-3">{{ t('memory.text') }}</h2>
             <p class="text-gray-600 leading-relaxed bg-gray-50 p-4 rounded-xl">{{ memory.text_content }}</p>
           </div>
 
           <!-- Image Path -->
           <div class="mt-8 pt-6 border-t border-gray-100">
             <p class="text-xs text-gray-400">
-              <span class="font-medium">图片路径:</span> {{ memory.image_path }}
+              <span class="font-medium">{{ t('memory.imagePath') }}:</span> {{ memory.image_path }}
             </p>
           </div>
         </div>
@@ -176,7 +177,7 @@ const markImageError = (url: string) => {
 
       <!-- Not Found -->
       <div v-else class="text-center py-20 text-gray-500">
-        记忆不存在或已删除
+        {{ t('memory.missing') }}
       </div>
     </div>
 

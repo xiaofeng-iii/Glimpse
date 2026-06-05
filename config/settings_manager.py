@@ -95,6 +95,7 @@ class SettingsManager:
             },
             "ui": {
                 "theme": "light",
+                "language": "zh-CN",
                 "auto_hide": False,
                 "start_minimized": False,
                 "close_action": "ask",
@@ -276,6 +277,12 @@ class SettingsManager:
                 return False
         if "theme" in section and not isinstance(section["theme"], str):
             return False
+        if "language" in section:
+            language = section["language"]
+            if not isinstance(language, str):
+                return False
+            if language not in {"zh-CN", "en-US"}:
+                return False
         if "auto_hide" in section and not isinstance(section["auto_hide"], bool):
             return False
         if "start_minimized" in section and not isinstance(section["start_minimized"], bool):

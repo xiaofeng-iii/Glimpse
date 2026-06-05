@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useMemoriesStore } from '@/stores/memories'
+import { t } from '@/utils/i18n'
 
 const props = defineProps<{
   modelValue?: string
@@ -19,10 +20,10 @@ const source = ref('all')
 const searchInput = ref<HTMLInputElement | null>(null)
 
 const sources = [
-  { value: 'all', label: '综合结果' },
-  { value: 'exact', label: '仅看精确' },
-  { value: 'semantic', label: '仅看语义' },
-]
+  { value: 'all', labelKey: 'search.all' },
+  { value: 'exact', labelKey: 'search.exactOnly' },
+  { value: 'semantic', labelKey: 'search.semanticOnly' },
+] as const
 
 let debounceTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -70,7 +71,7 @@ defineExpose({ focus })
         ref="searchInput"
         v-model="query"
         type="text"
-        placeholder="搜索记忆..."
+        :placeholder="t('search.placeholder')"
         class="flex-1 bg-transparent border-none outline-none px-4 py-3 text-gray-900 placeholder-gray-400 text-lg"
       />
 
@@ -93,7 +94,7 @@ defineExpose({ focus })
             : ''
         ]"
       >
-        {{ s.label }}
+        {{ t(s.labelKey) }}
       </button>
     </div>
   </div>

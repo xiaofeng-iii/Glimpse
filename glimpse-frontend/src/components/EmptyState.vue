@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { t } from '@/utils/i18n'
 
 const props = defineProps<{
   shortcutLabel: string
@@ -22,8 +23,8 @@ const shortcutParts = computed(() => {
       </svg>
     </div>
 
-    <h3 class="text-lg font-medium text-gray-900 mb-2">暂无记忆</h3>
-    <p class="text-gray-500 text-sm mb-4">按截图快捷键开始记录</p>
+    <h3 class="text-lg font-medium text-gray-900 mb-2">{{ t('memory.emptyTitle') }}</h3>
+    <p class="text-gray-500 text-sm mb-4">{{ t('memory.emptyHint') }}</p>
 
     <div class="empty-shortcut flex items-center gap-1">
       <template v-for="(part, i) in shortcutParts" :key="i">

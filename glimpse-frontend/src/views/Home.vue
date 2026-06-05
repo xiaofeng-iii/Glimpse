@@ -21,6 +21,7 @@ import DetailPanel from '@/components/DetailPanel.vue'
 import ClusterBar from '@/components/ClusterBar.vue'
 import CloseActionDialog from '@/components/CloseActionDialog.vue'
 import glimpseLogo from '@/assets/glimpse.svg'
+import { t } from '@/utils/i18n'
 
 type SearchBarExpose = {
   focus: () => void
@@ -154,7 +155,7 @@ const checkBackendHealth = async () => {
 const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
   if (isCapturing.value) {
     if (options.initiatedByHotkey) {
-      notificationStore.show('快捷键截图失败：当前已有截图任务正在处理中。', 'warning', 2800)
+      notificationStore.show(t('message.busyCapture'), 'warning', 2800)
     }
     return
   }
@@ -163,8 +164,8 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
   if (!healthy) {
       notificationStore.show(
       options.initiatedByHotkey
-        ? '快捷键截图失败：后端未连接，请先启动 Python API 服务。'
-        : '后端未连接，请先启动 Python API 服务。',
+        ? t('message.backendOfflineHotkey')
+        : t('message.backendOffline'),
       'error',
       4500,
     )
@@ -176,8 +177,8 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
   if (!clusterModeEnabled.value) {
   notificationStore.show(
     options.initiatedByHotkey
-      ? '快捷键已触发，正在截图并提交分析...'
-      : '正在截图并提交分析...',
+      ? t('message.captureStartedHotkey')
+      : t('message.captureStarted'),
     'info',
     1800,
   )
@@ -193,8 +194,8 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
     if (!result.success) {
       notificationStore.show(
         options.initiatedByHotkey
-          ? `快捷键截图失败：${result.message || '截图请求失败。'}`
-          : result.message || '截图请求失败。',
+          ? `${t('message.captureFailed')}${result.message ? ` ${result.message}` : ''}`
+          : result.message || t('message.captureFailed'),
         'error',
         4500,
       )
@@ -204,8 +205,8 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
     if (!result.clustered && !clusterModeEnabled.value) {
       notificationStore.show(
       options.initiatedByHotkey
-        ? `快捷键截图成功：${result.message || '已提交分析请求，等待结果。'}`
-        : '截图已提交，等待分析完成。',
+        ? result.message || t('message.captureSubmitted')
+        : t('message.captureSubmitted'),
       'success',
         2400,
       )
@@ -214,8 +215,8 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
     console.error('Screenshot failed:', error)
     notificationStore.show(
       options.initiatedByHotkey
-        ? '快捷键截图失败：请检查后端日志。'
-        : '截图请求失败，请检查后端日志。',
+        ? t('message.checkBackendLogs')
+        : t('message.checkBackendLogs'),
       'error',
       4500,
     )
@@ -296,7 +297,7 @@ const requestWindowClose = async () => {
     await performCloseAction(closeAction.value)
   } catch (error) {
     console.error('Close window failed:', error)
-    notificationStore.show('退出失败，请查看日志。', 'error', 3200)
+    notificationStore.show(t('message.exitFailed'), 'error', 3200)
   }
 }
 
@@ -321,14 +322,14 @@ const handleCloseDialogChoice = async (payload: {
         closeAction.value = payload.action
       } catch (error) {
         console.error('Saving close action failed:', error)
-        notificationStore.show('关闭偏好保存失败，但本次操作会继续执行。', 'warning', 3200)
+        notificationStore.show(t('message.closePreferenceFailed'), 'warning', 3200)
       }
     }
 
     await performCloseAction(payload.action)
   } catch (error) {
     console.error('Applying close action failed:', error)
-    notificationStore.show('关闭操作失败，请查看日志。', 'error', 3200)
+    notificationStore.show(t('message.closeActionFailed'), 'error', 3200)
   }
 }
 
@@ -342,7 +343,7 @@ const handleDeleteMemory = async (memory: Memory) => {
     return
   }
 
-  const confirmed = window.confirm('确定要删除这条记忆吗？')
+  const confirmed = window.confirm(t('message.deleteConfirm'))
   if (!confirmed) {
     return
   }
@@ -350,10 +351,10 @@ const handleDeleteMemory = async (memory: Memory) => {
   deletingMemoryId.value = memory.id
   try {
     await memoriesStore.remove(memory.id)
-    notificationStore.show('记忆已删除', 'success', 2200)
+    notificationStore.show(t('message.deleted'), 'success', 2200)
   } catch (error) {
     console.error('Delete memory failed:', error)
-    notificationStore.show('删除失败，请稍后重试。', 'error', 3200)
+    notificationStore.show(t('message.deleteFailed'), 'error', 3200)
   } finally {
     deletingMemoryId.value = null
   }
@@ -434,7 +435,7 @@ onUnmounted(() => {
           </div>
           <div data-tauri-drag-region>
             <h1 class="text-lg font-semibold text-slate-900">Glimpse</h1>
-            <p class="text-xs text-slate-500">桌面记忆弹窗</p>
+            <p class="text-xs text-slate-500">{{ t('app.subtitle') }}</p>
           </div>
         </div>
 
@@ -446,7 +447,7 @@ onUnmounted(() => {
               backendReady ? 'status-pill-ready' : 'status-pill-offline',
             ]"
           >
-            {{ backendReady ? '服务正常' : '服务异常' }}
+            {{ backendReady ? t('status.ready') : t('status.offline') }}
           </span>
         </div>
 
@@ -455,7 +456,7 @@ onUnmounted(() => {
             class="shell-icon-button"
             :disabled="isCheckingBackend || memoriesStore.isLoading"
             @click="handleRefresh"
-            title="刷新"
+            :title="t('action.refresh')"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582M20 20v-5h-.581M5.59 9A7.97 7.97 0 0112 6c2.075 0 3.963.79 5.375 2.083L20 11M4 13l2.625 2.917A7.965 7.965 0 0012 18a7.97 7.97 0 005.41-2.1" />
@@ -472,14 +473,14 @@ onUnmounted(() => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <span v-else class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/35 border-t-white"></span>
-            <span>{{ isCapturing ? '处理中...' : '截图' }}</span>
+            <span>{{ isCapturing ? t('action.processing') : t('action.capture') }}</span>
             <kbd>{{ screenshotShortcutLabel }}</kbd>
           </button>
 
           <button
             class="shell-icon-button"
             @click="handleOpenSettings"
-            title="设置"
+            :title="t('action.settings')"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -491,7 +492,7 @@ onUnmounted(() => {
             v-if="isDesktop"
             class="shell-icon-button"
             @click="handleMinimizeWindow"
-            title="最小化"
+            :title="t('action.minimize')"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
@@ -502,7 +503,7 @@ onUnmounted(() => {
             v-if="isDesktop"
             class="shell-icon-button"
             @click="handleToggleMaximizeWindow"
-            :title="isWindowMaximized ? '恢复' : '最大化'"
+            :title="isWindowMaximized ? t('action.restore') : t('action.maximize')"
           >
             <svg
               v-if="!isWindowMaximized"
@@ -529,7 +530,7 @@ onUnmounted(() => {
             v-if="isDesktop"
             class="shell-icon-button shell-icon-button-danger"
             @click="handleCloseWindow"
-            title="关闭"
+            :title="t('action.close')"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -567,7 +568,7 @@ onUnmounted(() => {
               @open="handleOpenMemoryDetail"
             />
             <div v-else class="card flex h-full min-h-0 items-center justify-center p-8 text-sm text-slate-500">
-              选择一条记忆后，可在这里查看摘要与识别文本。
+              {{ t('memory.selectHint') }}
             </div>
           </div>
         </div>

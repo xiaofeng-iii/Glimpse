@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { t } from '@/utils/i18n'
 
 const props = withDefaults(defineProps<{
   open: boolean
@@ -71,7 +72,7 @@ const showNext = () => {
         v-if="currentImage"
         :src="currentImage"
         class="max-h-[85vh] max-w-[88vw] rounded-3xl border border-white/12 bg-white/8 object-contain shadow-2xl"
-        alt="记忆图片预览"
+        :alt="t('memory.previewAlt')"
       />
 
       <button
