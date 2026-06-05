@@ -41,8 +41,13 @@ def main():
     parser = argparse.ArgumentParser(description="Glimpse API Server")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind (default: 8000)")
+    parser.add_argument("--auth-token", type=str, default="", help="Optional local auth token for desktop clients")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
     args = parser.parse_args()
+    if args.auth_token:
+        os.environ["GLIMPSE_AUTH_TOKEN"] = args.auth_token
+    else:
+        os.environ.pop("GLIMPSE_AUTH_TOKEN", None)
 
     print(f"""
 ╔═══════════════════════════════════════════════════════════╗

@@ -2,8 +2,12 @@
 API Server - FastAPI application entry point
 Serves REST API and WebSocket endpoints for Tauri frontend
 """
-from fastapi import FastAPI, WebSocket
+import os
+import secrets
+
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import asyncio
 
@@ -13,6 +17,35 @@ from api.hotkeys import setup_global_hotkeys, shutdown_global_hotkeys
 from api.websocket import websocket_endpoint, setup_signal_forwarding, manager
 from container import container
 from services.bootstrap import configure_ai_client
+
+APP_VERSION = "1.0.0"
+AUTH_HEADER = "X-Glimpse-Auth"
+AUTH_QUERY_PARAM = "auth_token"
+
+
+def configured_auth_token() -> str:
+    return os.environ.get("GLIMPSE_AUTH_TOKEN", "").strip()
+
+
+def auth_token_is_valid(candidate: str | None) -> bool:
+    expected = configured_auth_token()
+    if not expected:
+        return True
+    return bool(candidate) and secrets.compare_digest(candidate, expected)
+
+
+def request_is_authorized(request: Request) -> bool:
+    return auth_token_is_valid(
+        request.headers.get(AUTH_HEADER)
+        or request.query_params.get(AUTH_QUERY_PARAM)
+    )
+
+
+def websocket_is_authorized(websocket: WebSocket) -> bool:
+    return auth_token_is_valid(
+        websocket.headers.get(AUTH_HEADER)
+        or websocket.query_params.get(AUTH_QUERY_PARAM)
+    )
 
 
 @asynccontextmanager
@@ -42,7 +75,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Glimpse API",
     description="AI-powered desktop memory retrieval system API",
-    version="1.0.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -54,6 +87,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def require_local_auth(request: Request, call_next):
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    if request.url.path.startswith("/api/") and not request_is_authorized(request):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Invalid Glimpse backend auth token"},
+        )
+
+    return await call_next(request)
+
 
 # Include routers
 app.include_router(memories.router, prefix="/api")
@@ -69,7 +117,7 @@ async def root():
     """Root endpoint - API info"""
     return {
         "name": "Glimpse API",
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "docs": "/docs",
         "websocket": "/ws/events",
     }
@@ -78,12 +126,22 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "container_initialized": container.has("memory_service")}
+    return {
+        "status": "healthy",
+        "app": "Glimpse",
+        "role": "backend",
+        "version": APP_VERSION,
+        "pid": os.getpid(),
+        "container_initialized": container.has("memory_service"),
+    }
 
 
 @app.websocket("/ws/events")
 async def websocket_handler(websocket: WebSocket):
     """WebSocket endpoint for real-time events"""
+    if not websocket_is_authorized(websocket):
+        await websocket.close(code=1008)
+        return
     await websocket_endpoint(websocket)
 
 

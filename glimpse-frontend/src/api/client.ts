@@ -1,12 +1,20 @@
 import axios from 'axios'
-import { getApiBaseUrl } from '@/config/runtime'
+import { getApiBaseUrl, getBackendAuthToken } from '@/config/runtime'
 
 const api = axios.create({
-  baseURL: getApiBaseUrl(),
   timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
+})
+
+api.interceptors.request.use((config) => {
+  config.baseURL = getApiBaseUrl()
+  const token = getBackendAuthToken()
+  if (token) {
+    (config.headers as Record<string, string>)['X-Glimpse-Auth'] = token
+  }
+  return config
 })
 
 // Types
@@ -132,7 +140,7 @@ export const statsApi = {
 
 // Health check
 export const healthApi = {
-  check: async (): Promise<{ status: string }> => {
+  check: async (): Promise<{ status: string, app?: string, role?: string, version?: string, pid?: number }> => {
     const response = await api.get('/health', {
       timeout: 2000,
     })

@@ -3,7 +3,7 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useClusterStore } from '@/stores/cluster'
 import { useNotificationStore } from '@/stores/notification'
 import { focusDesktopWindow } from '@/platform/desktop'
-import { getWsBaseUrl } from '@/config/runtime'
+import { appendBackendAuthToken, getWsBaseUrl } from '@/config/runtime'
 
 type WebSocketEvent = {
   type: string
@@ -21,7 +21,7 @@ export function useWebSocket() {
     if (ws?.readyState === WebSocket.OPEN) return
 
     const wsBaseUrl = getWsBaseUrl().replace(/\/$/, '')
-    const wsUrl = `${wsBaseUrl}/events`
+    const wsUrl = appendBackendAuthToken(`${wsBaseUrl}/events`)
 
     ws = new WebSocket(wsUrl)
 
