@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { t } from '@/utils/i18n'
 
 const props = defineProps<{
   open: boolean
@@ -37,28 +38,28 @@ const chooseAction = (action: 'minimize' | 'exit') => {
   >
     <div class="glass w-full max-w-md rounded-[24px] p-6 shadow-2xl">
       <div class="space-y-3">
-        <h2 class="text-lg font-semibold text-slate-900">关闭 Glimpse</h2>
+        <h2 class="text-lg font-semibold text-slate-900">{{ t('close.title') }}</h2>
         <p class="text-sm text-slate-700">
-          关闭窗口时，要最小化到托盘还是直接退出应用？
+          {{ t('close.question') }}
         </p>
         <p class="text-xs leading-6 text-slate-500">
-          最小化到托盘后，程序仍会在后台运行，可通过托盘菜单重新打开。
+          {{ t('close.description') }}
         </p>
       </div>
 
-      <label class="mt-5 flex items-center gap-3 rounded-2xl bg-white/70 px-4 py-3 text-sm text-slate-700">
+      <label class="close-action-remember mt-5 flex items-center gap-3 rounded-2xl bg-white/70 px-4 py-3 text-sm text-slate-700">
         <input
           v-model="rememberChoice"
           type="checkbox"
-          class="h-4 w-4 rounded border-slate-300 text-[var(--shell-highlight)] focus:ring-[var(--shell-highlight)]"
+          class="close-action-checkbox h-4 w-4 rounded border-slate-300 text-[var(--shell-highlight)] focus:ring-[var(--shell-highlight)]"
         />
-        <span>记住我的选择</span>
+        <span>{{ t('close.remember') }}</span>
       </label>
 
       <div class="mt-6 flex flex-wrap justify-end gap-3">
-        <button class="btn-secondary" @click="emit('close')">取消</button>
-        <button class="btn-secondary" @click="chooseAction('minimize')">最小化到托盘</button>
-        <button class="btn-primary" @click="chooseAction('exit')">退出应用</button>
+        <button class="btn-secondary" @click="emit('close')">{{ t('action.cancel') }}</button>
+        <button class="btn-secondary" @click="chooseAction('minimize')">{{ t('close.minimize') }}</button>
+        <button class="btn-primary" @click="chooseAction('exit')">{{ t('close.exit') }}</button>
       </div>
     </div>
   </div>

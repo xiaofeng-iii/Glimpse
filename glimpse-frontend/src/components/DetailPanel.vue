@@ -6,6 +6,7 @@ import { openExternalTarget } from '@/platform/desktop'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { getMemoryImageUrls } from '@/utils/memory-images'
+import { t } from '@/utils/i18n'
 import ImagePreviewModal from './ImagePreviewModal.vue'
 
 const props = defineProps<{
@@ -30,7 +31,7 @@ const formatDate = (dateStr: string) => {
 }
 
 const handleDelete = async () => {
-  if (confirm('确定要删除这条记忆吗？此操作不可撤销。')) {
+  if (confirm(t('message.deleteConfirmIrreversible'))) {
     await memoriesStore.remove(props.memory.id)
     emit('close')
   }
@@ -39,9 +40,9 @@ const handleDelete = async () => {
 const handleCopy = async () => {
   try {
     await navigator.clipboard.writeText(props.memory.ai_summary)
-    notificationStore.show('已复制成功', 'success', 2200)
+    notificationStore.show(t('message.copied'), 'success', 2200)
   } catch (error) {
-    notificationStore.show('复制失败，请重试。', 'error', 3000)
+    notificationStore.show(t('message.copyFailed'), 'error', 3000)
   }
 }
 
@@ -72,7 +73,7 @@ const markImageError = (url: string) => {
       <!-- Header -->
       <div class="flex items-start justify-between mb-4">
         <div>
-          <h3 class="text-lg font-bold text-gray-900">记忆详情</h3>
+          <h3 class="text-lg font-bold text-gray-900">{{ t('memory.detail') }}</h3>
           <p class="text-sm text-gray-500 mt-1">{{ formatDate(memory.created_at) }}</p>
         </div>
         <button
@@ -106,7 +107,7 @@ const markImageError = (url: string) => {
             @error="markImageError(imageUrls[0])"
           />
           <div v-else class="flex h-64 items-center justify-center text-sm text-slate-500">
-            图片预览加载失败
+            {{ t('memory.previewFailed') }}
           </div>
         </button>
 
@@ -125,7 +126,7 @@ const markImageError = (url: string) => {
               @error="markImageError(imageUrl)"
             />
             <div v-else class="flex h-20 items-center justify-center text-[11px] text-slate-400">
-              加载失败
+              {{ t('memory.loadFailed') }}
             </div>
           </button>
         </div>
@@ -133,19 +134,19 @@ const markImageError = (url: string) => {
 
       <!-- AI Summary -->
       <div class="mb-4">
-        <h4 class="text-sm font-semibold text-gray-700 mb-2">AI 摘要</h4>
+        <h4 class="text-sm font-semibold text-gray-700 mb-2">{{ t('memory.summary') }}</h4>
         <p class="text-gray-900 leading-relaxed">{{ memory.ai_summary }}</p>
       </div>
 
       <!-- Extracted Text -->
       <div v-if="memory.text_content" class="mb-4">
-        <h4 class="text-sm font-semibold text-gray-700 mb-2">识别文本</h4>
+        <h4 class="text-sm font-semibold text-gray-700 mb-2">{{ t('memory.text') }}</h4>
         <p class="text-gray-600 text-sm leading-relaxed max-h-32 overflow-y-auto">{{ memory.text_content }}</p>
       </div>
 
       <!-- Image Path -->
       <div class="mb-6 text-xs text-gray-400 truncate">
-        <span class="font-medium">图片:</span> {{ memory.image_path }}
+        <span class="font-medium">{{ t('memory.image') }}:</span> {{ memory.image_path }}
       </div>
 
       <!-- Actions -->
@@ -154,19 +155,19 @@ const markImageError = (url: string) => {
           @click="handleOpenDetail"
           class="flex-1 btn-primary text-sm py-2 justify-center"
         >
-          查看详情
+          {{ t('action.viewDetail') }}
         </button>
         <button
           @click="handleCopy"
           class="flex-1 btn-secondary text-sm py-2"
         >
-          复制摘要
+          {{ t('action.copySummary') }}
         </button>
         <button
           @click="handleOpenImage"
           class="flex-1 btn-secondary text-sm py-2"
         >
-          打开图片
+          {{ t('action.openImage') }}
         </button>
       </div>
 
@@ -174,7 +175,7 @@ const markImageError = (url: string) => {
         @click="handleDelete"
         class="w-full mt-3 py-2 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
       >
-        删除记忆
+        {{ t('action.delete') }}
       </button>
     </div>
   </div>

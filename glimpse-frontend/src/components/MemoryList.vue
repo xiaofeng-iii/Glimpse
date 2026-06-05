@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
+import { t } from '@/utils/i18n'
 import EmptyState from './EmptyState.vue'
 import LoadingSpinner from './LoadingSpinner.vue'
 
@@ -66,7 +67,7 @@ const markImageError = (memoryId: string) => {
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <!-- Header -->
       <div class="mb-4 flex items-center justify-between">
-        <span class="text-sm text-gray-500">{{ memories.length }} 条记忆</span>
+        <span class="text-sm text-gray-500">{{ t('memory.count', { count: memories.length }) }}</span>
       </div>
 
       <!-- Memory Cards -->
@@ -115,13 +116,13 @@ const markImageError = (memoryId: string) => {
                     v-if="memory.match_sources?.includes('精确')"
                     class="badge badge-exact"
                   >
-                    精确
+                    {{ t('match.exact') }}
                   </span>
                   <span
                     v-if="memory.match_sources?.includes('语义')"
                     class="badge badge-semantic"
                   >
-                    语义
+                    {{ t('match.semantic') }}
                   </span>
                   <span class="text-xs text-gray-400">
                     {{ formatTime(memory.created_at) }}
@@ -136,7 +137,7 @@ const markImageError = (memoryId: string) => {
                     {{ memory.app_name }}
                   </div>
                   <div v-else class="text-xs text-gray-400">
-                    双击查看详情
+                    {{ t('memory.openHint') }}
                   </div>
 
                   <button
@@ -144,7 +145,7 @@ const markImageError = (memoryId: string) => {
                     :disabled="Boolean(deletingId)"
                     @click.stop="handleDelete(memory)"
                   >
-                    {{ deletingId === memory.id ? '删除中...' : '删除' }}
+                    {{ deletingId === memory.id ? t('action.deleting') : t('action.delete') }}
                   </button>
                 </div>
               </div>

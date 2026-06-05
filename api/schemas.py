@@ -67,6 +67,7 @@ class SettingsResponse(BaseModel):
     })
     ui: Dict[str, Any] = Field(default_factory=lambda: {
         "theme": "light",
+        "language": "zh-CN",
         "auto_hide": False,
         "start_minimized": False,
         "close_action": "ask",

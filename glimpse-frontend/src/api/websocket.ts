@@ -4,6 +4,7 @@ import { useClusterStore } from '@/stores/cluster'
 import { useNotificationStore } from '@/stores/notification'
 import { focusDesktopWindow } from '@/platform/desktop'
 import { appendBackendAuthToken, getWsBaseUrl } from '@/config/runtime'
+import { t } from '@/utils/i18n'
 
 type WebSocketEvent = {
   type: string
@@ -87,7 +88,7 @@ export function useWebSocket() {
             memoriesStore.select(savedMemory)
           }
         })
-        notificationStore.show('记忆已保存', 'success')
+        notificationStore.show(t('message.saved'), 'success')
         if (event.data.source === 'global_hotkey') {
           void focusDesktopWindow()
         }
@@ -98,7 +99,7 @@ export function useWebSocket() {
         break
 
       case 'screenshot_completed':
-        notificationStore.show('截图完成', 'info')
+        notificationStore.show(t('message.screenshotDone'), 'info')
         break
 
       case 'status_updated':
@@ -122,12 +123,12 @@ export function useWebSocket() {
 
       case 'cluster_flushed':
         clusterStore.flush(event.data.images)
-        notificationStore.show('集群截图已提交', 'success')
+        notificationStore.show(t('message.clusterSubmitted'), 'success')
         break
 
       case 'cluster_discarded':
         clusterStore.discard()
-        notificationStore.show('集群截图已取消', 'info')
+        notificationStore.show(t('message.clusterCancelled'), 'info')
         break
 
       case 'desktop_action':

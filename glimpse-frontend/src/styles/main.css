@@ -13,6 +13,51 @@
   --shell-bg-a: #f6e8da;
   --shell-bg-b: #eff5f3;
   --shell-bg-c: #f8f0e8;
+  --shell-glow-a: rgba(217, 107, 49, 0.18);
+  --shell-glow-b: rgba(35, 93, 103, 0.16);
+  --shell-frame-bg: rgba(255, 252, 248, 0.92);
+  --shell-window-bg: rgba(255, 252, 248, 0.8);
+  --shell-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.14));
+  --shell-card-border: rgba(255, 255, 255, 0.7);
+  --shell-card-shadow: 0 10px 26px rgba(34, 30, 25, 0.08);
+  --shell-control-bg: rgba(255, 255, 255, 0.78);
+  --shell-control-hover: rgba(35, 93, 103, 0.08);
+  --shell-primary-start: var(--shell-highlight);
+  --shell-primary-end: var(--shell-accent);
+  --shell-primary-shadow: rgba(35, 93, 103, 0.2);
+  --shell-primary-shadow-hover: rgba(35, 93, 103, 0.24);
+  --shell-filter-bg: rgba(255, 255, 255, 0.8);
+  --shell-filter-text: #5f6d86;
+  --shell-filter-hover: rgba(255, 255, 255, 0.94);
+}
+
+:root[data-theme='dark'] {
+  --shell-ink: #eef3f8;
+  --shell-muted: #aab5c3;
+  --shell-line: rgba(226, 232, 240, 0.13);
+  --shell-card: rgba(24, 30, 39, 0.78);
+  --shell-highlight: #e18a51;
+  --shell-highlight-strong: #ffb073;
+  --shell-accent: #69b9c0;
+  --shell-bg-a: #121820;
+  --shell-bg-b: #17242a;
+  --shell-bg-c: #221d1a;
+  --shell-glow-a: rgba(225, 138, 81, 0.2);
+  --shell-glow-b: rgba(105, 185, 192, 0.18);
+  --shell-frame-bg: rgba(10, 14, 20, 0.94);
+  --shell-window-bg: rgba(16, 21, 29, 0.86);
+  --shell-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025));
+  --shell-card-border: rgba(226, 232, 240, 0.1);
+  --shell-card-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+  --shell-control-bg: rgba(31, 40, 53, 0.78);
+  --shell-control-hover: rgba(105, 185, 192, 0.12);
+  --shell-primary-start: #33434d;
+  --shell-primary-end: #4d6f6d;
+  --shell-primary-shadow: rgba(5, 10, 16, 0.28);
+  --shell-primary-shadow-hover: rgba(105, 185, 192, 0.16);
+  --shell-filter-bg: rgba(31, 40, 53, 0.78);
+  --shell-filter-text: #aab5c3;
+  --shell-filter-hover: rgba(42, 54, 70, 0.92);
 }
 
 html,
@@ -26,8 +71,8 @@ body {
   font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   color: var(--shell-ink);
   background:
-    radial-gradient(circle at top left, rgba(217, 107, 49, 0.18), transparent 24%),
-    radial-gradient(circle at top right, rgba(35, 93, 103, 0.16), transparent 18%),
+    radial-gradient(circle at top left, var(--shell-glow-a), transparent 24%),
+    radial-gradient(circle at top right, var(--shell-glow-b), transparent 18%),
     linear-gradient(135deg, var(--shell-bg-a) 0%, var(--shell-bg-b) 48%, var(--shell-bg-c) 100%);
   overflow: hidden;
 }
@@ -40,11 +85,11 @@ textarea {
 }
 
 .shell-frame {
-  background: rgba(255, 252, 248, 0.92);
+  background: var(--shell-frame-bg);
 }
 
 .shell-card {
-  background: rgba(255, 252, 248, 0.8);
+  background: var(--shell-window-bg);
   border: 0;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.75);
@@ -54,7 +99,7 @@ textarea {
 
 .shell-header {
   border-bottom: 1px solid var(--shell-line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.14));
+  background: var(--shell-header-bg);
   cursor: grab;
   user-select: none;
 }
@@ -112,8 +157,8 @@ textarea {
 .card,
 .search-bar {
   background: var(--shell-card);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 10px 26px rgba(34, 30, 25, 0.08);
+  border: 1px solid var(--shell-card-border);
+  box-shadow: var(--shell-card-shadow);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
@@ -140,14 +185,14 @@ textarea {
   color: #fff;
   font-weight: 600;
   transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
-  background: linear-gradient(135deg, var(--shell-highlight) 0%, var(--shell-accent) 100%);
-  box-shadow: 0 12px 26px rgba(35, 93, 103, 0.2);
+  background: linear-gradient(135deg, var(--shell-primary-start) 0%, var(--shell-primary-end) 100%);
+  box-shadow: 0 12px 26px var(--shell-primary-shadow);
 }
 
 .btn-primary:hover,
 .capture-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 14px 28px rgba(35, 93, 103, 0.24);
+  box-shadow: 0 14px 28px var(--shell-primary-shadow-hover);
 }
 
 .btn-primary:disabled,
@@ -158,7 +203,7 @@ textarea {
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--shell-control-bg);
   color: var(--shell-accent);
   border: 1px solid rgba(35, 93, 103, 0.18);
   border-radius: 14px;
@@ -169,7 +214,7 @@ textarea {
 }
 
 .btn-secondary:hover {
-  background: rgba(35, 93, 103, 0.08);
+  background: var(--shell-control-hover);
   border-color: rgba(35, 93, 103, 0.34);
   transform: translateY(-1px);
 }
@@ -194,6 +239,25 @@ kbd {
 .search-bar:focus-within {
   border-color: rgba(217, 107, 49, 0.38);
   box-shadow: 0 16px 34px rgba(217, 107, 49, 0.12);
+}
+
+.source-filter-button {
+  background: var(--shell-filter-bg);
+  color: var(--shell-filter-text);
+  border: 1px solid var(--shell-card-border);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+}
+
+.source-filter-button:hover {
+  background: var(--shell-filter-hover);
+  color: var(--shell-ink);
+}
+
+.source-filter-button-active {
+  background: linear-gradient(135deg, var(--shell-primary-start) 0%, var(--shell-primary-end) 100%);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 24px var(--shell-primary-shadow);
 }
 
 .shell-icon-button {
@@ -314,6 +378,173 @@ kbd {
   border-top-color: var(--shell-accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+:root[data-theme='dark'] .shell-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme='dark'] .card:hover {
+  border-color: rgba(225, 138, 81, 0.28);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.34);
+}
+
+:root[data-theme='dark'] .shell-icon-button {
+  background: rgba(31, 40, 53, 0.72);
+  border-color: rgba(226, 232, 240, 0.1);
+  color: var(--shell-muted);
+}
+
+:root[data-theme='dark'] .shell-icon-button:hover {
+  background: rgba(42, 54, 70, 0.95);
+  color: var(--shell-ink);
+}
+
+:root[data-theme='dark'] .btn-primary,
+:root[data-theme='dark'] .capture-button,
+:root[data-theme='dark'] .source-filter-button-active {
+  color: #f4fbfb;
+  border: 1px solid rgba(226, 232, 240, 0.1);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme='dark'] .btn-primary:hover,
+:root[data-theme='dark'] .capture-button:hover,
+:root[data-theme='dark'] .source-filter-button-active:hover {
+  filter: brightness(1.08);
+}
+
+:root[data-theme='dark'] .btn-secondary {
+  border-color: rgba(105, 185, 192, 0.16);
+  color: #9fd8de;
+}
+
+:root[data-theme='dark'] .btn-secondary:hover {
+  border-color: rgba(105, 185, 192, 0.28);
+  color: #c7f2f5;
+}
+
+:root[data-theme='dark'] .close-action-remember {
+  background: rgba(22, 30, 41, 0.82) !important;
+  border: 1px solid rgba(226, 232, 240, 0.12);
+  color: #b0bdca !important;
+}
+
+:root[data-theme='dark'] .close-action-remember:hover {
+  background: rgba(29, 39, 52, 0.9) !important;
+  border-color: rgba(105, 185, 192, 0.2);
+}
+
+:root[data-theme='dark'] .close-action-checkbox {
+  accent-color: #69b9c0;
+  background-color: rgba(10, 15, 22, 0.9);
+  border-color: rgba(170, 181, 195, 0.36);
+}
+
+:root[data-theme='dark'] input,
+:root[data-theme='dark'] select,
+:root[data-theme='dark'] textarea {
+  background-color: rgba(20, 27, 37, 0.86);
+  border-color: rgba(226, 232, 240, 0.14);
+  color: var(--shell-ink);
+}
+
+:root[data-theme='dark'] input::placeholder,
+:root[data-theme='dark'] textarea::placeholder {
+  color: rgba(170, 181, 195, 0.72);
+}
+
+:root[data-theme='dark'] .bg-white,
+:root[data-theme='dark'] .bg-gray-50,
+:root[data-theme='dark'] .bg-gray-100,
+:root[data-theme='dark'] .bg-slate-50,
+:root[data-theme='dark'] .bg-slate-100,
+:root[data-theme='dark'] .bg-violet-50,
+:root[data-theme='dark'] .bg-pink-50,
+:root[data-theme='dark'] .bg-indigo-50 {
+  background-color: rgba(24, 32, 43, 0.86) !important;
+}
+
+:root[data-theme='dark'] .hover\:bg-gray-50:hover,
+:root[data-theme='dark'] .hover\:bg-gray-100:hover,
+:root[data-theme='dark'] .hover\:bg-red-50:hover,
+:root[data-theme='dark'] .hover\:bg-sky-50\/82:hover {
+  background-color: rgba(42, 54, 70, 0.88) !important;
+}
+
+:root[data-theme='dark'] .border-gray-100,
+:root[data-theme='dark'] .border-gray-200,
+:root[data-theme='dark'] .border-slate-200 {
+  border-color: rgba(226, 232, 240, 0.12) !important;
+}
+
+:root[data-theme='dark'] .text-gray-900,
+:root[data-theme='dark'] .text-slate-900 {
+  color: #eef3f8 !important;
+}
+
+:root[data-theme='dark'] .text-gray-800,
+:root[data-theme='dark'] .text-slate-800 {
+  color: #dde7ef !important;
+}
+
+:root[data-theme='dark'] .text-gray-700,
+:root[data-theme='dark'] .text-slate-700 {
+  color: #c7d1dc !important;
+}
+
+:root[data-theme='dark'] .text-gray-600,
+:root[data-theme='dark'] .text-slate-600 {
+  color: #b0bdca !important;
+}
+
+:root[data-theme='dark'] .text-gray-500,
+:root[data-theme='dark'] .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+:root[data-theme='dark'] .text-gray-400,
+:root[data-theme='dark'] .text-slate-400 {
+  color: #7f8ea3 !important;
+}
+
+:root[data-theme='dark'] .text-indigo-600,
+:root[data-theme='dark'] .text-violet-600,
+:root[data-theme='dark'] .text-violet-700,
+:root[data-theme='dark'] .text-sky-600 {
+  color: #9fd8de !important;
+}
+
+:root[data-theme='dark'] .from-violet-50,
+:root[data-theme='dark'] .from-indigo-50 {
+  --tw-gradient-from: rgba(65, 77, 104, 0.72) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgba(65, 77, 104, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+:root[data-theme='dark'] .to-pink-50,
+:root[data-theme='dark'] .to-violet-50 {
+  --tw-gradient-to: rgba(93, 61, 47, 0.64) var(--tw-gradient-to-position);
+}
+
+:root[data-theme='dark'] .badge-exact {
+  background: rgba(105, 185, 192, 0.16);
+  color: #9fd8de;
+}
+
+:root[data-theme='dark'] .badge-semantic {
+  background: rgba(225, 138, 81, 0.18);
+  color: #ffbd85;
+}
+
+:root[data-theme='dark'] .status-pill-ready {
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+}
+
+:root[data-theme='dark'] .status-pill-offline {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fca5a5;
 }
 
 @keyframes spin {

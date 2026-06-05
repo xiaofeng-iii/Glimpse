@@ -39,6 +39,7 @@ def get_default_settings() -> dict:
         },
         "ui": {
             "theme": "light",
+            "language": "zh-CN",
             "auto_hide": False,
             "start_minimized": False,
             "close_action": "ask",

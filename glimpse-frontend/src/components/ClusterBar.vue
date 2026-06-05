@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useClusterStore } from '@/stores/cluster'
+import { t } from '@/utils/i18n'
 
 const clusterStore = useClusterStore()
 
 const progressText = computed(() => {
-  return `${clusterStore.count}/${clusterStore.maxCount} 张截图`
+  return t('cluster.progressCount', {
+    count: clusterStore.count,
+    max: clusterStore.maxCount,
+  })
 })
 
 const countdownText = computed(() => {
@@ -23,7 +27,7 @@ const countdownText = computed(() => {
       <div class="flex items-center gap-3">
         <div class="w-3 h-3 rounded-full bg-violet-500 animate-pulse-soft"></div>
         <span class="text-violet-700 font-medium">
-          正在收集 {{ progressText }} {{ countdownText }}
+          {{ t('cluster.progress', { progress: progressText, countdown: countdownText }) }}
         </span>
       </div>
 
@@ -33,13 +37,13 @@ const countdownText = computed(() => {
           @click="$emit('submit')"
           class="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-pink-600 text-white text-sm font-medium hover:scale-105 transition-transform"
         >
-          立即提交
+          {{ t('cluster.submit') }}
         </button>
         <button
           @click="$emit('cancel')"
           class="px-4 py-2 rounded-lg bg-white text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors"
         >
-          取消
+          {{ t('action.cancel') }}
         </button>
       </div>
     </div>
