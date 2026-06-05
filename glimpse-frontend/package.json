@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "build:backend": "python ../scripts/build_backend_sidecar.py --if-needed",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "npm run build:backend && tauri build"
   },
   "dependencies": {
     "vue": "^3.4.0",

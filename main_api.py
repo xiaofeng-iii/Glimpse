@@ -9,14 +9,31 @@ Default: http://localhost:8000
 """
 import sys
 import os
+from pathlib import Path
+
+
+def _packaged_log_path() -> Path:
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        return Path(local_app_data).resolve() / "Glimpse" / "logs" / "python-backend.log"
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent / "python-backend.log"
+    return Path.cwd() / "python-backend.log"
+
 
 if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w")
+    log_path = _packaged_log_path()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    sys.stdout = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
 if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w")
+    if sys.stdout is not None and getattr(sys.stdout, "name", None) != os.devnull:
+        sys.stderr = sys.stdout
+    else:
+        log_path = _packaged_log_path()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        sys.stderr = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
 
 import argparse
-from pathlib import Path
 from runtime_env import get_env_file, get_runtime_root
 
 # Ensure project root is in path
