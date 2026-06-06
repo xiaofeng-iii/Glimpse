@@ -17,8 +17,8 @@ from pathlib import Path
 from typing import Optional
 
 # Default log format
-LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s] - %(message)s"
+DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 # Global log level (can be overridden via environment variable)
 DEFAULT_LOG_LEVEL = logging.INFO

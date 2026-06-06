@@ -1,9 +1,9 @@
-type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+type LogLevel = 'debug' | 'info' | 'warning' | 'error'
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 0,
   info: 1,
-  warn: 2,
+  warning: 2,
   error: 3,
 }
 
@@ -14,9 +14,9 @@ function shouldLog(level: LogLevel): boolean {
 }
 
 function formatMessage(level: LogLevel, context: string, message: string, ...args: unknown[]): string {
-  const timestamp = new Date().toISOString()
+  const timestamp = new Date().toISOString().replace(/\.000Z$/, '')
   const formattedArgs = args.length > 0 ? ' ' + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') : ''
-  return `[${timestamp}] [${level.toUpperCase()}] [${context}] ${message}${formattedArgs}`
+  return `[${timestamp}] [${level.toUpperCase()}] [${context}] - ${message}${formattedArgs}`
 }
 
 export function createLogger(context: string) {
