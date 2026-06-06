@@ -60,7 +60,7 @@ def get_default_settings() -> dict:
             "search": "<ctrl>+<f>",
         },
         "screenshot": {
-            "debounce_interval": 5.0,
+            "capture_limit_window_seconds": 5.0,
             "cluster_threshold": 2.0,
             "max_captures_per_window": 10,
         },

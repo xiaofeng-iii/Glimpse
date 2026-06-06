@@ -59,6 +59,7 @@ class SettingsManager:
             return defaults
         merged = self._deep_merge(defaults, settings)
         merged["hotkeys"] = self._sanitize_hotkeys(merged.get("hotkeys"))
+        merged["screenshot"] = self._sanitize_screenshot(settings.get("screenshot"))
         return merged
 
     def _deep_merge(self, base: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -74,7 +75,7 @@ class SettingsManager:
         return {
             "hotkeys": copy.deepcopy(HOTKEY_DEFAULTS),
             "screenshot": {
-                "debounce_interval": 5.0,
+                "capture_limit_window_seconds": 5.0,
                 "max_captures_per_window": 10
             },
             "ai": {
@@ -186,23 +187,53 @@ class SettingsManager:
                 sanitized[key] = value
         return sanitized
 
+    def _is_positive_number(self, value: Any) -> bool:
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0
+
+    def _is_positive_int(self, value: Any) -> bool:
+        return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+    def _sanitize_screenshot(self, section: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        defaults = copy.deepcopy(self._build_default_settings()["screenshot"])
+        if not isinstance(section, dict):
+            return defaults
+
+        sanitized = copy.deepcopy(defaults)
+        for key, value in section.items():
+            if key == "debounce_interval":
+                continue
+            sanitized[key] = value
+
+        window_value = section.get("capture_limit_window_seconds")
+        if not self._is_positive_number(window_value):
+            window_value = section.get("debounce_interval")
+        if self._is_positive_number(window_value):
+            sanitized["capture_limit_window_seconds"] = float(window_value)
+
+        max_captures = section.get("max_captures_per_window")
+        if self._is_positive_int(max_captures):
+            sanitized["max_captures_per_window"] = max_captures
+
+        return sanitized
+
     def _validate_screenshot(self, section: Dict[str, Any], required_keys: bool = True) -> bool:
         if not isinstance(section, dict):
             return False
         if required_keys:
-            required = {"debounce_interval", "max_captures_per_window"}
-            missing = required - set(section.keys())
-            if missing:
+            has_window = (
+                "capture_limit_window_seconds" in section
+                or "debounce_interval" in section
+            )
+            if not has_window or "max_captures_per_window" not in section:
+                return False
+        if "capture_limit_window_seconds" in section:
+            if not self._is_positive_number(section["capture_limit_window_seconds"]):
                 return False
         if "debounce_interval" in section:
-            if not isinstance(section["debounce_interval"], (int, float)):
-                return False
-            if section["debounce_interval"] <= 0:
+            if not self._is_positive_number(section["debounce_interval"]):
                 return False
         if "max_captures_per_window" in section:
-            if not isinstance(section["max_captures_per_window"], int):
-                return False
-            if section["max_captures_per_window"] <= 0:
+            if not self._is_positive_int(section["max_captures_per_window"]):
                 return False
         return True
 
@@ -317,6 +348,10 @@ class SettingsManager:
             settings = settings[k]
 
         settings[keys[-1]] = value
+        if keys[0] == "screenshot" and isinstance(self._settings.get("screenshot"), dict):
+            if keys[-1] == "debounce_interval":
+                self._settings["screenshot"]["capture_limit_window_seconds"] = value
+            self._settings["screenshot"] = self._sanitize_screenshot(self._settings["screenshot"])
 
         self._save_settings(self._settings)
         return True
@@ -332,9 +367,17 @@ class SettingsManager:
         try:
             for key, value in settings.items():
                 if isinstance(value, dict) and key in temp_settings and isinstance(temp_settings[key], dict):
+                    if (
+                        key == "screenshot"
+                        and "debounce_interval" in value
+                        and "capture_limit_window_seconds" not in value
+                    ):
+                        temp_settings[key]["capture_limit_window_seconds"] = value["debounce_interval"]
                     temp_settings[key].update(value)
                     if key == "hotkeys":
                         temp_settings[key] = self._sanitize_hotkeys(temp_settings[key])
+                    elif key == "screenshot":
+                        temp_settings[key] = self._sanitize_screenshot(temp_settings[key])
                 else:
                     temp_settings[key] = value
 

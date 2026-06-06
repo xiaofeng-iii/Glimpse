@@ -49,7 +49,7 @@ class SettingsResponse(BaseModel):
         "search": "<ctrl>+<f>",
     })
     screenshot: Dict[str, Any] = Field(default_factory=lambda: {
-        "debounce_interval": 5.0,
+        "capture_limit_window_seconds": 5.0,
         "cluster_threshold": 2.0,
         "max_captures_per_window": 10,
     })
@@ -105,7 +105,7 @@ class AITestResponse(BaseModel):
 
 class ScreenshotRequest(BaseModel):
     """Screenshot trigger request"""
-    force: bool = False  # bypass debounce
+    force: bool = False  # legacy compatibility flag
 
 
 class ScreenshotResponse(BaseModel):

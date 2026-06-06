@@ -113,7 +113,7 @@ def mock_settings_manager():
             "search": "<ctrl>+<f>",
         },
         "screenshot": {
-            "debounce_interval": 5.0,
+            "capture_limit_window_seconds": 5.0,
             "max_captures_per_window": 10,
         },
         "ai": {

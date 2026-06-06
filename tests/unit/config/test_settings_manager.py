@@ -32,6 +32,8 @@ class TestSettingsManagerInit:
         assert sm.get("ai.base_url") == "https://api.openai.com/v1"
         assert sm.get("ai.model") == "gpt-4o-mini"
         assert sm.get("ui.close_action") == "ask"
+        assert sm.get("screenshot.capture_limit_window_seconds") == 5.0
+        assert sm.get("screenshot.debounce_interval") is None
 
     def test_old_settings_migrated_with_ai_defaults(self, mock_path_manager):
         from config.settings_manager import SettingsManager
@@ -79,11 +81,15 @@ class TestSettingsManagerInit:
         assert sm.get("ai.timeout") == 45
         assert sm.get("ui.close_action") == "exit"
         assert sm.get("hotkeys.clear") is None
+        assert sm.get("screenshot.capture_limit_window_seconds") == 5.0
+        assert sm.get("screenshot.debounce_interval") is None
 
         persisted = json.loads(settings_file.read_text(encoding="utf-8"))
         assert persisted["ai"]["provider"] == "OpenAI"
         assert persisted["ai"]["api_key"] == "sk-existing"
         assert "clear" not in persisted["hotkeys"]
+        assert persisted["screenshot"]["capture_limit_window_seconds"] == 5.0
+        assert "debounce_interval" not in persisted["screenshot"]
 
     def test_get_with_default(self, mock_path_manager):
         from config.settings_manager import SettingsManager
@@ -237,6 +243,35 @@ class TestSettingsManagerUpdate:
             }
         }) is True
         assert sm.get("ai.base_url") == "http://localhost:11434/v1"
+
+    def test_update_migrates_old_screenshot_debounce_field(self, mock_path_manager):
+        from config.settings_manager import SettingsManager
+
+        sm = SettingsManager(mock_path_manager)
+
+        assert sm.update({
+            "screenshot": {
+                "debounce_interval": 7.5,
+                "max_captures_per_window": 12,
+            }
+        }) is True
+        assert sm.get("screenshot.capture_limit_window_seconds") == 7.5
+        assert sm.get("screenshot.debounce_interval") is None
+        assert sm.get("screenshot.max_captures_per_window") == 12
+
+    def test_update_accepts_new_screenshot_limit_window_field(self, mock_path_manager):
+        from config.settings_manager import SettingsManager
+
+        sm = SettingsManager(mock_path_manager)
+
+        assert sm.update({
+            "screenshot": {
+                "capture_limit_window_seconds": 3.5,
+                "max_captures_per_window": 4,
+            }
+        }) is True
+        assert sm.get("screenshot.capture_limit_window_seconds") == 3.5
+        assert sm.get("screenshot.max_captures_per_window") == 4
 
 
 class TestSettingsManagerReset:
