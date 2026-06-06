@@ -32,8 +32,8 @@ export function createLogger(context: string) {
       }
     },
     warn: (message: string, ...args: unknown[]) => {
-      if (shouldLog('warn')) {
-        console.warn(formatMessage('warn', context, message, ...args))
+      if (shouldLog('warning')) {
+        console.warn(formatMessage('warning', context, message, ...args))
       }
     },
     error: (message: string, ...args: unknown[]) => {
