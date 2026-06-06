@@ -8,8 +8,12 @@ from dataclasses import dataclass, asdict, field
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from pathlib import Path
 
+from utils.logger import get_logger
+
 if TYPE_CHECKING:
     from config.path_manager import PathManager
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -161,7 +165,7 @@ class SQLiteManager:
                 self._conn.commit()
                 return True
             except Exception as e:
-                print(f"Insert memory error: {e}")
+                logger.error("Insert memory error: %s", e)
                 return False
 
     def get_memory_by_id(self, memory_id: str) -> Optional[MemoryRecord]:
@@ -223,7 +227,7 @@ class SQLiteManager:
                 self._conn.commit()
                 return cursor.rowcount > 0
             except Exception as e:
-                print(f"Update memory error: {e}")
+                logger.error("Update memory error: %s", e)
                 return False
 
     def delete_memory(self, memory_id: str) -> bool:
@@ -234,7 +238,7 @@ class SQLiteManager:
                 self._conn.commit()
                 return cursor.rowcount > 0
             except Exception as e:
-                print(f"Delete memory error: {e}")
+                logger.error("Delete memory error: %s", e)
                 return False
 
     def get_memories_count(self) -> int:

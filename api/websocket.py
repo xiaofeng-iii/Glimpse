@@ -73,7 +73,7 @@ def _report_broadcast_result(future):
     try:
         future.result()
     except Exception as exc:
-        print(f"WebSocket broadcast error: {exc}")
+        logger.error("WebSocket broadcast error: %s", exc)
 
 
 def _schedule_broadcast(event_type: str, data: Dict[str, Any]):
@@ -163,7 +163,7 @@ def setup_signal_forwarding(loop: Optional[asyncio.AbstractEventLoop] = None):
         cluster_buffer.discarded.connect(on_cluster_discarded)
 
     except Exception as e:
-        print(f"Warning: Could not connect cluster buffer signals: {e}")
+        logger.warning("Could not connect cluster buffer signals: %s", e)
 
 
 async def websocket_endpoint(websocket: WebSocket):

@@ -7,6 +7,10 @@ import threading
 from typing import Optional, Callable, Any, List, Dict
 from enum import Enum
 
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class Lifetime(Enum):
     SINGLETON = "singleton"
@@ -240,7 +244,7 @@ class DIContainer:
             try:
                 handler()
             except Exception as e:
-                print(f"Shutdown handler error: {e}")
+                logger.error("Shutdown handler error: %s", e)
 
         with self._scoped_lock:
             for scope_instances in self._scoped_instances.values():

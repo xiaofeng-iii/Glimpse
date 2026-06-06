@@ -11,8 +11,12 @@ from threading import Lock
 import mss
 from PIL import Image
 
+from utils.logger import get_logger
+
 if TYPE_CHECKING:
     from config.path_manager import PathManager
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -71,8 +75,7 @@ class CaptureManager:
             self._update_capture_count(is_fullscreen=True)
             return result
         except Exception as e:
-            print(f"Capture fullscreen error: {e}")
-            traceback.print_exc()
+            logger.error("Capture fullscreen error: %s", e, exc_info=True)
             return None
 
     def capture_region(self, region: Tuple[int, int, int, int]) -> Optional[CaptureResult]:
@@ -94,8 +97,7 @@ class CaptureManager:
             self._update_capture_count(is_fullscreen=False)
             return result
         except Exception as e:
-            print(f"Capture region error: {e}")
-            traceback.print_exc()
+            logger.error("Capture region error: %s", e, exc_info=True)
             return None
 
     def _check_debounce(self, is_fullscreen: bool = True) -> bool:

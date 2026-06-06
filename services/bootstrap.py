@@ -4,6 +4,10 @@ Bootstrap - 应用启动时的配置编排
 """
 import os
 
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 DEFAULT_PROVIDER = "OpenAI"
 DEFAULT_PROVIDER_TYPE = "openai_compatible"
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
@@ -75,11 +79,11 @@ def configure_ai_client(ai_client, settings_manager) -> bool:
             provider=resolved["provider"],
             provider_type=resolved["provider_type"],
         )
-        print(
-            "AI client configured via "
-            f"{resolved['api_key_source']}: model={ai_client._model}, base_url={ai_client._base_url}"
+        logger.info(
+            "AI client configured via %s: model=%s, base_url=%s",
+            resolved['api_key_source'], ai_client._model, ai_client._base_url,
         )
         return True
     else:
-        print("WARNING: No API key found. Screenshot analysis disabled.")
+        logger.warning("No API key found. Screenshot analysis disabled.")
         return False

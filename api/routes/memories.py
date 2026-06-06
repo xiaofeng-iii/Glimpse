@@ -7,6 +7,9 @@ from typing import Optional
 from api.schemas import MemoryResponse, MemoryListResponse
 from api.dependencies import get_search_service, get_memory_service
 from api.websocket import broadcast_event
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/memories", tags=["memories"])
 
@@ -76,7 +79,7 @@ async def delete_memory(memory_id: str):
                 },
             )
         except Exception as exc:
-            print(f"Warning: failed to broadcast deleted memory {memory_id}: {exc}")
+            logger.warning("Failed to broadcast deleted memory %s: %s", memory_id, exc)
 
         return {"success": True, "message": f"Memory {memory_id} deleted"}
     except HTTPException:

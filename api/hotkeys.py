@@ -8,6 +8,9 @@ from typing import Callable, Dict, Optional
 from api.dependencies import get_keyboard_manager, get_settings_manager
 from api.desktop_actions import capture_and_analyze
 from api.websocket import broadcast_event, has_active_connections
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 _hotkey_loop: Optional[asyncio.AbstractEventLoop] = None
 
@@ -24,7 +27,7 @@ def _report_future(future) -> None:
     try:
         future.result()
     except Exception as exc:
-        print(f"Global hotkey handler failed: {exc}")
+        logger.error("Global hotkey handler failed: %s", exc)
 
 
 def _schedule(coro) -> None:
@@ -99,7 +102,7 @@ def reload_global_hotkeys() -> bool:
     keyboard_manager = get_keyboard_manager()
     success = keyboard_manager.reload_hotkeys(_build_hotkey_handlers())
     if not success:
-        print("Warning: Failed to reload API global hotkeys")
+        logger.warning("Failed to reload API global hotkeys")
     return success
 
 
