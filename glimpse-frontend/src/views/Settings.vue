@@ -2,6 +2,9 @@
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useRouter } from 'vue-router'
+import { createLogger } from '@/utils/logger'
+
+const logger = createLogger('views/Settings')
 
 const settingsStore = useSettingsStore()
 const router = useRouter()
@@ -213,7 +216,7 @@ const handleSave = async () => {
     })
     router.push('/')
   } catch (error) {
-    console.error('Failed to save settings:', error)
+    logger.error('Failed to save settings: %s', error)
   }
 }
 

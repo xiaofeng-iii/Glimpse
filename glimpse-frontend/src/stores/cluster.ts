@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { createLogger } from '@/utils/logger'
+
+const logger = createLogger('stores/cluster')
 
 export const useClusterStore = defineStore('cluster', () => {
   const state = ref<'IDLE' | 'COLLECTING'>('IDLE')
@@ -28,7 +31,7 @@ export const useClusterStore = defineStore('cluster', () => {
     count.value = 0
     state.value = 'IDLE'
     remainingSeconds.value = 0
-    console.log('Cluster flushed:', flushedImages)
+    logger.info('Cluster flushed: %s', flushedImages)
   }
 
   const discard = () => {

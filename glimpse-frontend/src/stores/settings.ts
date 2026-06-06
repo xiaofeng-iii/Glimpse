@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { settingsApi, type Settings } from '@/api/client'
+import { createLogger } from '@/utils/logger'
+
+const logger = createLogger('stores/settings')
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<Settings | null>(null)
@@ -11,7 +14,7 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       settings.value = await settingsApi.get()
     } catch (error) {
-      console.error('Failed to load settings:', error)
+      logger.error('Failed to load settings: %s', error)
     } finally {
       isLoading.value = false
     }
@@ -24,7 +27,7 @@ export const useSettingsStore = defineStore('settings', () => {
         settings.value = { ...settings.value, ...newSettings } as Settings
       }
     } catch (error) {
-      console.error('Failed to update settings:', error)
+      logger.error('Failed to update settings: %s', error)
       throw error
     }
   }
@@ -34,7 +37,7 @@ export const useSettingsStore = defineStore('settings', () => {
       await settingsApi.reset()
       await load()
     } catch (error) {
-      console.error('Failed to reset settings:', error)
+      logger.error('Failed to reset settings: %s', error)
       throw error
     }
   }

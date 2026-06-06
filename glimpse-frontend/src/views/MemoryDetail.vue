@@ -6,7 +6,10 @@ import { getImageUrl } from '@/config/runtime'
 import { openExternalTarget } from '@/platform/desktop'
 import { useNotificationStore } from '@/stores/notification'
 import { getMemoryImageUrls } from '@/utils/memory-images'
+import { createLogger } from '@/utils/logger'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
+
+const logger = createLogger('views/MemoryDetail')
 
 const route = useRoute()
 const router = useRouter()
@@ -23,7 +26,7 @@ onMounted(async () => {
   try {
     memory.value = await memoriesApi.get(id)
   } catch (error) {
-    console.error('Failed to load memory:', error)
+    logger.error('Failed to load memory: %s', error)
   } finally {
     isLoading.value = false
   }

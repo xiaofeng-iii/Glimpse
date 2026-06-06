@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { memoriesApi, searchApi, type Memory } from '@/api/client'
+import { createLogger } from '@/utils/logger'
+
+const logger = createLogger('stores/memories')
 
 export const useMemoriesStore = defineStore('memories', () => {
   const memories = ref<Memory[]>([])
@@ -19,7 +22,7 @@ export const useMemoriesStore = defineStore('memories', () => {
       memories.value = result.memories
       total.value = result.total
     } catch (error) {
-      console.error('Failed to load memories:', error)
+      logger.error('Failed to load memories: %s', error)
     } finally {
       isLoading.value = false
     }
@@ -40,7 +43,7 @@ export const useMemoriesStore = defineStore('memories', () => {
       memories.value = result.memories
       total.value = result.memories.length
     } catch (error) {
-      console.error('Search failed:', error)
+      logger.error('Search failed: %s', error)
     } finally {
       isLoading.value = false
     }
@@ -60,7 +63,7 @@ export const useMemoriesStore = defineStore('memories', () => {
         selectedMemory.value = remainingMemories[0] ?? null
       }
     } catch (error) {
-      console.error('Failed to delete memory:', error)
+      logger.error('Failed to delete memory: %s', error)
       throw error
     }
   }

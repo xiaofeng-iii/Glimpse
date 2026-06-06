@@ -5,6 +5,7 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useClusterStore } from '@/stores/cluster'
 import { useNotificationStore } from '@/stores/notification'
 import { screenshotApi, clusterApi, healthApi, settingsApi, type Memory } from '@/api/client'
+import { createLogger } from '@/utils/logger'
 import {
   closeDesktopWindow,
   getDesktopWindowMaximized,
@@ -47,6 +48,8 @@ const screenshotShortcutLabel = ref('Ctrl+Shift+G')
 const searchShortcutLabel = ref('Ctrl+F')
 const clusterModeEnabled = ref(false)
 let removeDesktopCloseListener: (() => void) | null = null
+
+const logger = createLogger('views/Home')
 
 type ScreenshotTriggerOptions = {
   initiatedByHotkey?: boolean
@@ -129,7 +132,7 @@ const loadUiSettings = async () => {
     )
     clusterModeEnabled.value = Boolean(settings.cluster?.cluster_mode)
   } catch (error) {
-    console.error('Failed to load UI settings:', error)
+    logger.error('Failed to load UI settings: %s', error)
   }
 }
 
@@ -211,7 +214,7 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
       )
     }
   } catch (error) {
-    console.error('Screenshot failed:', error)
+    logger.error('Screenshot failed: %s', error)
     notificationStore.show(
       options.initiatedByHotkey
         ? '快捷键截图失败：请检查后端日志。'
@@ -295,7 +298,7 @@ const requestWindowClose = async () => {
   try {
     await performCloseAction(closeAction.value)
   } catch (error) {
-    console.error('Close window failed:', error)
+        logger.error('Close window failed: %s', error)
     notificationStore.show('退出失败，请查看日志。', 'error', 3200)
   }
 }
@@ -320,14 +323,14 @@ const handleCloseDialogChoice = async (payload: {
         })
         closeAction.value = payload.action
       } catch (error) {
-        console.error('Saving close action failed:', error)
+        logger.error('Saving close action failed: %s', error)
         notificationStore.show('关闭偏好保存失败，但本次操作会继续执行。', 'warning', 3200)
       }
     }
 
     await performCloseAction(payload.action)
   } catch (error) {
-    console.error('Applying close action failed:', error)
+    logger.error('Applying close action failed: %s', error)
     notificationStore.show('关闭操作失败，请查看日志。', 'error', 3200)
   }
 }
@@ -352,7 +355,7 @@ const handleDeleteMemory = async (memory: Memory) => {
     await memoriesStore.remove(memory.id)
     notificationStore.show('记忆已删除', 'success', 2200)
   } catch (error) {
-    console.error('Delete memory failed:', error)
+    logger.error('Delete memory failed: %s', error)
     notificationStore.show('删除失败，请稍后重试。', 'error', 3200)
   } finally {
     deletingMemoryId.value = null
