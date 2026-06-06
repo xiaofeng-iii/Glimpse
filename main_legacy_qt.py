@@ -16,6 +16,10 @@ import sys
 import os
 from pathlib import Path
 
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 project_root = Path(__file__).parent.resolve()
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
@@ -26,7 +30,7 @@ try:
     env_path = project_root / ".env"
     if env_path.exists():
         load_dotenv(env_path)
-        print(f"Loaded .env from {env_path}")
+        logger.info("Loaded .env from %s", env_path)
 except ImportError:
     pass
 
@@ -38,27 +42,27 @@ def main():
     from services.bootstrap import configure_ai_client
     from ui.app_icon import create_app_icon, set_windows_app_user_model_id
 
-    print("Initializing container...")
+    logger.info("Initializing container...")
     container.initialize_defaults()
 
-    print("Initializing path manager...")
+    logger.info("Initializing path manager...")
     path_manager = container.get("path_manager")
     settings_manager = container.get("settings_manager")
 
-    print("Initializing databases...")
+    logger.info("Initializing databases...")
     sqlite_manager = container.get("sqlite_manager")
     chroma_manager = container.get("chroma_manager")
 
-    print("Initializing services...")
+    logger.info("Initializing services...")
     ai_client = container.get("ai_client")
 
     # 配置 AI 客户端
     configure_ai_client(ai_client, settings_manager)
 
-    print("Initializing task queue...")
+    logger.info("Initializing task queue...")
     task_queue = container.get("task_queue")
 
-    print("Initializing keyboard manager...")
+    logger.info("Initializing keyboard manager...")
     keyboard_manager = container.get("keyboard_manager")
 
     from ui.locale_manager import init_locale
@@ -68,10 +72,10 @@ def main():
 
     def on_screenshot():
         from ui.signals import signals
-        print("Global screenshot shortcut pressed!")
+        logger.info("Global screenshot shortcut pressed!")
         signals.screenshot_requested.emit()
 
-    print("Starting UI...")
+    logger.info("Starting UI...")
     set_windows_app_user_model_id()
     app = QApplication(sys.argv)
     app.setApplicationName("Glimpse")
@@ -89,7 +93,7 @@ def main():
         # 在 Qt 消息泵启动后注册全局热键，避免 Windows 钩子初始化冲突
         keyboard_manager.register_hotkey(screenshot_hotkey, on_screenshot)
         keyboard_manager.start_listening()
-        print(f"Global hotkey registered: {screenshot_hotkey}")
+        logger.info("Global hotkey registered: %s", screenshot_hotkey)
 
         sys.exit(app.exec())
     except Exception as e:
