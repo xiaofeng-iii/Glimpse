@@ -215,7 +215,7 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
       await wait(300)
     }
 
-    const result = await screenshotApi.triggerAndAnalyze(true)
+    const result = await screenshotApi.triggerAndAnalyze()
     if (!result.success) {
       notificationStore.show(
         options.initiatedByHotkey

@@ -33,7 +33,7 @@ const activeSection = ref<SectionId>('hotkeys')
 
 // Form refs
 const screenshotHotkey = ref('')
-const debounceInterval = ref(5)
+const captureLimitWindowSeconds = ref(5)
 const clusterThreshold = ref(2)
 const maxCaptures = ref(10)
 const aiApiKey = ref('')
@@ -170,7 +170,8 @@ const loadSettings = async () => {
   if (settingsStore.settings) {
     const s = settingsStore.settings
     screenshotHotkey.value = s.hotkeys?.screenshot || ''
-    debounceInterval.value = s.screenshot?.debounce_interval || 5
+    captureLimitWindowSeconds.value =
+      s.screenshot?.capture_limit_window_seconds ?? s.screenshot?.debounce_interval ?? 5
     clusterThreshold.value = s.screenshot?.cluster_threshold || 2
     maxCaptures.value = s.screenshot?.max_captures_per_window || 10
     aiApiKey.value = s.ai?.api_key || ''
@@ -315,7 +316,7 @@ const handleSave = async () => {
         screenshot: screenshotHotkey.value,
       },
       screenshot: {
-        debounce_interval: debounceInterval.value,
+        capture_limit_window_seconds: captureLimitWindowSeconds.value,
         cluster_threshold: clusterThreshold.value,
         max_captures_per_window: maxCaptures.value,
       },
@@ -439,8 +440,8 @@ const handleCancel = () => {
               <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('settings.screenshot') }}</h2>
               <div class="space-y-4">
                 <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.debounce') }}</label>
-                  <input v-model.number="debounceInterval" type="number" step="0.5" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.captureLimitWindow') }}</label>
+                  <input v-model.number="captureLimitWindowSeconds" type="number" step="0.5" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
                 </div>
                 <div>
                   <label class="block text-sm text-gray-600 mb-2">{{ t('settings.maxCaptures') }}</label>
