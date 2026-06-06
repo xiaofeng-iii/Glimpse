@@ -1,10 +1,11 @@
 """
 Chroma Manager - encapsulates vector database operations with graceful fallback.
 """
+import gc
 import os
-import subprocess
-import sys
+import shutil
 import threading
+from datetime import datetime
 from typing import List, Dict, Optional, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -13,6 +14,9 @@ if TYPE_CHECKING:
 
 class ChromaManager:
     """Vector database manager with no-op fallback when Chroma is unavailable."""
+
+    COLLECTION_NAME = "memories"
+    COLLECTION_METADATA = {"description": "Glimpse memory embeddings"}
 
     def __init__(self, path_manager: "PathManager"):
         self._client: Optional[Any] = None
@@ -32,27 +36,14 @@ class ChromaManager:
             self._startup_error = "ChromaDB disabled by GLIMPSE_DISABLE_CHROMA=1"
             return False
 
-        command = [sys.executable, "-c", "import chromadb"]
-        kwargs = {
-            "capture_output": True,
-            "text": True,
-            "timeout": 20,
-        }
-        if os.name == "nt":
-            kwargs["creationflags"] = 0x08000000
-
         try:
-            result = subprocess.run(command, **kwargs)
+            import chromadb  # noqa: F401
         except Exception as exc:
-            self._startup_error = f"ChromaDB probe failed: {exc}"
+            self._startup_error = f"ChromaDB import failed: {exc}"
             return False
 
-        if result.returncode == 0:
-            return True
-
-        probe_error = (result.stderr or result.stdout or "").strip()
-        self._startup_error = probe_error or f"ChromaDB probe exited with code {result.returncode}"
-        return False
+        self._startup_error = None
+        return True
 
     def _ensure_initialized(self) -> bool:
         if self._available and self._collection is not None:
@@ -82,8 +73,8 @@ class ChromaManager:
                     settings=Settings(anonymized_telemetry=False),
                 )
                 self._collection = self._client.get_or_create_collection(
-                    name="memories",
-                    metadata={"description": "Glimpse memory embeddings"},
+                    name=self.COLLECTION_NAME,
+                    metadata=self.COLLECTION_METADATA,
                 )
                 self._available = True
             except Exception as exc:
@@ -94,6 +85,53 @@ class ChromaManager:
                 self._available = False
 
         return self._available and self._collection is not None
+
+    def _clear_runtime_handles(self) -> None:
+        self._client = None
+        self._collection = None
+        self._available = False
+        self._initialization_attempted = False
+        gc.collect()
+
+    def _recreate_store_from_disk(self) -> bool:
+        try:
+            if not self._probe_chromadb_import():
+                return False
+
+            self._clear_runtime_handles()
+            if self._chroma_path.exists():
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = self._chroma_path.parent / f"chroma_repair_backup_{timestamp}"
+                shutil.move(str(self._chroma_path), str(backup_path))
+                print(f"Backed up damaged Chroma store to: {backup_path}")
+            self._chroma_path.mkdir(parents=True, exist_ok=True)
+            return self._ensure_initialized()
+        except Exception as exc:
+            self._startup_error = f"ChromaDB store reset failed: {exc}"
+            print(f"Warning: ChromaDB store reset failed: {exc}")
+            return False
+
+    def reset_collection(self) -> bool:
+        if not self.available:
+            return self._recreate_store_from_disk()
+
+        with self._lock:
+            try:
+                try:
+                    self._client.delete_collection(self.COLLECTION_NAME)
+                except Exception as exc:
+                    print(f"Delete Chroma collection warning: {exc}")
+
+                self._collection = self._client.get_or_create_collection(
+                    name=self.COLLECTION_NAME,
+                    metadata=self.COLLECTION_METADATA,
+                )
+                self._startup_error = None
+                return True
+            except Exception as exc:
+                print(f"Reset Chroma collection failed, recreating store: {exc}")
+
+        return self._recreate_store_from_disk()
 
     @property
     def available(self) -> bool:
@@ -127,6 +165,32 @@ class ChromaManager:
                 return True
             except Exception as exc:
                 print(f"Add memory error: {exc}")
+                return False
+
+    def upsert_memory(
+        self,
+        memory_id: str,
+        text: str,
+        embedding: List[float],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        if not self.available:
+            return False
+
+        with self._lock:
+            try:
+                meta = metadata or {}
+                meta["memory_id"] = memory_id
+
+                self._collection.upsert(
+                    ids=[memory_id],
+                    documents=[text],
+                    embeddings=[embedding],
+                    metadatas=[meta],
+                )
+                return True
+            except Exception as exc:
+                print(f"Upsert memory error: {exc}")
                 return False
 
     def search_similar(

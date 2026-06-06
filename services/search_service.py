@@ -37,6 +37,29 @@ class SearchService:
     def get_search_mode(self) -> str:
         return self._search_mode
 
+    def warmup(self) -> Dict[str, bool]:
+        result = {
+            "chroma_ready": False,
+            "embedding_ready": False,
+        }
+
+        try:
+            result["chroma_ready"] = bool(self._chroma_manager.available)
+        except Exception as exc:
+            print(f"Semantic search warmup: ChromaDB unavailable: {exc}")
+
+        try:
+            result["embedding_ready"] = bool(self._embedding_client.get_embedding("语义搜索预热"))
+        except Exception as exc:
+            print(f"Semantic search warmup: embedding model unavailable: {exc}")
+
+        print(
+            "Semantic search warmup completed: "
+            f"chroma_ready={result['chroma_ready']}, "
+            f"embedding_ready={result['embedding_ready']}"
+        )
+        return result
+
     def search(self, query: str, limit: int = 20, source_filter: Optional[str] = None) -> List:
         if not query.strip():
             return self.get_recent_memories(limit=limit)

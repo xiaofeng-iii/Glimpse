@@ -2,6 +2,7 @@
 Unit tests for db/chroma_manager.py
 """
 import pytest
+import builtins
 from unittest.mock import MagicMock, patch
 
 
@@ -28,6 +29,25 @@ class TestChromaManagerInit:
         mgr = ChromaManager(mock_path_manager)
         assert mgr.get_memory_count() == 0
         mgr.close()
+
+    def test_probe_import_does_not_spawn_frozen_executable(self, mock_path_manager):
+        from db.chroma_manager import ChromaManager
+        mgr = ChromaManager(mock_path_manager)
+        real_import = builtins.__import__
+
+        def import_side_effect(name, *args, **kwargs):
+            if name == "chromadb":
+                return MagicMock()
+            return real_import(name, *args, **kwargs)
+
+        with (
+            patch("sys.frozen", True, create=True),
+            patch("builtins.__import__", side_effect=import_side_effect),
+            patch("subprocess.run") as run,
+        ):
+            assert mgr._probe_chromadb_import() is True
+
+        run.assert_not_called()
 
 
 class TestChromaManagerAdd:
@@ -61,6 +81,43 @@ class TestChromaManagerAdd:
             mgr.add_memory(f"multi-{i}", f"doc {i}", embedding)
         assert mgr.get_memory_count() == 3
         mgr.close()
+
+
+class TestChromaManagerUpsert:
+    def test_upsert_memory_uses_collection_upsert(self, mock_path_manager):
+        from db.chroma_manager import ChromaManager
+
+        mgr = ChromaManager(mock_path_manager)
+        mgr._available = True
+        mgr._collection = MagicMock()
+
+        assert mgr.upsert_memory("mem-1", "hello", [0.1, 0.2], {"app_name": "app"}) is True
+        mgr._collection.upsert.assert_called_once_with(
+            ids=["mem-1"],
+            documents=["hello"],
+            embeddings=[[0.1, 0.2]],
+            metadatas=[{"app_name": "app", "memory_id": "mem-1"}],
+        )
+
+
+class TestChromaManagerReset:
+    def test_reset_collection_recreates_memories_collection(self, mock_path_manager):
+        from db.chroma_manager import ChromaManager
+
+        mgr = ChromaManager(mock_path_manager)
+        mgr._available = True
+        mgr._client = MagicMock()
+        mgr._collection = MagicMock()
+        recreated = MagicMock()
+        mgr._client.get_or_create_collection.return_value = recreated
+
+        assert mgr.reset_collection() is True
+        mgr._client.delete_collection.assert_called_once_with("memories")
+        mgr._client.get_or_create_collection.assert_called_once_with(
+            name="memories",
+            metadata={"description": "Glimpse memory embeddings"},
+        )
+        assert mgr._collection is recreated
 
 
 class TestChromaManagerSearch:

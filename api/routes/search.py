@@ -2,12 +2,39 @@
 Search Routes - Search functionality
 """
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
 
 from api.schemas import SearchResult, MemoryResponse
-from api.dependencies import get_search_service
+from api.dependencies import get_search_service, get_task_queue
 
 router = APIRouter(prefix="/search", tags=["search"])
+SEARCH_WARMUP_TASK_ID = "semantic_search_warmup"
+
+
+def task_is_active(task) -> bool:
+    return bool(task and task.status.name in {"PENDING", "RUNNING"})
+
+
+def task_can_be_reused(task) -> bool:
+    return bool(task and task.status.name in {"PENDING", "RUNNING", "COMPLETED"})
+
+
+def serialize_warmup_task(task) -> dict:
+    if not task:
+        return {
+            "task_id": SEARCH_WARMUP_TASK_ID,
+            "status": "idle",
+            "running": False,
+            "result": None,
+            "error": None,
+        }
+
+    return {
+        "task_id": task.id,
+        "status": task.status.name.lower(),
+        "running": task_is_active(task),
+        "result": task.result,
+        "error": task.error,
+    }
 
 
 def memory_to_response(memory) -> dict:
@@ -40,5 +67,21 @@ async def search(
             query=q,
             source=source,
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/warmup")
+async def warmup_search():
+    """Open the vector store and load the embedding model in a background task."""
+    try:
+        task_queue = get_task_queue()
+        existing = task_queue.get_task(SEARCH_WARMUP_TASK_ID)
+        if task_can_be_reused(existing):
+            return serialize_warmup_task(existing)
+
+        search_service = get_search_service()
+        task = task_queue.submit(SEARCH_WARMUP_TASK_ID, search_service.warmup)
+        return serialize_warmup_task(task)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

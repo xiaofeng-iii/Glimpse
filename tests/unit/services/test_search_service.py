@@ -41,6 +41,30 @@ class TestSearchServiceInit:
         ss = SearchService(**mock_services)
         assert ss.get_search_mode() == "hybrid"
 
+    def test_warmup_loads_chroma_and_embedding(self, mock_services):
+        from services.search_service import SearchService
+
+        mock_services["chroma_manager"].available = True
+        mock_services["embedding_client"].get_embedding.return_value = [0.1, 0.2]
+
+        ss = SearchService(**mock_services)
+        result = ss.warmup()
+
+        assert result == {"chroma_ready": True, "embedding_ready": True}
+        mock_services["embedding_client"].get_embedding.assert_called_once()
+        mock_services["chroma_manager"].search_similar.assert_not_called()
+
+    def test_warmup_handles_embedding_failure(self, mock_services):
+        from services.search_service import SearchService
+
+        mock_services["chroma_manager"].available = True
+        mock_services["embedding_client"].get_embedding.return_value = []
+
+        ss = SearchService(**mock_services)
+        result = ss.warmup()
+
+        assert result == {"chroma_ready": True, "embedding_ready": False}
+
 
 class TestSearchServiceSearchMode:
     def test_set_search_mode_text(self, mock_services):

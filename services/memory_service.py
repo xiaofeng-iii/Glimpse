@@ -50,6 +50,7 @@ class MemoryService:
         self._semaphore = Semaphore(MAX_CONCURRENT_MEMORIES)
         self._active_count = 0
         self._active_lock = Lock()
+        self._repair_lock = Lock()
         self._on_progress: Optional[Callable[[str], None]] = None
 
     def set_progress_callback(self, callback: Callable[[str], None]) -> None:
@@ -58,6 +59,9 @@ class MemoryService:
     def _report_progress(self, message: str) -> None:
         if self._on_progress:
             self._on_progress(message)
+
+    def _embedding_text_for_memory(self, memory) -> str:
+        return f"{memory.ai_summary or ''} {memory.text_content or ''}".strip()
 
     def create_memory(
         self,
@@ -265,6 +269,133 @@ class MemoryService:
 
         task_id = f"cluster_memory_{uuid.uuid4().hex[:8]}"
         self._task_queue.submit(task_id, task)
+
+    def repair_vector_index(self, batch_size: int = 100, force_rebuild: bool = False) -> dict:
+        with self._repair_lock:
+            return self._repair_vector_index_impl(batch_size, force_rebuild)
+
+    def _repair_vector_index_impl(self, batch_size: int, force_rebuild: bool) -> dict:
+        if force_rebuild and not self._chroma_manager.reset_collection():
+            return {"status": "failed", "processed": 0, "indexed": 0, "failed": 0}
+
+        if not self._chroma_manager.available:
+            return {"status": "unavailable", "processed": 0, "indexed": 0, "failed": 0}
+
+        total = self._sqlite_manager.get_memories_count()
+        existing_ids = set()
+        if not force_rebuild:
+            offset = 0
+            while True:
+                ids = self._chroma_manager.get_all_memory_ids(limit=batch_size, offset=offset)
+                if not ids:
+                    break
+                existing_ids.update(ids)
+                offset += len(ids)
+                if len(ids) < batch_size:
+                    break
+
+        if total == 0:
+            result = {
+                "status": "completed",
+                "processed": 0,
+                "indexed": 0,
+                "skipped": 0,
+                "failed": 0,
+                "rebuilt": force_rebuild,
+            }
+            print("Vector index repair completed: no memories to index")
+            return result
+
+        if force_rebuild and not self._chroma_manager.available:
+            return {"status": "unavailable", "processed": 0, "indexed": 0, "failed": 0}
+
+        processed = 0
+        indexed = 0
+        skipped = 0
+        failed = 0
+        offset = 0
+        while processed < total:
+            memories = self._sqlite_manager.get_all_memories(limit=batch_size, offset=offset)
+            if not memories:
+                break
+
+            for memory in memories:
+                processed += 1
+                if memory.id in existing_ids:
+                    skipped += 1
+                    continue
+
+                embedding_text = self._embedding_text_for_memory(memory)
+                if not embedding_text:
+                    failed += 1
+                    continue
+
+                embedding = self._embedding_client.get_embedding(embedding_text)
+                if not embedding:
+                    failed += 1
+                    continue
+
+                metadata = {
+                    "memory_id": memory.id,
+                    "created_at": memory.created_at,
+                    "app_name": memory.app_name,
+                }
+                if self._chroma_manager.upsert_memory(
+                    memory_id=memory.id,
+                    text=embedding_text,
+                    embedding=embedding,
+                    metadata=metadata,
+                ):
+                    indexed += 1
+                    existing_ids.add(memory.id)
+                else:
+                    failed += 1
+
+            offset += len(memories)
+
+        result = {
+            "status": "completed",
+            "processed": processed,
+            "indexed": indexed,
+            "skipped": skipped,
+            "failed": failed,
+            "rebuilt": force_rebuild,
+        }
+        print(
+            "Vector index repair completed: "
+            f"{indexed} indexed, {skipped} skipped, {failed} failed"
+        )
+        return result
+
+    def repair_vector_index_async(self) -> bool:
+        if not self._task_queue:
+            return False
+
+        try:
+            sqlite_count = self._sqlite_manager.get_memories_count()
+            chroma_count = self._chroma_manager.get_memory_count()
+        except Exception as exc:
+            print(f"Vector index repair check failed: {exc}")
+            return False
+
+        if sqlite_count == 0 or chroma_count >= sqlite_count:
+            return False
+
+        print(
+            "Vector index is behind SQLite; scheduling background repair "
+            f"({chroma_count}/{sqlite_count})."
+        )
+        self._task_queue.submit("vector_index_repair", self.repair_vector_index)
+        return True
+
+    def get_vector_index_counts(self) -> dict:
+        sqlite_count = self._sqlite_manager.get_memories_count()
+        chroma_count = self._chroma_manager.get_memory_count()
+        return {
+            "sqlite_count": sqlite_count,
+            "chroma_count": chroma_count,
+            "synced": sqlite_count == chroma_count,
+        }
 
     def delete_memory(self, memory_id: str) -> bool:
         deleted_sqlite = self._sqlite_manager.delete_memory(memory_id)

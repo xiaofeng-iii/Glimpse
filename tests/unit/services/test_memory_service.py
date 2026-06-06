@@ -13,7 +13,10 @@ def mock_services():
 
     chroma_mgr = MagicMock()
     chroma_mgr.add_memory.return_value = True
+    chroma_mgr.upsert_memory.return_value = True
+    chroma_mgr.reset_collection.return_value = True
     chroma_mgr.delete_memory.return_value = True
+    chroma_mgr.available = True
 
     ocr_engine = MagicMock()
     ocr_engine.extract_text.return_value = "extracted text"
@@ -160,6 +163,87 @@ class TestMemoryServiceAsync:
         assert isinstance(args[0], str)
         assert args[0].startswith("memory_creation_")
         assert callable(args[1])
+
+
+class TestMemoryServiceVectorRepair:
+    def test_repair_vector_index_indexes_missing_memories(self, mock_services):
+        from db.sqlite_manager import MemoryRecord
+        from services.memory_service import MemoryService
+
+        existing = MemoryRecord(
+            id="existing",
+            created_at="now",
+            image_path="path",
+            ai_summary="old summary",
+            app_name="app",
+        )
+        missing = MemoryRecord(
+            id="missing",
+            created_at="later",
+            image_path="path",
+            ai_summary="new summary",
+            app_name="app",
+        )
+        mock_services["sqlite_manager"].get_memories_count.return_value = 2
+        mock_services["sqlite_manager"].get_all_memories.return_value = [existing, missing]
+        mock_services["chroma_manager"].get_all_memory_ids.return_value = ["existing"]
+
+        ms = MemoryService(**mock_services)
+        result = ms.repair_vector_index()
+
+        assert result["indexed"] == 1
+        assert result["skipped"] == 1
+        mock_services["chroma_manager"].upsert_memory.assert_called_once()
+        kwargs = mock_services["chroma_manager"].upsert_memory.call_args.kwargs
+        assert kwargs["memory_id"] == "missing"
+        assert kwargs["text"] == "new summary"
+
+    def test_repair_vector_index_force_rebuild_indexes_all_memories(self, mock_services):
+        from db.sqlite_manager import MemoryRecord
+        from services.memory_service import MemoryService
+
+        memory = MemoryRecord(
+            id="mem-1",
+            created_at="now",
+            image_path="path",
+            ai_summary="summary",
+            app_name="app",
+        )
+        mock_services["sqlite_manager"].get_memories_count.return_value = 1
+        mock_services["sqlite_manager"].get_all_memories.return_value = [memory]
+        mock_services["chroma_manager"].get_all_memory_ids.return_value = ["mem-1"]
+
+        ms = MemoryService(**mock_services)
+        result = ms.repair_vector_index(force_rebuild=True)
+
+        assert result["rebuilt"] is True
+        assert result["indexed"] == 1
+        assert result["skipped"] == 0
+        mock_services["chroma_manager"].reset_collection.assert_called_once()
+        mock_services["chroma_manager"].upsert_memory.assert_called_once()
+
+    def test_repair_vector_index_async_skips_when_counts_match(self, mock_services):
+        from services.memory_service import MemoryService
+
+        mock_services["sqlite_manager"].get_memories_count.return_value = 3
+        mock_services["chroma_manager"].get_memory_count.return_value = 3
+
+        ms = MemoryService(**mock_services)
+        assert ms.repair_vector_index_async() is False
+        mock_services["task_queue"].submit.assert_not_called()
+
+    def test_repair_vector_index_async_schedules_when_chroma_is_behind(self, mock_services):
+        from services.memory_service import MemoryService
+
+        mock_services["sqlite_manager"].get_memories_count.return_value = 3
+        mock_services["chroma_manager"].get_memory_count.return_value = 1
+
+        ms = MemoryService(**mock_services)
+        assert ms.repair_vector_index_async() is True
+        mock_services["task_queue"].submit.assert_called_once_with(
+            "vector_index_repair",
+            ms.repair_vector_index,
+        )
 
 
 class TestMemoryServiceDelete:

@@ -5,12 +5,51 @@ from fastapi import APIRouter, HTTPException
 import copy
 
 from api.schemas import SettingsResponse, SettingsUpdate, AITestRequest, AITestResponse
-from api.dependencies import get_settings_manager, get_ai_client, get_capture_manager
+from api.dependencies import (
+    get_settings_manager,
+    get_ai_client,
+    get_capture_manager,
+    get_memory_service,
+    get_task_queue,
+)
 from api.hotkeys import reload_global_hotkeys
 from services.bootstrap import configure_ai_client, resolve_ai_configuration
 from services.ai_client import AIClient
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+INDEX_REPAIR_TASK_ID = "vector_index_repair_full"
+
+
+def task_is_active(task) -> bool:
+    return bool(task and task.status.name in {"PENDING", "RUNNING"})
+
+
+def serialize_index_repair_task(task) -> dict:
+    if not task:
+        return {
+            "task_id": INDEX_REPAIR_TASK_ID,
+            "status": "idle",
+            "running": False,
+            "result": None,
+            "error": None,
+        }
+
+    return {
+        "task_id": task.id,
+        "status": task.status.name.lower(),
+        "running": task_is_active(task),
+        "result": task.result,
+        "error": task.error,
+    }
+
+
+def index_repair_status_response(task=None) -> dict:
+    payload = serialize_index_repair_task(task)
+    try:
+        payload.update(get_memory_service().get_vector_index_counts())
+    except Exception as exc:
+        payload.update({"stats_error": str(exc)})
+    return payload
 
 
 def get_default_settings() -> dict:
@@ -192,6 +231,36 @@ async def test_ai_connection(request: AITestRequest = None):
                 )
             return AITestResponse(success=False, message=f"Current AI configuration failed: {message}")
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/index/repair")
+async def start_index_repair():
+    """Force rebuild the semantic vector index in a background task."""
+    try:
+        task_queue = get_task_queue()
+        existing = task_queue.get_task(INDEX_REPAIR_TASK_ID)
+        if task_is_active(existing):
+            return index_repair_status_response(existing)
+
+        memory_service = get_memory_service()
+        task = task_queue.submit(
+            INDEX_REPAIR_TASK_ID,
+            memory_service.repair_vector_index,
+            force_rebuild=True,
+        )
+        return index_repair_status_response(task)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/index/repair")
+async def get_index_repair_status():
+    """Return the latest semantic vector index repair task status."""
+    try:
+        task = get_task_queue().get_task(INDEX_REPAIR_TASK_ID)
+        return index_repair_status_response(task)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
