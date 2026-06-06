@@ -94,3 +94,24 @@ When touching Qt UI, also run the app manually in the `glimpse` environment and 
 - Existing style: English type before the colon, Chinese subject after it, for example `fix: 修复快捷键监听与应用名占位显示`.
 - Do not rewrite or discard user changes unless explicitly asked.
 - If removing tracked AI artifacts, use `git rm --cached` so local scratch files are not deleted.
+
+
+
+以暗猜接口为耻，以认真查阅为荣
+以模糊执行为耻，以寻求确认为荣
+以盲想业务为耻，以人类确认为荣
+以创造接口为耻，以复用现有为荣
+以跳过验证为耻，以主动测试为荣
+以破坏架构为耻，以遵循规范为荣
+以假装理解为耻，以诚实无知为菜
+以盲目修改为耻，以谨慎重构为荣
+
+Shame in guessing APIs, Honor in careful research.
+Shame in vague execution, Honor in seeking confirmation.
+Shame in assuming business logic, Honor in human verification.
+Shame in creating interfaces, Honor in reusing existing ones.
+Shame in skipping validation, Honor in proactive testing.
+Shame in breaking architecture, Honor in following specifications.
+Shame in pretending to understand, Honor in honest ignorance.
+Shame in blind modification, Honor in careful refactoring.
+
