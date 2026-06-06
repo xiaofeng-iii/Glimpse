@@ -2,15 +2,26 @@
 CaptureManager 单元测试
 
 测试核心模块 core/capture.py
-覆盖: CaptureResult, CaptureManager 初始化/截图/防抖/设置
+覆盖: CaptureResult, CaptureManager 初始化/截图/滑动窗口限流/设置
 """
 import time
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import MagicMock, patch, PropertyMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from core.capture import CaptureResult, CaptureManager
+
+
+def configure_mock_screenshot(mock_mss, width=2, height=2):
+    mock_mss_instance = mock_mss.return_value.__enter__.return_value
+    mock_mss_instance.monitors = [{}, {"width": width, "height": height}]
+
+    mock_screenshot = MagicMock()
+    mock_screenshot.size = (width, height)
+    mock_screenshot.rgb = b"\x00" * (width * height * 3)
+    mock_screenshot.width = width
+    mock_screenshot.height = height
+    mock_mss_instance.grab.return_value = mock_screenshot
+    return mock_mss_instance
 
 
 class TestCaptureResult:
@@ -50,181 +61,148 @@ class TestCaptureManagerInit:
         assert mgr._path_manager is mock_path_manager
 
     def test_default_settings(self, mock_path_manager):
-        """验证: 默认防抖/窗口设置"""
+        """验证: 默认滑动窗口限流设置"""
         mgr = CaptureManager(mock_path_manager)
         settings = mgr.get_settings()
-        assert settings["debounce_interval"] == 5.0
+        assert settings["capture_limit_window_seconds"] == 5.0
         assert settings["max_captures_per_window"] == 10
+        assert "debounce_interval" not in settings
 
 
-class TestCaptureManagerDebounce:
-    """CaptureManager 防抖算法测试"""
-
-    @patch("core.capture.mss.mss")
-    def setup_method(self, mock_mss, mock_path_manager):
-        self.mgr = CaptureManager(mock_path_manager)
+class TestCaptureManagerSlidingWindow:
+    """CaptureManager 滑动窗口限流测试"""
 
     @patch("core.capture.mss.mss")
-    def test_check_debounce_first_call_allows(self, mock_mss, mock_path_manager):
-        """验证: 首次截图防抖检查通过"""
+    def test_consecutive_fullscreen_captures_are_allowed(self, mock_mss, mock_path_manager):
+        """验证: 连续截图不会被旧防抖拦截"""
+        configure_mock_screenshot(mock_mss)
         mgr = CaptureManager(mock_path_manager)
-        assert mgr._check_debounce(is_fullscreen=True) is True
-        assert mgr._check_debounce(is_fullscreen=False) is True
+
+        first = mgr.capture_fullscreen()
+        second = mgr.capture_fullscreen()
+
+        assert first is not None
+        assert second is not None
+        assert mock_mss.return_value.__enter__.return_value.grab.call_count == 2
+
+    def test_limit_blocks_when_recent_window_is_full(self, mock_path_manager):
+        """验证: 最近窗口内达到最大截图数后限流"""
+        mgr = CaptureManager(mock_path_manager)
+        mgr.update_settings({
+            "capture_limit_window_seconds": 5.0,
+            "max_captures_per_window": 2,
+        })
+
+        with patch("core.capture.time.time", side_effect=[100.0, 101.0, 102.0]):
+            assert mgr._try_reserve_capture_slot() is not None
+            assert mgr._try_reserve_capture_slot() is not None
+            assert mgr._try_reserve_capture_slot() is None
+
+    def test_old_timestamps_are_pruned_after_window_moves(self, mock_path_manager):
+        """验证: 时间推进后，窗口外旧时间戳被清理，新截图可通过"""
+        mgr = CaptureManager(mock_path_manager)
+        mgr.update_settings({
+            "capture_limit_window_seconds": 5.0,
+            "max_captures_per_window": 2,
+        })
+
+        with patch("core.capture.time.time", side_effect=[100.0, 101.0, 105.0]):
+            assert mgr._try_reserve_capture_slot() is not None
+            assert mgr._try_reserve_capture_slot() is not None
+            assert mgr._try_reserve_capture_slot() is not None
+
+        assert [record[0] for record in mgr._capture_timestamps] == [101.0, 105.0]
 
     @patch("core.capture.mss.mss")
-    def test_check_debounce_within_interval_blocks(self, mock_mss, mock_path_manager):
-        """验证: 防抖间隔内第二次截图被阻止"""
-        mgr = CaptureManager(mock_path_manager)
-        mgr._fullscreen_debounce_time = time.time()
-        assert mgr._check_debounce(is_fullscreen=True) is False
-
-    @patch("core.capture.mss.mss")
-    def test_check_debounce_after_interval_allows(self, mock_mss, mock_path_manager):
-        """验证: 超过防抖间隔后截图通过"""
-        mgr = CaptureManager(mock_path_manager)
-        mgr._fullscreen_debounce_time = time.time() - 10.0  # 10 秒前
-        assert mgr._check_debounce(is_fullscreen=True) is True
-
-    @patch("core.capture.mss.mss")
-    def test_fullscreen_and_region_independent_debounce(self, mock_mss, mock_path_manager):
-        """验证: 全屏和区域截图有独立的防抖计时器"""
-        mgr = CaptureManager(mock_path_manager)
-        mgr._fullscreen_debounce_time = time.time()  # 刚截过全屏
-        # 区域截图应该不受影响
-        assert mgr._check_debounce(is_fullscreen=False) is True
-
-    @patch("core.capture.mss.mss")
-    def test_capture_fullscreen_bypass_debounce(self, mock_mss, mock_path_manager):
-        """验证: force_bypass_debounce=True 时绕过防抖"""
-        mgr = CaptureManager(mock_path_manager)
-        mgr._fullscreen_debounce_time = time.time()  # 刚截过全屏，防抖应该生效
-
-        # 模拟 mss.monitors 和 grab
+    def test_capture_failure_releases_reserved_slot(self, mock_mss, mock_path_manager):
+        """验证: 截图失败会释放预占限流槽"""
         mock_mss_instance = mock_mss.return_value.__enter__.return_value
-        mock_mss_instance.monitors = [{}, {"width": 1920, "height": 1080}]
-        mock_screenshot = MagicMock()
-        mock_screenshot.size = (1920, 1080)
-        mock_screenshot.rgb = b"\x00" * (1920 * 1080 * 3)
-        mock_screenshot.width = 1920
-        mock_screenshot.height = 1080
-        mock_mss_instance.grab.return_value = mock_screenshot
+        mock_mss_instance.monitors = [{}, {"width": 2, "height": 2}]
+        mock_mss_instance.grab.side_effect = RuntimeError("boom")
+        mgr = CaptureManager(mock_path_manager)
 
-        # 1. 默认 force_bypass_debounce=False，应该被防抖阻止，返回 None
-        res = mgr.capture_fullscreen()
-        assert res is None
+        with patch("core.capture.traceback.print_exc"):
+            result = mgr.capture_fullscreen()
 
-        # 2. force_bypass_debounce=True，应该绕过防抖，成功截图
-        res = mgr.capture_fullscreen(force_bypass_debounce=True)
-        assert res is not None
-        assert "screenshot_" in res.image_path
+        assert result is None
+        assert len(mgr._capture_timestamps) == 0
 
     @patch("core.capture.mss.mss")
     def test_capture_fullscreen_works_from_worker_thread(self, mock_mss, mock_path_manager):
         """验证: 在线程池中使用同一个管理器也能截图"""
+        configure_mock_screenshot(mock_mss)
         mgr = CaptureManager(mock_path_manager)
 
-        mock_mss_instance = mock_mss.return_value.__enter__.return_value
-        mock_mss_instance.monitors = [{}, {"width": 1920, "height": 1080}]
-        mock_screenshot = MagicMock()
-        mock_screenshot.size = (1920, 1080)
-        mock_screenshot.rgb = b"\x00" * (1920 * 1080 * 3)
-        mock_screenshot.width = 1920
-        mock_screenshot.height = 1080
-        mock_mss_instance.grab.return_value = mock_screenshot
-
         with ThreadPoolExecutor(max_workers=1) as executor:
-            result = executor.submit(
-                lambda: mgr.capture_fullscreen(force_bypass_debounce=True)
-            ).result()
+            result = executor.submit(lambda: mgr.capture_fullscreen()).result()
 
         assert result is not None
         assert "screenshot_" in result.image_path
 
 
-class TestCaptureManagerForceSplit:
-    """CaptureManager 窗口截图数限制测试"""
-
-    @patch("core.capture.mss.mss")
-    def test_force_split_under_limit(self, mock_mss, mock_path_manager):
-        """验证: 窗口内截图数未超限不触发强制分片"""
-        mgr = CaptureManager(mock_path_manager)
-        mgr._fullscreen_count = 5
-        mgr._region_count = 4  # total=9 < max(10)
-        assert mgr._check_force_split() is False
-
-    @patch("core.capture.mss.mss")
-    def test_force_split_at_limit(self, mock_mss, mock_path_manager):
-        """验证: 窗口内截图数达到上限触发强制分片"""
-        mgr = CaptureManager(mock_path_manager)
-        mgr._capture_window_start = time.time()  # 保持在当前窗口内
-        mgr._fullscreen_count = 5
-        mgr._region_count = 5  # total=10 >= max(10)
-        assert mgr._check_force_split() is True
-
-    @patch("core.capture.mss.mss")
-    def test_force_split_window_reset(self, mock_mss, mock_path_manager):
-        """验证: 防抖间隔过后窗口计数器重置"""
-        mgr = CaptureManager(mock_path_manager)
-        mgr._capture_window_start = time.time() - 10.0  # 超过 debounce_interval
-        mgr._fullscreen_count = 100
-        mgr._region_count = 100
-        assert mgr._check_force_split() is False  # 窗口重置
-
-
 class TestCaptureManagerSettings:
     """CaptureManager 设置管理测试"""
 
-    @patch("core.capture.mss.mss")
-    def test_set_debounce_interval_valid(self, mock_mss, mock_path_manager):
-        """验证: set_debounce_interval 接受有效值"""
+    def test_set_capture_limit_window_seconds_valid(self, mock_path_manager):
+        """验证: set_capture_limit_window_seconds 接受有效值"""
         mgr = CaptureManager(mock_path_manager)
-        assert mgr.set_debounce_interval(3.0) is True
-        assert mgr._debounce_interval == 3.0
+        assert mgr.set_capture_limit_window_seconds(3.0) is True
+        assert mgr.get_settings()["capture_limit_window_seconds"] == 3.0
 
-    @patch("core.capture.mss.mss")
-    def test_set_debounce_interval_invalid(self, mock_mss, mock_path_manager):
-        """验证: set_debounce_interval 拒绝无效值"""
+    def test_set_capture_limit_window_seconds_invalid(self, mock_path_manager):
+        """验证: set_capture_limit_window_seconds 拒绝无效值"""
         mgr = CaptureManager(mock_path_manager)
-        assert mgr.set_debounce_interval("invalid") is False
-        assert mgr._debounce_interval == 5.0  # 保持默认
+        assert mgr.set_capture_limit_window_seconds("invalid") is False
+        assert mgr.get_settings()["capture_limit_window_seconds"] == 5.0
 
-    @patch("core.capture.mss.mss")
-    def test_set_max_captures_per_window(self, mock_mss, mock_path_manager):
+    def test_set_debounce_interval_is_compatibility_alias(self, mock_path_manager):
+        """验证: set_debounce_interval 保留为旧接口兼容别名"""
+        mgr = CaptureManager(mock_path_manager)
+        assert mgr.set_debounce_interval(4.0) is True
+        assert mgr.get_settings()["capture_limit_window_seconds"] == 4.0
+
+    def test_set_max_captures_per_window(self, mock_path_manager):
         """验证: set_max_captures_per_window"""
         mgr = CaptureManager(mock_path_manager)
         assert mgr.set_max_captures_per_window(20) is True
-        assert mgr._max_captures_per_window == 20
+        assert mgr.get_settings()["max_captures_per_window"] == 20
 
-    @patch("core.capture.mss.mss")
-    def test_update_settings_partial(self, mock_mss, mock_path_manager):
-        """验证: update_settings 部分更新"""
+    def test_update_settings_partial_new_field(self, mock_path_manager):
+        """验证: update_settings 部分更新新限流窗口字段"""
         mgr = CaptureManager(mock_path_manager)
-        result = mgr.update_settings({"debounce_interval": 10.0})
+        result = mgr.update_settings({"capture_limit_window_seconds": 10.0})
         assert result is True
         settings = mgr.get_settings()
-        assert settings["debounce_interval"] == 10.0
-        assert settings["max_captures_per_window"] == 10  # 未改变
+        assert settings["capture_limit_window_seconds"] == 10.0
+        assert settings["max_captures_per_window"] == 10
 
-    @patch("core.capture.mss.mss")
-    def test_update_settings_invalid_rollback(self, mock_mss, mock_path_manager):
+    def test_update_settings_migrates_old_debounce_field(self, mock_path_manager):
+        """验证: update_settings 接收旧 debounce_interval 字段作为兼容输入"""
+        mgr = CaptureManager(mock_path_manager)
+        result = mgr.update_settings({"debounce_interval": 9.0})
+        assert result is True
+        settings = mgr.get_settings()
+        assert settings["capture_limit_window_seconds"] == 9.0
+        assert "debounce_interval" not in settings
+
+    def test_update_settings_invalid_rollback(self, mock_path_manager):
         """验证: update_settings 无效值时回滚"""
         mgr = CaptureManager(mock_path_manager)
         original = mgr.get_settings()
-        result = mgr.update_settings({"debounce_interval": -1.0})
+        result = mgr.update_settings({"capture_limit_window_seconds": -1.0})
         assert result is False
         assert mgr.get_settings() == original
 
-    @patch("core.capture.mss.mss")
-    def test_update_settings_all(self, mock_mss, mock_path_manager):
+    def test_update_settings_all(self, mock_path_manager):
         """验证: update_settings 全部更新"""
         mgr = CaptureManager(mock_path_manager)
         result = mgr.update_settings({
-            "debounce_interval": 8.0,
+            "capture_limit_window_seconds": 8.0,
             "max_captures_per_window": 15,
         })
         assert result is True
         settings = mgr.get_settings()
-        assert settings["debounce_interval"] == 8.0
+        assert settings["capture_limit_window_seconds"] == 8.0
         assert settings["max_captures_per_window"] == 15
 
 

@@ -1,7 +1,8 @@
 """
-Capture - pynput 与 mss 的封装，包含防抖与窗口限流
+Capture - pynput 与 mss 的封装，包含滑动窗口截图限流
 注入PathManager
 """
+from collections import deque
 import time
 import traceback
 from typing import Optional, Tuple, TYPE_CHECKING
@@ -30,13 +31,10 @@ class CaptureManager:
     def __init__(self, path_manager: "PathManager"):
         self._path_manager = path_manager
         self._last_capture_time = 0
-        self._debounce_interval = 5.0
-        self._capture_window_start = 0
+        self._capture_limit_window_seconds = 5.0
         self._max_captures_per_window = 10
-        self._fullscreen_debounce_time = 0
-        self._region_debounce_time = 0
-        self._fullscreen_count = 0
-        self._region_count = 0
+        self._capture_timestamps = deque()
+        self._next_capture_reservation_id = 0
         self._settings_lock = Lock()
 
     def _save_screenshot(self, screenshot) -> CaptureResult:
@@ -58,19 +56,17 @@ class CaptureManager:
         if delay > 0:
             time.sleep(delay)
 
-        if not force_bypass_debounce and not self._check_debounce(is_fullscreen=True):
-            return None
-
-        if self._check_force_split():
+        reservation = self._try_reserve_capture_slot()
+        if reservation is None:
             return None
 
         try:
             with mss.mss() as sct:
                 screenshot = sct.grab(sct.monitors[1])
                 result = self._save_screenshot(screenshot)
-            self._update_capture_count(is_fullscreen=True)
             return result
         except Exception as e:
+            self._release_capture_slot(reservation)
             print(f"Capture fullscreen error: {e}")
             traceback.print_exc()
             return None
@@ -80,10 +76,8 @@ class CaptureManager:
         if w <= 0 or h <= 0:
             return None
 
-        if not self._check_debounce(is_fullscreen=False):
-            return None
-
-        if self._check_force_split():
+        reservation = self._try_reserve_capture_slot()
+        if reservation is None:
             return None
 
         try:
@@ -91,71 +85,83 @@ class CaptureManager:
             with mss.mss() as sct:
                 screenshot = sct.grab(monitor)
                 result = self._save_screenshot(screenshot)
-            self._update_capture_count(is_fullscreen=False)
             return result
         except Exception as e:
+            self._release_capture_slot(reservation)
             print(f"Capture region error: {e}")
             traceback.print_exc()
             return None
 
-    def _check_debounce(self, is_fullscreen: bool = True) -> bool:
-        current_time = time.time()
-        last_time = self._fullscreen_debounce_time if is_fullscreen else self._region_debounce_time
-        if current_time - last_time < self._debounce_interval:
-            return False
-        return True
+    def _prune_capture_timestamps_locked(self, now: float):
+        cutoff = now - self._capture_limit_window_seconds
+        while self._capture_timestamps and self._capture_timestamps[0][0] <= cutoff:
+            self._capture_timestamps.popleft()
 
-    def _check_force_split(self) -> bool:
+    def _try_reserve_capture_slot(self) -> Optional[Tuple[float, int]]:
         with self._settings_lock:
-            current_time = time.time()
-            if current_time - self._capture_window_start >= self._debounce_interval:
-                self._capture_window_start = current_time
-                self._fullscreen_count = 0
-                self._region_count = 0
+            now = time.time()
+            self._prune_capture_timestamps_locked(now)
+            if len(self._capture_timestamps) >= self._max_captures_per_window:
+                return None
 
-            count = self._fullscreen_count + self._region_count
-            if count >= self._max_captures_per_window:
-                return True
-            return False
+            reservation = (now, self._next_capture_reservation_id)
+            self._next_capture_reservation_id += 1
+            self._capture_timestamps.append(reservation)
+            self._last_capture_time = now
+            return reservation
 
-    def _update_capture_count(self, is_fullscreen: bool = True):
+    def _release_capture_slot(self, reservation: Tuple[float, int]):
         with self._settings_lock:
-            self._last_capture_time = time.time()
-            if is_fullscreen:
-                self._fullscreen_debounce_time = self._last_capture_time
-                self._fullscreen_count += 1
-            else:
-                self._region_debounce_time = self._last_capture_time
-                self._region_count += 1
+            try:
+                self._capture_timestamps.remove(reservation)
+            except ValueError:
+                pass
 
-    def set_debounce_interval(self, interval: float) -> bool:
+    def set_capture_limit_window_seconds(self, seconds: float) -> bool:
         try:
-            self._debounce_interval = float(interval)
+            value = float(seconds)
+            if value <= 0:
+                return False
+            with self._settings_lock:
+                self._capture_limit_window_seconds = value
+                self._prune_capture_timestamps_locked(time.time())
             return True
         except (ValueError, TypeError):
             return False
 
+    def set_debounce_interval(self, interval: float) -> bool:
+        return self.set_capture_limit_window_seconds(interval)
+
     def set_max_captures_per_window(self, max_captures: int) -> bool:
         try:
-            self._max_captures_per_window = int(max_captures)
+            value = int(max_captures)
+            if value <= 0:
+                return False
+            with self._settings_lock:
+                self._max_captures_per_window = value
             return True
         except (ValueError, TypeError):
             return False
 
     def update_settings(self, settings: dict) -> bool:
         with self._settings_lock:
-            old_debounce = self._debounce_interval
+            old_window = self._capture_limit_window_seconds
             old_max = self._max_captures_per_window
 
-            new_debounce = old_debounce
+            new_window = old_window
             new_max = old_max
 
             try:
-                if "debounce_interval" in settings:
+                if "capture_limit_window_seconds" in settings:
+                    value = float(settings["capture_limit_window_seconds"])
+                    if value <= 0:
+                        raise ValueError(f"Invalid capture_limit_window_seconds: {value}")
+                    new_window = value
+                elif "debounce_interval" in settings:
                     value = float(settings["debounce_interval"])
                     if value <= 0:
                         raise ValueError(f"Invalid debounce_interval: {value}")
-                    new_debounce = value
+                    new_window = value
 
                 if "max_captures_per_window" in settings:
                     value = int(settings["max_captures_per_window"])
@@ -163,19 +169,21 @@ class CaptureManager:
                         raise ValueError(f"Invalid max_captures_per_window: {value}")
                     new_max = value
 
-                self._debounce_interval = new_debounce
+                self._capture_limit_window_seconds = new_window
                 self._max_captures_per_window = new_max
+                self._prune_capture_timestamps_locked(time.time())
                 return True
             except (ValueError, TypeError):
-                self._debounce_interval = old_debounce
+                self._capture_limit_window_seconds = old_window
                 self._max_captures_per_window = old_max
                 return False
 
     def get_settings(self) -> dict:
-        return {
-            "debounce_interval": self._debounce_interval,
-            "max_captures_per_window": self._max_captures_per_window
-        }
+        with self._settings_lock:
+            return {
+                "capture_limit_window_seconds": self._capture_limit_window_seconds,
+                "max_captures_per_window": self._max_captures_per_window
+            }
 
     def close(self):
         return None
