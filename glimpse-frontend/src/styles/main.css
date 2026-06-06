@@ -260,6 +260,14 @@ kbd {
   box-shadow: 0 12px 24px var(--shell-primary-shadow);
 }
 
+.source-filter-button.source-filter-button-active:hover {
+  background: linear-gradient(135deg, var(--shell-primary-start) 0%, var(--shell-primary-end) 100%);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 14px 28px var(--shell-primary-shadow-hover);
+  transform: translateY(-1px);
+}
+
 .shell-icon-button {
   display: inline-flex;
   align-items: center;

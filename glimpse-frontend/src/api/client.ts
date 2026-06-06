@@ -39,6 +39,38 @@ export interface Settings {
   cluster: Record<string, any>
 }
 
+export interface IndexRepairResult {
+  status: string
+  processed: number
+  indexed: number
+  skipped?: number
+  failed: number
+  rebuilt?: boolean
+}
+
+export interface IndexRepairStatus {
+  task_id: string
+  status: 'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+  running: boolean
+  result: IndexRepairResult | null
+  error: string | null
+  sqlite_count?: number
+  chroma_count?: number
+  synced?: boolean
+  stats_error?: string
+}
+
+export interface SearchWarmupStatus {
+  task_id: string
+  status: 'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+  running: boolean
+  result: {
+    chroma_ready: boolean
+    embedding_ready: boolean
+  } | null
+  error: string | null
+}
+
 // Memories API
 export const memoriesApi = {
   list: async (limit = 100, offset = 0): Promise<{ memories: Memory[], total: number }> => {
@@ -61,6 +93,11 @@ export const memoriesApi = {
 export const searchApi = {
   search: async (query: string, source = 'all', limit = 20): Promise<{ memories: Memory[], query: string, source: string }> => {
     const response = await api.get(`/search?q=${encodeURIComponent(query)}&source=${source}&limit=${limit}`)
+    return response.data
+  },
+
+  warmup: async (): Promise<SearchWarmupStatus> => {
+    const response = await api.post('/search/warmup')
     return response.data
   },
 }
@@ -108,6 +145,19 @@ export const settingsApi = {
 
   testAi: async (apiKey?: string, baseUrl?: string, model?: string): Promise<{ success: boolean, message: string }> => {
     const response = await api.post('/settings/ai/test', { api_key: apiKey, base_url: baseUrl, model })
+    return response.data
+  },
+}
+
+// Index maintenance API
+export const indexApi = {
+  repair: async (): Promise<IndexRepairStatus> => {
+    const response = await api.post('/settings/index/repair')
+    return response.data
+  },
+
+  status: async (): Promise<IndexRepairStatus> => {
+    const response = await api.get('/settings/index/repair')
     return response.data
   },
 }

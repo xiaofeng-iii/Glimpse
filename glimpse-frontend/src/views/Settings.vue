@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
+import { useNotificationStore } from '@/stores/notification'
 import { useRouter } from 'vue-router'
+import { indexApi, type IndexRepairStatus } from '@/api/client'
 import {
   applyThemePreference,
   normalizeThemePreference,
@@ -15,6 +17,7 @@ import {
 } from '@/utils/i18n'
 
 const settingsStore = useSettingsStore()
+const notificationStore = useNotificationStore()
 const router = useRouter()
 
 const sections = [
@@ -22,6 +25,7 @@ const sections = [
   { id: 'screenshot', labelKey: 'settings.screenshot', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z' },
   { id: 'ai', labelKey: 'settings.ai', icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z' },
   { id: 'ui', labelKey: 'settings.ui', icon: 'M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25' },
+  { id: 'maintenance', labelKey: 'settings.maintenance', icon: 'M4 6c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3z M4 6v6c0 1.657 3.582 3 8 3s8-1.343 8-3V6 M4 12v6c0 1.657 3.582 3 8 3s8-1.343 8-3v-6' },
 ] as const
 
 type SectionId = typeof sections[number]['id']
@@ -49,6 +53,9 @@ const clusterTimeout = ref(5)
 const isTestingAi = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
 const recordingHotkey = ref<'screenshot' | 'search' | null>(null)
+const isRepairingIndex = ref(false)
+const indexRepairStatus = ref<IndexRepairStatus | null>(null)
+let indexRepairPollTimer: ReturnType<typeof setTimeout> | null = null
 
 const hotkeyLabels: Record<string, string> = {
   ctrl: 'Ctrl',
@@ -191,8 +198,115 @@ const loadSettings = async () => {
   }
 }
 
+const clearIndexRepairPoll = () => {
+  if (indexRepairPollTimer) {
+    clearTimeout(indexRepairPollTimer)
+    indexRepairPollTimer = null
+  }
+}
+
+const indexRepairFailed = (status: IndexRepairStatus) => {
+  return Boolean(
+    status.error ||
+    status.status === 'failed' ||
+    status.result?.status === 'failed' ||
+    status.result?.status === 'unavailable'
+  )
+}
+
+const handleIndexRepairFinished = (status: IndexRepairStatus) => {
+  isRepairingIndex.value = false
+
+  if (indexRepairFailed(status)) {
+    notificationStore.show(t('message.indexRepairFailed'), 'error')
+    return
+  }
+
+  const failed = status.result?.failed ?? 0
+  notificationStore.show(
+    failed > 0 ? t('message.indexRepairPartial') : t('message.indexRepairDone'),
+    failed > 0 ? 'warning' : 'success',
+  )
+}
+
+const refreshIndexRepairStatus = async () => {
+  const status = await indexApi.status()
+  indexRepairStatus.value = status
+  isRepairingIndex.value = status.running
+  return status
+}
+
+const pollIndexRepairStatus = () => {
+  clearIndexRepairPoll()
+  indexRepairPollTimer = setTimeout(async () => {
+    try {
+      const status = await refreshIndexRepairStatus()
+      if (status.running) {
+        pollIndexRepairStatus()
+      } else {
+        handleIndexRepairFinished(status)
+      }
+    } catch (error) {
+      isRepairingIndex.value = false
+      notificationStore.show(t('message.indexRepairFailed'), 'error')
+    }
+  }, 1500)
+}
+
+const handleRepairIndex = async () => {
+  if (isRepairingIndex.value) return
+  if (!confirm(t('settings.indexRepairConfirm'))) return
+
+  try {
+    isRepairingIndex.value = true
+    indexRepairStatus.value = await indexApi.repair()
+    notificationStore.show(t('message.indexRepairStarted'), 'info')
+
+    if (indexRepairStatus.value.running) {
+      pollIndexRepairStatus()
+    } else {
+      handleIndexRepairFinished(indexRepairStatus.value)
+    }
+  } catch (error) {
+    isRepairingIndex.value = false
+    notificationStore.show(t('message.indexRepairFailed'), 'error')
+  }
+}
+
+const indexRepairStatusText = () => {
+  if (isRepairingIndex.value || indexRepairStatus.value?.running) {
+    return t('settings.indexRepairRunning')
+  }
+
+  const result = indexRepairStatus.value?.result
+  if (result) {
+    return t('settings.indexRepairLastResult', {
+      processed: result.processed,
+      indexed: result.indexed,
+      failed: result.failed,
+    })
+  }
+
+  return t('settings.indexRepairIdle', {
+    sqlite: indexRepairStatus.value?.sqlite_count ?? 0,
+    chroma: indexRepairStatus.value?.chroma_count ?? 0,
+  })
+}
+
 onMounted(async () => {
   await loadSettings()
+  try {
+    const status = await refreshIndexRepairStatus()
+    if (status.running) {
+      pollIndexRepairStatus()
+    }
+  } catch (error) {
+    // Settings remain usable even if maintenance status is temporarily unavailable.
+  }
+})
+
+onUnmounted(() => {
+  clearIndexRepairPoll()
 })
 
 const handleSave = async () => {
@@ -445,6 +559,26 @@ const handleCancel = () => {
                     <option value="minimize">{{ t('settings.closeMinimize') }}</option>
                     <option value="exit">{{ t('settings.closeExit') }}</option>
                   </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Maintenance -->
+            <div v-if="activeSection === 'maintenance'">
+              <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('settings.maintenance') }}</h2>
+              <div class="space-y-4">
+                <div class="flex items-center justify-between gap-4 border-b border-gray-100 py-3">
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-gray-900">{{ t('settings.repairIndex') }}</div>
+                    <div class="mt-1 text-xs text-gray-500">{{ indexRepairStatusText() }}</div>
+                  </div>
+                  <button
+                    @click="handleRepairIndex"
+                    :disabled="isRepairingIndex"
+                    class="btn-secondary whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {{ isRepairingIndex ? t('settings.repairingIndex') : t('settings.repairIndex') }}
+                  </button>
                 </div>
               </div>
             </div>

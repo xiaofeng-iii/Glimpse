@@ -15,22 +15,41 @@ const runtimeState: BackendRuntime = {
   token: null,
 }
 
+let runtimeReady = !isDesktopShell()
+let runtimeReadyPromise: Promise<void> | null = null
+
 export const initializeBackendRuntime = async () => {
-  if (!isDesktopShell()) {
-    return
+  if (runtimeReadyPromise) {
+    return runtimeReadyPromise
   }
 
-  try {
-    const module = await import('@tauri-apps/api/core')
-    const backendRuntime = await module.invoke<BackendRuntime>('get_backend_runtime')
-    if (backendRuntime.origin) {
-      runtimeState.origin = backendRuntime.origin.replace(/\/$/, '')
+  runtimeReadyPromise = (async () => {
+    if (!isDesktopShell()) {
+      runtimeReady = true
+      return
     }
-    runtimeState.token = backendRuntime.token || null
-  } catch (error) {
-    console.error('Failed to load backend runtime:', error)
-  }
+
+    try {
+      const module = await import('@tauri-apps/api/core')
+      const backendRuntime = await module.invoke<BackendRuntime>('get_backend_runtime')
+      if (backendRuntime.origin) {
+        runtimeState.origin = backendRuntime.origin.replace(/\/$/, '')
+      }
+      runtimeState.token = backendRuntime.token || null
+    } catch (error) {
+      console.error('Failed to load backend runtime:', error)
+    } finally {
+      runtimeReady = true
+      window.dispatchEvent(new CustomEvent('glimpse:backend-runtime-ready'))
+    }
+  })()
+
+  return runtimeReadyPromise
 }
+
+export const isBackendRuntimeReady = () => runtimeReady
+
+export const whenBackendRuntimeReady = () => initializeBackendRuntime()
 
 export const getApiOrigin = () => runtimeState.origin
 

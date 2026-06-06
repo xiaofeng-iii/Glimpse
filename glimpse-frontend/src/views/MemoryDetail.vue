@@ -93,17 +93,17 @@ const markImageError = (url: string) => {
       <!-- Memory Detail -->
       <div v-else-if="memory">
         <!-- Header -->
-        <div class="flex items-center justify-between mb-6">
-          <button @click="router.back()" class="btn-secondary">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="mb-6 flex items-center justify-between gap-3">
+          <button @click="router.back()" class="btn-secondary memory-detail-action">
+            <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             {{ t('action.back') }}
           </button>
-          <div class="flex gap-2">
-            <button @click="handleCopy" class="btn-secondary">{{ t('action.copySummary') }}</button>
-            <button @click="handleOpenImage" class="btn-secondary">{{ t('action.viewImage') }}</button>
-            <button @click="handleDelete" class="px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">{{ t('action.delete') }}</button>
+          <div class="flex items-center gap-2">
+            <button @click="handleCopy" class="btn-secondary memory-detail-action">{{ t('action.copySummary') }}</button>
+            <button @click="handleOpenImage" class="btn-secondary memory-detail-action">{{ t('action.viewImage') }}</button>
+            <button @click="handleDelete" class="memory-detail-action text-red-500 hover:bg-red-50">{{ t('action.delete') }}</button>
           </div>
         </div>
 
@@ -191,3 +191,19 @@ const markImageError = (url: string) => {
     />
   </div>
 </template>
+
+<style scoped>
+.memory-detail-action {
+  display: inline-flex;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0 1rem;
+  border-radius: 14px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+</style>

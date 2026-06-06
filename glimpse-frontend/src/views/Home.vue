@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { useMemoriesStore } from '@/stores/memories'
 import { useClusterStore } from '@/stores/cluster'
 import { useNotificationStore } from '@/stores/notification'
-import { screenshotApi, clusterApi, healthApi, settingsApi, type Memory } from '@/api/client'
+import { screenshotApi, clusterApi, healthApi, settingsApi, searchApi, type Memory } from '@/api/client'
+import { whenBackendRuntimeReady } from '@/config/runtime'
 import {
   closeDesktopWindow,
   getDesktopWindowMaximized,
@@ -48,6 +49,8 @@ const screenshotShortcutLabel = ref('Ctrl+Shift+G')
 const searchShortcutLabel = ref('Ctrl+F')
 const clusterModeEnabled = ref(false)
 let removeDesktopCloseListener: (() => void) | null = null
+let semanticWarmupTimer: ReturnType<typeof window.setTimeout> | null = null
+let homeUnmounted = false
 
 type ScreenshotTriggerOptions = {
   initiatedByHotkey?: boolean
@@ -57,6 +60,19 @@ const wait = (ms: number) =>
   new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms)
   })
+
+const scheduleSemanticWarmup = () => {
+  if (semanticWarmupTimer) {
+    return
+  }
+
+  semanticWarmupTimer = window.setTimeout(() => {
+    semanticWarmupTimer = null
+    void searchApi.warmup().catch((error) => {
+      console.error('Semantic search warmup failed:', error)
+    })
+  }, 2000)
+}
 
 const formatShortcutLabel = (hotkey?: string, fallback = '') => {
   if (!hotkey) {
@@ -150,6 +166,19 @@ const checkBackendHealth = async () => {
   }
 
   return backendReady.value
+}
+
+const waitForBackendReady = async (timeoutMs = 30000) => {
+  const deadline = Date.now() + timeoutMs
+
+  while (!homeUnmounted && Date.now() < deadline) {
+    if (await checkBackendHealth()) {
+      return true
+    }
+    await wait(500)
+  }
+
+  return !homeUnmounted && (await checkBackendHealth())
 }
 
 const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
@@ -334,7 +363,11 @@ const handleCloseDialogChoice = async (payload: {
 }
 
 const handleRefresh = async () => {
-  await checkBackendHealth()
+  const healthy = await checkBackendHealth()
+  if (!healthy) {
+    return
+  }
+  scheduleSemanticWarmup()
   await memoriesStore.refresh()
 }
 
@@ -398,6 +431,8 @@ const handleShortcutScreenshotEvent = async () => {
 }
 
 onMounted(async () => {
+  homeUnmounted = false
+
   if (isDesktop) {
     await focusDesktopWindow()
     await syncDesktopWindowState()
@@ -409,13 +444,28 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('glimpse:focus-search', handleFocusSearchEvent)
   window.addEventListener('glimpse:shortcut-screenshot', handleShortcutScreenshotEvent)
+  await focusSearch()
+  await whenBackendRuntimeReady()
+
+  const healthy = await waitForBackendReady()
+  if (!healthy) {
+    return
+  }
+
   await loadUiSettings()
-  await checkBackendHealth()
   await loadMemories()
+  scheduleSemanticWarmup()
   await focusSearch()
 })
 
 onUnmounted(() => {
+  homeUnmounted = true
+
+  if (semanticWarmupTimer) {
+    window.clearTimeout(semanticWarmupTimer)
+    semanticWarmupTimer = null
+  }
+
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('glimpse:focus-search', handleFocusSearchEvent)
   window.removeEventListener('glimpse:shortcut-screenshot', handleShortcutScreenshotEvent)

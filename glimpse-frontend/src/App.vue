@@ -3,6 +3,7 @@ import { RouterView } from 'vue-router'
 import { onMounted, onUnmounted } from 'vue'
 import { useWebSocket } from '@/api/websocket'
 import { useSettingsStore } from '@/stores/settings'
+import { whenBackendRuntimeReady } from '@/config/runtime'
 import { applyThemePreference, watchSystemTheme } from '@/utils/theme'
 import { setLanguagePreference } from '@/utils/i18n'
 import NotificationToast from '@/components/NotificationToast.vue'
@@ -19,6 +20,7 @@ const applySavedTheme = async () => {
 
 // Connect WebSocket on app mount
 onMounted(async () => {
+  await whenBackendRuntimeReady()
   await applySavedTheme()
   stopWatchingSystemTheme = watchSystemTheme(() => {
     applyThemePreference(settingsStore.settings?.ui?.theme)

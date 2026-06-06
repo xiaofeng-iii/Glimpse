@@ -10,7 +10,6 @@ import { getStoredLanguagePreference, setLanguagePreference } from './utils/i18n
 const bootstrap = async () => {
   applyThemePreference(getStoredThemePreference())
   setLanguagePreference(getStoredLanguagePreference())
-  await initializeBackendRuntime()
 
   const app = createApp(App)
   const pinia = createPinia()
@@ -18,6 +17,8 @@ const bootstrap = async () => {
   app.use(pinia)
   app.use(router)
   app.mount('#app')
+
+  void initializeBackendRuntime()
 }
 
 void bootstrap()
