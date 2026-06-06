@@ -656,10 +656,10 @@ class MainWindow(QMainWindow):
             settings_manager = container.get("settings_manager")
             cluster_mode = settings_manager.get("cluster.cluster_mode", False)
             cluster_buffer = container.get("cluster_buffer")
-            bypass_debounce = cluster_mode and cluster_buffer.is_collecting()
+            cluster_collecting = cluster_mode and cluster_buffer.is_collecting()
         except Exception:
             cluster_mode = False
-            bypass_debounce = False
+            cluster_collecting = False
 
         self.status_label.setText(t("status.capturing"))
         was_visible = self.isVisible()
@@ -669,7 +669,7 @@ class MainWindow(QMainWindow):
         def do_capture():
             try:
                 capture_manager = container.get("capture_manager")
-                result = capture_manager.capture_fullscreen(force_bypass_debounce=bypass_debounce)
+                result = capture_manager.capture_fullscreen()
             except Exception as e:
                 self.status_label.setText(f"{t('status.error_prefix')}: {e}")
                 signals.error_occurred.emit(f"Screenshot error: {e}")
@@ -684,7 +684,7 @@ class MainWindow(QMainWindow):
 
             if result is None:
                 self.status_label.setText(
-                    t("status.cluster_max_rate") if bypass_debounce
+                    t("status.cluster_max_rate") if cluster_collecting
                     else t("status.capture_too_fast")
                 )
                 return

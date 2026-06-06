@@ -68,7 +68,7 @@
     "hotkey_screenshot": "Screenshot Hotkey:",
     "hotkey_search": "Search Hotkey:",
     "hotkey_clear": "Clear Hotkey:",
-    "debounce_interval": "Debounce Interval:",
+    "capture_limit_window_seconds": "Capture Limit Window:",
     "max_captures": "Max Captures:",
     "cluster_capture": "Cluster Capture",
     "cluster_mode": "Enable cluster capture mode",
@@ -104,7 +104,7 @@
     "validation_hotkey_hint": "Valid format examples: <ctrl>+<shift>+g or ctrl+c",
     "validation_input_error": "Input Error",
     "validation_api_key": "API Key cannot be blank or whitespace only",
-    "validation_debounce": "Debounce interval must be greater than 0",
+    "validation_capture_limit_window": "Capture limit window must be greater than 0",
     "validation_max_captures": "Max captures must be greater than 0",
     "validation_cluster_max_images": "Cluster max images must be between 1 and 10",
     "validation_cluster_timeout": "Cluster submit delay must be between 1 and 10 seconds"

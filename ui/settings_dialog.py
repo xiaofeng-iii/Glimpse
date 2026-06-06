@@ -92,7 +92,7 @@ class SettingsDialog(QDialog):
         return {
             "hotkeys": copy.deepcopy(DEFAULT_HOTKEYS),
             "screenshot": {
-                "debounce_interval": 5.0,
+                "capture_limit_window_seconds": 5.0,
                 "max_captures_per_window": 10,
             },
             "cluster": {
@@ -209,11 +209,14 @@ class SettingsDialog(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(16, 20, 16, 16)
 
-        self._debounce_interval = QDoubleSpinBox()
-        self._debounce_interval.setRange(0.1, 60.0)
-        self._debounce_interval.setSingleStep(0.5)
-        self._debounce_interval.setSuffix(" s")
-        layout.addRow(t("settings.debounce_interval"), self._debounce_interval)
+        self._capture_limit_window_seconds = QDoubleSpinBox()
+        self._capture_limit_window_seconds.setRange(0.1, 60.0)
+        self._capture_limit_window_seconds.setSingleStep(0.5)
+        self._capture_limit_window_seconds.setSuffix(" s")
+        layout.addRow(
+            t("settings.capture_limit_window_seconds"),
+            self._capture_limit_window_seconds,
+        )
 
         self._max_captures = QSpinBox()
         self._max_captures.setRange(1, 100)
@@ -318,7 +321,12 @@ class SettingsDialog(QDialog):
         )
 
         screenshot = merged.get("screenshot", {})
-        self._debounce_interval.setValue(screenshot.get("debounce_interval", 5.0))
+        self._capture_limit_window_seconds.setValue(
+            screenshot.get(
+                "capture_limit_window_seconds",
+                screenshot.get("debounce_interval", 5.0),
+            )
+        )
         self._max_captures.setValue(screenshot.get("max_captures_per_window", 10))
 
         cluster = merged.get("cluster", {})
@@ -351,7 +359,7 @@ class SettingsDialog(QDialog):
                 "search": self._hotkey_search.pynput_hotkey(),
             },
             "screenshot": {
-                "debounce_interval": self._debounce_interval.value(),
+                "capture_limit_window_seconds": self._capture_limit_window_seconds.value(),
                 "max_captures_per_window": self._max_captures.value(),
             },
             "cluster": {
@@ -507,8 +515,8 @@ class SettingsDialog(QDialog):
             return False
 
         screenshot = settings.get("screenshot", {})
-        if screenshot.get("debounce_interval", 1) <= 0:
-            QMessageBox.warning(self, t("settings.validation_input_error"), t("settings.validation_debounce"))
+        if screenshot.get("capture_limit_window_seconds", 1) <= 0:
+            QMessageBox.warning(self, t("settings.validation_input_error"), t("settings.validation_capture_limit_window"))
             return False
         if screenshot.get("max_captures_per_window", 1) <= 0:
             QMessageBox.warning(self, t("settings.validation_input_error"), t("settings.validation_max_captures"))

@@ -9,7 +9,7 @@ class FakeSettingsManager:
     def __init__(self, settings=None):
         self._settings = settings or {
             "hotkeys": {"screenshot": "<ctrl>+<shift>+g", "search": "<ctrl>+<f>"},
-            "screenshot": {"debounce_interval": 5.0, "max_captures_per_window": 10},
+            "screenshot": {"capture_limit_window_seconds": 5.0, "max_captures_per_window": 10},
             "cluster": {
                 "cluster_mode": False,
                 "cluster_auto_submit": True,
@@ -68,7 +68,7 @@ class TestOnSave:
 
     def test_save_with_changes_succeeds(self, settings_dialog, qtbot):
         """When settings changed, _on_save saves and returns True silently (no popup)."""
-        settings_dialog._debounce_interval.setValue(10.0)
+        settings_dialog._capture_limit_window_seconds.setValue(10.0)
         with patch.object(QMessageBox, "information") as mock_info:
             result = settings_dialog._on_save()
             assert result is True
@@ -117,7 +117,7 @@ class TestOnApply:
 
     def test_apply_with_changes_closes(self, settings_dialog, qtbot):
         """Changes + no conflicts -> accept() called, no confirmation popup."""
-        settings_dialog._debounce_interval.setValue(10.0)
+        settings_dialog._capture_limit_window_seconds.setValue(10.0)
         from unittest.mock import patch
         with patch.object(QMessageBox, "information") as mock_info, \
              patch.object(QMessageBox, "question") as mock_question, \
@@ -125,11 +125,11 @@ class TestOnApply:
             settings_dialog._on_apply()
         assert settings_dialog.result() == 1
         mock_question.assert_not_called()
-        assert settings_dialog._settings_manager._settings["screenshot"]["debounce_interval"] == 10.0
+        assert settings_dialog._settings_manager._settings["screenshot"]["capture_limit_window_seconds"] == 10.0
 
     def test_apply_with_conflict_shows_dialog(self, settings_dialog, qtbot):
         """Changes + conflict -> shows conflict dialog, user confirms -> accept()."""
-        settings_dialog._debounce_interval.setValue(10.0)
+        settings_dialog._capture_limit_window_seconds.setValue(10.0)
         from unittest.mock import patch
         with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes) as mock_question, \
              patch.object(QMessageBox, "information") as mock_info, \
@@ -143,7 +143,7 @@ class TestOnApply:
 class TestCloseEvent:
     def test_close_with_changes_no_prompt(self, settings_dialog, qtbot):
         """Closing with unsaved changes should NOT prompt (no dirty check)."""
-        settings_dialog._debounce_interval.setValue(99.0)
+        settings_dialog._capture_limit_window_seconds.setValue(99.0)
         from unittest.mock import patch
         with patch.object(QMessageBox, "question") as mock_question:
             settings_dialog.close()

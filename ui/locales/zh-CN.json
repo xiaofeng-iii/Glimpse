@@ -68,7 +68,7 @@
     "hotkey_screenshot": "截图快捷键:",
     "hotkey_search": "搜索快捷键:",
     "hotkey_clear": "清除快捷键:",
-    "debounce_interval": "防抖间隔:",
+    "capture_limit_window_seconds": "截图限流窗口:",
     "max_captures": "最大截图数:",
     "cluster_capture": "集群截图",
     "cluster_mode": "启用集群截图模式",
@@ -104,7 +104,7 @@
     "validation_hotkey_hint": "正确格式示例：<ctrl>+<shift>+g 或 ctrl+c",
     "validation_input_error": "输入错误",
     "validation_api_key": "API Key 不能只包含空白字符",
-    "validation_debounce": "防抖间隔必须大于 0",
+    "validation_capture_limit_window": "截图限流窗口必须大于 0",
     "validation_max_captures": "最大截图数必须大于 0",
     "validation_cluster_max_images": "集群最多收集张数必须在 1 到 10 之间",
     "validation_cluster_timeout": "集群提交等待时间必须在 1 到 10 秒之间"
