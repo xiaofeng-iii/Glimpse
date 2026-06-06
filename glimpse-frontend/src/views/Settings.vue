@@ -15,6 +15,9 @@ import {
   t,
   type LanguagePreference,
 } from '@/utils/i18n'
+import { createLogger } from '@/utils/logger'
+
+const logger = createLogger('views/Settings')
 
 const settingsStore = useSettingsStore()
 const notificationStore = useNotificationStore()
@@ -337,7 +340,7 @@ const handleSave = async () => {
     setLanguagePreference(language.value)
     router.push('/')
   } catch (error) {
-    console.error('Failed to save settings:', error)
+    logger.error('Failed to save settings: %s', error)
   }
 }
 

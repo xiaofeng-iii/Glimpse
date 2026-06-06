@@ -11,6 +11,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.resolve()
 FRONTEND_DIR = PROJECT_ROOT / "glimpse-frontend"
@@ -26,7 +29,7 @@ def _load_dotenv() -> None:
     env_path = PROJECT_ROOT / ".env"
     if env_path.exists():
         load_dotenv(env_path)
-        print(f"Loaded .env from {env_path}")
+        logger.info("Loaded .env from %s", env_path)
 
 
 def _build_tauri_command() -> str:
@@ -42,18 +45,18 @@ def main() -> int:
     _load_dotenv()
 
     if not FRONTEND_DIR.exists():
-        print(f"Frontend directory not found: {FRONTEND_DIR}", file=sys.stderr)
+        logger.error("Frontend directory not found: %s", FRONTEND_DIR)
         return 1
 
     if not TAURI_ENV_SCRIPT.exists():
-        print(f"Tauri environment script not found: {TAURI_ENV_SCRIPT}", file=sys.stderr)
+        logger.error("Tauri environment script not found: %s", TAURI_ENV_SCRIPT)
         return 1
 
     env = os.environ.copy()
     env["GLIMPSE_PYTHON"] = sys.executable
 
-    print("Starting Glimpse Tauri frontend...")
-    print("The Tauri shell will start the Python API automatically if needed.")
+    logger.info("Starting Glimpse Tauri frontend...")
+    logger.info("The Tauri shell will start the Python API automatically if needed.")
 
     completed = subprocess.run(
         _build_tauri_command(),

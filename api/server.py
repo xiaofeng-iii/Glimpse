@@ -17,6 +17,9 @@ from api.hotkeys import setup_global_hotkeys, shutdown_global_hotkeys
 from api.websocket import websocket_endpoint, setup_signal_forwarding, manager
 from container import container
 from services.bootstrap import configure_ai_client
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 APP_VERSION = "1.0.0"
 AUTH_HEADER = "X-Glimpse-Auth"
@@ -52,7 +55,7 @@ def websocket_is_authorized(websocket: WebSocket) -> bool:
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup: Initialize container and services
-    print("Starting Glimpse API Server...")
+    logger.info("Starting Glimpse API Server...")
     container.initialize_defaults()
     configure_ai_client(container.get("ai_client"), container.get("settings_manager"))
 
@@ -62,12 +65,12 @@ async def lifespan(app: FastAPI):
     setup_cluster_processing(loop)
     setup_global_hotkeys(loop)
 
-    print("API Server ready!")
+    logger.info("API Server ready!")
 
     yield
 
     # Shutdown: Clean up resources
-    print("Shutting down API Server...")
+    logger.info("Shutting down API Server...")
     shutdown_global_hotkeys()
     container.shutdown()
 

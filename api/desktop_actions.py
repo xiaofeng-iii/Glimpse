@@ -11,6 +11,9 @@ from api.dependencies import (
     get_settings_manager,
 )
 from api.websocket import broadcast_event
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 _cluster_processing_initialized = False
 
@@ -28,7 +31,7 @@ def _report_background_future(future) -> None:
     try:
         future.result()
     except Exception as exc:
-        print(f"Background broadcast error: {exc}")
+        logger.error("Background broadcast error: %s", exc)
 
 
 def _emit_from_thread(
@@ -159,7 +162,7 @@ def setup_cluster_processing(loop: asyncio.AbstractEventLoop) -> None:
                 except Exception as background_exc:
                     on_error(str(background_exc))
 
-            print(f"Cluster async queue unavailable, falling back to thread: {exc}")
+            logger.warning("Cluster async queue unavailable, falling back to thread: %s", exc)
             asyncio.run_coroutine_threadsafe(create_cluster_in_background(), loop)
 
     cluster_buffer.flushed.connect(on_cluster_flushed)

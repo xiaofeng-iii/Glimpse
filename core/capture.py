@@ -12,8 +12,12 @@ from threading import Lock
 import mss
 from PIL import Image
 
+from utils.logger import get_logger
+
 if TYPE_CHECKING:
     from config.path_manager import PathManager
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -67,8 +71,7 @@ class CaptureManager:
             return result
         except Exception as e:
             self._release_capture_slot(reservation)
-            print(f"Capture fullscreen error: {e}")
-            traceback.print_exc()
+            logger.error("Capture fullscreen error: %s", e, exc_info=True)
             return None
 
     def capture_region(self, region: Tuple[int, int, int, int]) -> Optional[CaptureResult]:
@@ -88,8 +91,7 @@ class CaptureManager:
             return result
         except Exception as e:
             self._release_capture_slot(reservation)
-            print(f"Capture region error: {e}")
-            traceback.print_exc()
+            logger.error("Capture region error: %s", e, exc_info=True)
             return None
 
     def _prune_capture_timestamps_locked(self, now: float):

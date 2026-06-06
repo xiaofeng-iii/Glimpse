@@ -11,6 +11,10 @@ import sys
 import os
 from pathlib import Path
 
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 def _packaged_log_path() -> Path:
     local_app_data = os.environ.get("LOCALAPPDATA")
@@ -47,7 +51,7 @@ try:
     env_path = get_env_file(project_root)
     if env_path.exists():
         load_dotenv(env_path)
-        print(f"Loaded .env from {env_path}")
+        logger.info("Loaded .env from %s", env_path)
 except ImportError:
     pass
 
@@ -66,16 +70,16 @@ def main():
     else:
         os.environ.pop("GLIMPSE_AUTH_TOKEN", None)
 
-    print(f"""
+    logger.info("""
 ╔═══════════════════════════════════════════════════════════╗
 ║                    Glimpse API Server                      ║
 ║                                                            ║
-║  REST API:  http://{args.host}:{args.port}/api/                  ║
-║  WebSocket: ws://{args.host}:{args.port}/ws/events             ║
-║  Docs:      http://{args.host}:{args.port}/docs                 ║
+║  REST API:  http://%s:%s/api/                  ║
+║  WebSocket: ws://%s:%s/ws/events             ║
+║  Docs:      http://%s:%s/docs                 ║
 ║                                                            ║
 ╚═══════════════════════════════════════════════════════════╝
-    """)
+    """, args.host, args.port, args.host, args.port, args.host, args.port)
 
     uvicorn.run(
         "api.server:app",

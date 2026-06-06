@@ -8,8 +8,12 @@ from pathlib import Path
 from urllib.parse import urlparse
 from typing import Dict, Any, Optional, Set, TYPE_CHECKING
 
+from utils.logger import get_logger
+
 if TYPE_CHECKING:
     from config.path_manager import PathManager
+
+logger = get_logger(__name__)
 
 
 SETTINGS_SCHEMA: Set[str] = {
@@ -385,7 +389,7 @@ class SettingsManager:
             self._settings = temp_settings
             return True
         except (json.JSONDecodeError, IOError, OSError) as e:
-            print(f"Settings save error: {e}")
+            logger.error("Settings save error: %s", e)
             return False
 
     def reset(self):

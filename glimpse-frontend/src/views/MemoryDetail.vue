@@ -8,7 +8,10 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { getMemoryImageUrls } from '@/utils/memory-images'
 import { t } from '@/utils/i18n'
+import { createLogger } from '@/utils/logger'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
+
+const logger = createLogger('views/MemoryDetail')
 
 const route = useRoute()
 const router = useRouter()
@@ -27,7 +30,7 @@ onMounted(async () => {
   try {
     memory.value = await memoriesApi.get(id)
   } catch (error) {
-    console.error('Failed to load memory:', error)
+    logger.error('Failed to load memory: %s', error)
   } finally {
     isLoading.value = false
   }
@@ -52,7 +55,7 @@ const handleDelete = async () => {
     notificationStore.show(t('message.deleted'), 'success', 2200)
     await router.push('/')
   } catch (error) {
-    console.error('Delete memory failed:', error)
+    logger.error('Delete memory failed: %s', error)
     notificationStore.show(t('message.deleteFailed'), 'error', 3200)
   } finally {
     isDeleting.value = false

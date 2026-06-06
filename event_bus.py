@@ -7,6 +7,9 @@ import weakref
 from typing import Any, Callable, List, Optional
 
 from async_runtime import get_async_runtime
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class _SubscriberRef:
@@ -68,7 +71,7 @@ class EventSignal:
                 if inspect.isawaitable(result):
                     get_async_runtime().create_task(result)
             except Exception as exc:
-                print(f"Signal '{self._name}' subscriber error: {exc}")
+                logger.error("Signal '%s' subscriber error: %s", self._name, exc)
 
     def _snapshot(self) -> List[Callable[..., Any]]:
         with self._lock:

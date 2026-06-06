@@ -9,6 +9,8 @@ import uuid
 from typing import Optional, Callable, List, TYPE_CHECKING
 from threading import Semaphore, Lock
 
+from utils.logger import get_logger
+
 if TYPE_CHECKING:
     from db.sqlite_manager import SQLiteManager
     from db.chroma_manager import ChromaManager
@@ -16,6 +18,8 @@ if TYPE_CHECKING:
     from services.ai_client import AIClient
     from services.embedding_client import EmbeddingClient
     from core.task_queue import TaskQueue
+
+logger = get_logger(__name__)
 
 
 MAX_CONCURRENT_MEMORIES = 5
@@ -25,7 +29,7 @@ def _rollback_sqlite(sqlite_manager, memory_id: str) -> None:
     try:
         sqlite_manager.delete_memory(memory_id)
     except Exception as e:
-        print(f"Rollback failed for memory {memory_id}: {e}")
+        logger.error("Rollback failed for memory %s: %s", memory_id, e)
 
 
 class MemoryService:
@@ -158,7 +162,7 @@ class MemoryService:
                 if on_complete:
                     on_complete(memory_id)
             except Exception as e:
-                print(f"Memory creation error: {e}")
+                logger.error("Memory creation error: %s", e)
                 if on_error:
                     on_error(str(e))
 
@@ -263,7 +267,7 @@ class MemoryService:
                 if on_complete:
                     on_complete(memory_id)
             except Exception as e:
-                print(f"Cluster memory creation error: {e}")
+                logger.error("Cluster memory creation error: %s", e)
                 if on_error:
                     on_error(str(e))
 

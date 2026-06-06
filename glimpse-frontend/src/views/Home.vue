@@ -6,6 +6,7 @@ import { useClusterStore } from '@/stores/cluster'
 import { useNotificationStore } from '@/stores/notification'
 import { screenshotApi, clusterApi, healthApi, settingsApi, searchApi, type Memory } from '@/api/client'
 import { whenBackendRuntimeReady } from '@/config/runtime'
+import { createLogger } from '@/utils/logger'
 import {
   closeDesktopWindow,
   getDesktopWindowMaximized,
@@ -51,6 +52,8 @@ const clusterModeEnabled = ref(false)
 let removeDesktopCloseListener: (() => void) | null = null
 let semanticWarmupTimer: ReturnType<typeof window.setTimeout> | null = null
 let homeUnmounted = false
+
+const logger = createLogger('views/Home')
 
 type ScreenshotTriggerOptions = {
   initiatedByHotkey?: boolean
@@ -142,7 +145,7 @@ const loadUiSettings = async () => {
     )
     clusterModeEnabled.value = Boolean(settings.cluster?.cluster_mode)
   } catch (error) {
-    console.error('Failed to load UI settings:', error)
+    logger.error('Failed to load UI settings: %s', error)
   }
 }
 
@@ -237,7 +240,7 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
       )
     }
   } catch (error) {
-    console.error('Screenshot failed:', error)
+    logger.error('Screenshot failed: %s', error)
     notificationStore.show(
       options.initiatedByHotkey
         ? t('message.checkBackendLogs')
@@ -321,7 +324,7 @@ const requestWindowClose = async () => {
   try {
     await performCloseAction(closeAction.value)
   } catch (error) {
-    console.error('Close window failed:', error)
+    logger.error('Close window failed: %s', error)
     notificationStore.show(t('message.exitFailed'), 'error', 3200)
   }
 }
@@ -346,14 +349,14 @@ const handleCloseDialogChoice = async (payload: {
         })
         closeAction.value = payload.action
       } catch (error) {
-        console.error('Saving close action failed:', error)
+        logger.error('Saving close action failed: %s', error)
         notificationStore.show(t('message.closePreferenceFailed'), 'warning', 3200)
       }
     }
 
     await performCloseAction(payload.action)
   } catch (error) {
-    console.error('Applying close action failed:', error)
+    logger.error('Applying close action failed: %s', error)
     notificationStore.show(t('message.closeActionFailed'), 'error', 3200)
   }
 }
@@ -382,7 +385,7 @@ const handleDeleteMemory = async (memory: Memory) => {
     await memoriesStore.remove(memory.id)
     notificationStore.show(t('message.deleted'), 'success', 2200)
   } catch (error) {
-    console.error('Delete memory failed:', error)
+    logger.error('Delete memory failed: %s', error)
     notificationStore.show(t('message.deleteFailed'), 'error', 3200)
   } finally {
     deletingMemoryId.value = null

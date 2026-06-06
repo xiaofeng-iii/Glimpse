@@ -5,6 +5,10 @@
 import numpy as np
 import threading
 
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class EmbeddingClient:
     """嵌入服务客户端"""
@@ -38,7 +42,7 @@ class EmbeddingClient:
             embedding = self.model.encode(text)
             return embedding.tolist()
         except Exception as e:
-            print(f"获取嵌入失败: {e}")
+            logger.error("获取嵌入失败: %s", e)
             return []
     
     def get_embeddings(self, texts: list) -> list:
@@ -54,7 +58,7 @@ class EmbeddingClient:
             embeddings = self.model.encode(texts)
             return embeddings.tolist()
         except Exception as e:
-            print(f"批量获取嵌入失败: {e}")
+            logger.error("批量获取嵌入失败: %s", e)
             return []
     
     def calculate_similarity(self, embedding1: list, embedding2: list) -> float:
@@ -84,7 +88,7 @@ class EmbeddingClient:
             
             return float(dot_product / (norm1 * norm2))
         except Exception as e:
-            print(f"计算相似度失败: {e}")
+            logger.error("计算相似度失败: %s", e)
             return 0.0
 
 

@@ -8,8 +8,12 @@ import threading
 from datetime import datetime
 from typing import List, Dict, Optional, Any, TYPE_CHECKING
 
+from utils.logger import get_logger
+
 if TYPE_CHECKING:
     from config.path_manager import PathManager
+
+logger = get_logger(__name__)
 
 
 class ChromaManager:
@@ -61,7 +65,7 @@ class ChromaManager:
             self._initialization_attempted = True
 
             if not self._probe_chromadb_import():
-                print(f"Warning: ChromaDB unavailable, semantic search disabled: {self._startup_error}")
+                logger.warning("ChromaDB unavailable, semantic search disabled: %s", self._startup_error)
                 return False
 
             try:
@@ -79,7 +83,7 @@ class ChromaManager:
                 self._available = True
             except Exception as exc:
                 self._startup_error = str(exc)
-                print(f"Warning: ChromaDB unavailable, semantic search disabled: {exc}")
+                logger.warning("ChromaDB unavailable, semantic search disabled: %s", exc)
                 self._client = None
                 self._collection = None
                 self._available = False
@@ -164,7 +168,7 @@ class ChromaManager:
                 )
                 return True
             except Exception as exc:
-                print(f"Add memory error: {exc}")
+                logger.error("Add memory error: %s", exc)
                 return False
 
     def upsert_memory(
@@ -224,7 +228,7 @@ class ChromaManager:
 
                 return formatted_results
             except Exception as exc:
-                print(f"Search error: {exc}")
+                logger.error("Search error: %s", exc)
                 return []
 
     def delete_memory(self, memory_id: str) -> bool:
@@ -236,7 +240,7 @@ class ChromaManager:
                 self._collection.delete(ids=[memory_id])
                 return True
             except Exception as exc:
-                print(f"Delete memory error: {exc}")
+                logger.error("Delete memory error: %s", exc)
                 return False
 
     def update_memory(
@@ -262,7 +266,7 @@ class ChromaManager:
                 self._collection.update(**update_kwargs)
                 return True
             except Exception as exc:
-                print(f"Update memory error: {exc}")
+                logger.error("Update memory error: %s", exc)
                 return False
 
     def get_memory_count(self) -> int:
@@ -284,7 +288,7 @@ class ChromaManager:
                 results = self._collection.get(limit=limit, offset=offset)
                 return results.get("ids", [])
             except Exception as exc:
-                print(f"Get all memory ids error: {exc}")
+                logger.error("Get all memory ids error: %s", exc)
                 return []
 
     def close(self) -> None:

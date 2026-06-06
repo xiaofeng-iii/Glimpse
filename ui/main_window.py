@@ -26,6 +26,9 @@ from ui.widgets.loading_spinner import LoadingSpinner
 from ui.widgets.segmented_filter import SegmentedFilterControl
 from ui.app_icon import create_app_icon
 from container import container
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 # ============================================================
@@ -419,7 +422,7 @@ class MainWindow(QMainWindow):
     def _setup_tray_icon(self):
         """Initialize system tray with polished icon."""
         if not QSystemTrayIcon.isSystemTrayAvailable():
-            print("Warning: System tray not available")
+            logger.warning("System tray not available")
             self.tray_icon = None
             return
 
