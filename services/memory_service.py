@@ -398,9 +398,12 @@ class MemoryService:
         }
 
     def delete_memory(self, memory_id: str) -> bool:
-        deleted_sqlite = self._sqlite_manager.delete_memory(memory_id)
         deleted_chroma = self._chroma_manager.delete_memory(memory_id)
-        return deleted_sqlite or deleted_chroma
+        if not deleted_chroma:
+            return False
+
+        deleted_sqlite = self._sqlite_manager.delete_memory(memory_id)
+        return deleted_sqlite
 
     def get_memory(self, memory_id: str) -> Optional["MemoryRecord"]:
         return self._sqlite_manager.get_memory_by_id(memory_id)

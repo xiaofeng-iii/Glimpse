@@ -261,10 +261,24 @@ class TestMemoryServiceDelete:
         mock_services["sqlite_manager"].delete_memory.assert_called_with("test-id")
         mock_services["chroma_manager"].delete_memory.assert_called_with("test-id")
 
-    def test_delete_memory_both_fail(self, mock_services):
+    def test_delete_memory_chroma_fail_returns_false(self, mock_services):
+        from services.memory_service import MemoryService
+        mock_services["chroma_manager"].delete_memory.return_value = False
+        ms = MemoryService(
+            sqlite_manager=mock_services["sqlite_manager"],
+            chroma_manager=mock_services["chroma_manager"],
+            ocr_engine=mock_services["ocr_engine"],
+            ai_client=mock_services["ai_client"],
+            embedding_client=mock_services["embedding_client"],
+        )
+        result = ms.delete_memory("test-id")
+        assert result is False
+        mock_services["sqlite_manager"].delete_memory.assert_not_called()
+
+    def test_delete_memory_sqlite_fail_after_chroma_delete_returns_false(self, mock_services):
         from services.memory_service import MemoryService
         mock_services["sqlite_manager"].delete_memory.return_value = False
-        mock_services["chroma_manager"].delete_memory.return_value = False
+        mock_services["chroma_manager"].delete_memory.return_value = True
         ms = MemoryService(
             sqlite_manager=mock_services["sqlite_manager"],
             chroma_manager=mock_services["chroma_manager"],
