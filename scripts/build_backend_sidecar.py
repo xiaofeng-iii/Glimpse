@@ -276,6 +276,32 @@ def collect_pyinstaller_resources() -> tuple[list[str], list[tuple[str, str]], l
         except Exception as exc:
             print(f"[warn] Unable to collect submodules for {package}: {exc}")
 
+    try:
+        import chromadb
+
+        chromadb_base = Path(chromadb.__file__).resolve().parent
+        ns_collected = 0
+        for dirpath, dirnames, filenames in os.walk(chromadb_base):
+            dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+            rel = Path(dirpath).relative_to(chromadb_base)
+            if rel == Path("."):
+                continue
+            pkg_name = "chromadb." + ".".join(rel.parts)
+            if pkg_name not in hiddenimports:
+                hiddenimports.append(pkg_name)
+                ns_collected += 1
+            init_file = Path(dirpath) / "__init__.py"
+            if not init_file.exists():
+                for fname in filenames:
+                    if fname.endswith(".py") and fname != "__init__.py":
+                        mod_name = pkg_name + "." + fname[:-3]
+                        if mod_name not in hiddenimports:
+                            hiddenimports.append(mod_name)
+                            ns_collected += 1
+        print(f"[info] Discovered {ns_collected} additional chromadb subpackages/modules via filesystem walk")
+    except Exception as exc:
+        print(f"[warn] Unable to walk chromadb filesystem packages: {exc}")
+
     for package in data_packages:
         try:
             datas.extend(collect_data_files(package))
