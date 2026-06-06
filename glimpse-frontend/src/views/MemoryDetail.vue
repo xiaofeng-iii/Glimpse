@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { memoriesApi, type Memory } from '@/api/client'
 import { getImageUrl } from '@/config/runtime'
 import { openExternalTarget } from '@/platform/desktop'
+import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { getMemoryImageUrls } from '@/utils/memory-images'
 import { t } from '@/utils/i18n'
@@ -11,10 +12,12 @@ import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 
 const route = useRoute()
 const router = useRouter()
+const memoriesStore = useMemoriesStore()
 const notificationStore = useNotificationStore()
 
 const memory = ref<Memory | null>(null)
 const isLoading = ref(true)
+const isDeleting = ref(false)
 const previewOpen = ref(false)
 const previewIndex = ref(0)
 const failedImages = ref<Record<string, boolean>>({})
@@ -35,9 +38,24 @@ const formatDate = (dateStr: string) => {
 }
 
 const handleDelete = async () => {
-  if (memory.value && confirm(t('message.deleteConfirm'))) {
-    await memoriesApi.delete(memory.value.id)
-    router.push('/')
+  if (!memory.value || isDeleting.value) {
+    return
+  }
+
+  if (!confirm(t('message.deleteConfirm'))) {
+    return
+  }
+
+  isDeleting.value = true
+  try {
+    await memoriesStore.remove(memory.value.id)
+    notificationStore.show(t('message.deleted'), 'success', 2200)
+    await router.push('/')
+  } catch (error) {
+    console.error('Delete memory failed:', error)
+    notificationStore.show(t('message.deleteFailed'), 'error', 3200)
+  } finally {
+    isDeleting.value = false
   }
 }
 
@@ -103,7 +121,13 @@ const markImageError = (url: string) => {
           <div class="flex items-center gap-2">
             <button @click="handleCopy" class="btn-secondary memory-detail-action">{{ t('action.copySummary') }}</button>
             <button @click="handleOpenImage" class="btn-secondary memory-detail-action">{{ t('action.viewImage') }}</button>
-            <button @click="handleDelete" class="memory-detail-action text-red-500 hover:bg-red-50">{{ t('action.delete') }}</button>
+            <button
+              @click="handleDelete"
+              :disabled="isDeleting"
+              class="memory-detail-action text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {{ isDeleting ? t('action.deleting') : t('action.delete') }}
+            </button>
           </div>
         </div>
 
