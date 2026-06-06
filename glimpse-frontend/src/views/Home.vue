@@ -46,7 +46,7 @@ const closeDialogOpen = ref(false)
 const isDesktop = isDesktopShell()
 const isWindowMaximized = ref(false)
 const screenshotShortcutLabel = ref('Ctrl+Shift+G')
-const searchShortcutLabel = ref('Ctrl+F')
+const searchShortcutLabel = 'Ctrl+F'
 const clusterModeEnabled = ref(false)
 let removeDesktopCloseListener: (() => void) | null = null
 let semanticWarmupTimer: ReturnType<typeof window.setTimeout> | null = null
@@ -139,10 +139,6 @@ const loadUiSettings = async () => {
     screenshotShortcutLabel.value = formatShortcutLabel(
       settings.hotkeys?.screenshot,
       'Ctrl+Shift+G',
-    )
-    searchShortcutLabel.value = formatShortcutLabel(
-      settings.hotkeys?.search,
-      'Ctrl+F',
     )
     clusterModeEnabled.value = Boolean(settings.cluster?.cluster_mode)
   } catch (error) {

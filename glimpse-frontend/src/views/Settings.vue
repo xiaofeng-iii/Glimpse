@@ -33,7 +33,6 @@ const activeSection = ref<SectionId>('hotkeys')
 
 // Form refs
 const screenshotHotkey = ref('')
-const searchHotkey = ref('')
 const debounceInterval = ref(5)
 const clusterThreshold = ref(2)
 const maxCaptures = ref(10)
@@ -52,7 +51,7 @@ const clusterTimeout = ref(5)
 // Test connection state
 const isTestingAi = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
-const recordingHotkey = ref<'screenshot' | 'search' | null>(null)
+const recordingHotkey = ref<'screenshot' | null>(null)
 const isRepairingIndex = ref(false)
 const indexRepairStatus = ref<IndexRepairStatus | null>(null)
 let indexRepairPollTimer: ReturnType<typeof setTimeout> | null = null
@@ -135,19 +134,15 @@ const formatHotkeyForDisplay = (hotkey: string) => {
     .join(' + ')
 }
 
-const startHotkeyRecording = (target: 'screenshot' | 'search') => {
-  recordingHotkey.value = target
+const startHotkeyRecording = () => {
+  recordingHotkey.value = 'screenshot'
 }
 
-const clearHotkey = (target: 'screenshot' | 'search') => {
-  if (target === 'screenshot') {
-    screenshotHotkey.value = ''
-  } else {
-    searchHotkey.value = ''
-  }
+const clearHotkey = () => {
+  screenshotHotkey.value = ''
 }
 
-const handleHotkeyKeydown = (event: KeyboardEvent, target: 'screenshot' | 'search') => {
+const handleHotkeyKeydown = (event: KeyboardEvent) => {
   event.preventDefault()
   event.stopPropagation()
 
@@ -158,7 +153,7 @@ const handleHotkeyKeydown = (event: KeyboardEvent, target: 'screenshot' | 'searc
 
   const noModifier = !event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey
   if ((event.key === 'Backspace' || event.key === 'Delete') && noModifier) {
-    clearHotkey(target)
+    clearHotkey()
     recordingHotkey.value = null
     return
   }
@@ -166,11 +161,7 @@ const handleHotkeyKeydown = (event: KeyboardEvent, target: 'screenshot' | 'searc
   const hotkey = formatHotkeyForPynput(event)
   if (!hotkey) return
 
-  if (target === 'screenshot') {
-    screenshotHotkey.value = hotkey
-  } else {
-    searchHotkey.value = hotkey
-  }
+  screenshotHotkey.value = hotkey
   recordingHotkey.value = null
 }
 
@@ -179,7 +170,6 @@ const loadSettings = async () => {
   if (settingsStore.settings) {
     const s = settingsStore.settings
     screenshotHotkey.value = s.hotkeys?.screenshot || ''
-    searchHotkey.value = s.hotkeys?.search || ''
     debounceInterval.value = s.screenshot?.debounce_interval || 5
     clusterThreshold.value = s.screenshot?.cluster_threshold || 2
     maxCaptures.value = s.screenshot?.max_captures_per_window || 10
@@ -323,7 +313,6 @@ const handleSave = async () => {
     await settingsStore.update({
       hotkeys: {
         screenshot: screenshotHotkey.value,
-        search: searchHotkey.value,
       },
       screenshot: {
         debounce_interval: debounceInterval.value,
@@ -430,8 +419,8 @@ const handleCancel = () => {
                         ? 'border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
                         : 'border-gray-200 bg-white text-gray-800 hover:border-violet-300 focus:border-violet-400',
                     ]"
-                    @click="startHotkeyRecording('screenshot')"
-                    @keydown="handleHotkeyKeydown($event, 'screenshot')"
+                    @click="startHotkeyRecording"
+                    @keydown="handleHotkeyKeydown"
                     @blur="recordingHotkey = null"
                   >
                     <span class="font-medium">
@@ -439,28 +428,6 @@ const handleCancel = () => {
                     </span>
                     <span class="ml-2 text-xs text-gray-400">
                       {{ recordingHotkey === 'screenshot' ? t('settings.recordHelp') : t('settings.recordHint') }}
-                    </span>
-                  </button>
-                </div>
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.searchHotkey') }}</label>
-                  <button
-                    type="button"
-                    :class="[
-                      'w-full min-h-11 px-4 py-2 rounded-lg border text-left outline-none transition-colors',
-                      recordingHotkey === 'search'
-                        ? 'border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
-                        : 'border-gray-200 bg-white text-gray-800 hover:border-violet-300 focus:border-violet-400',
-                    ]"
-                    @click="startHotkeyRecording('search')"
-                    @keydown="handleHotkeyKeydown($event, 'search')"
-                    @blur="recordingHotkey = null"
-                  >
-                    <span class="font-medium">
-                      {{ recordingHotkey === 'search' ? t('settings.recording') : formatHotkeyForDisplay(searchHotkey) }}
-                    </span>
-                    <span class="ml-2 text-xs text-gray-400">
-                      {{ recordingHotkey === 'search' ? t('settings.recordHelp') : t('settings.recordHint') }}
                     </span>
                   </button>
                 </div>

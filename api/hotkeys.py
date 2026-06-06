@@ -36,16 +36,6 @@ def _schedule(coro) -> None:
     future.add_done_callback(_report_future)
 
 
-async def _handle_search_hotkey() -> None:
-    await broadcast_event(
-        "desktop_action",
-        {
-            "action": "focus_search",
-            "source": "global_hotkey",
-        },
-    )
-
-
 async def _handle_screenshot_hotkey() -> None:
     if has_active_connections():
         await broadcast_event(
@@ -76,10 +66,6 @@ def _build_hotkey_handlers() -> Dict[str, Callable[[], None]]:
     screenshot_hotkey = (configured_hotkeys.get("screenshot") or "").strip()
     if screenshot_hotkey:
         handlers[screenshot_hotkey] = lambda: _schedule(_handle_screenshot_hotkey())
-
-    search_hotkey = (configured_hotkeys.get("search") or "").strip()
-    if search_hotkey:
-        handlers[search_hotkey] = lambda: _schedule(_handle_search_hotkey())
 
     return handlers
 
