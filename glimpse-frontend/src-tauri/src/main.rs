@@ -1,13 +1,14 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use serde::Serialize;
 #[cfg(not(debug_assertions))]
 use std::fmt::Write as FmtWrite;
 #[cfg(debug_assertions)]
 use std::io::{Read, Write};
+use std::net::SocketAddr;
 #[cfg(not(debug_assertions))]
 use std::net::TcpListener;
-use std::net::SocketAddr;
 #[cfg(debug_assertions)]
 use std::net::TcpStream;
 #[cfg(not(debug_assertions))]
@@ -20,7 +21,6 @@ use std::sync::{
 };
 #[cfg(debug_assertions)]
 use std::time::Duration;
-use serde::Serialize;
 use tauri::image::Image;
 use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
@@ -235,14 +235,12 @@ fn bundled_backend_dir(app: &AppHandle) -> Option<PathBuf> {
     Some(resource_dir.join("binaries").join("python-backend"))
 }
 
-fn spawn_backend_if_needed(app: &AppHandle) -> Option<(Child, BackendRuntime)> {
+fn spawn_backend_if_needed(app: &AppHandle, runtime: &BackendRuntime) -> Option<Child> {
     if backend_autostart_disabled() {
         return None;
     }
 
     cleanup_stale_backend_processes(app);
-
-    let runtime = backend_runtime_for_launch();
 
     #[cfg(debug_assertions)]
     if backend_port_is_open(&runtime.origin) {
@@ -256,7 +254,7 @@ fn spawn_backend_if_needed(app: &AppHandle) -> Option<(Child, BackendRuntime)> {
         return None;
     }
 
-    let mut command = build_backend_command(app, &runtime)?;
+    let mut command = build_backend_command(app, runtime)?;
 
     #[cfg(target_os = "windows")]
     {
@@ -264,7 +262,7 @@ fn spawn_backend_if_needed(app: &AppHandle) -> Option<(Child, BackendRuntime)> {
     }
 
     match command.spawn() {
-        Ok(child) => Some((child, runtime)),
+        Ok(child) => Some(child),
         Err(error) => {
             eprintln!("Failed to spawn backend automatically: {error}");
             None
@@ -285,11 +283,7 @@ fn run_hidden_command(command: &mut Command) {
 #[cfg(target_os = "windows")]
 fn kill_process_tree(pid: u32) {
     let mut command = Command::new("taskkill.exe");
-    command
-        .arg("/PID")
-        .arg(pid.to_string())
-        .arg("/T")
-        .arg("/F");
+    command.arg("/PID").arg(pid.to_string()).arg("/T").arg("/F");
     run_hidden_command(&mut command);
 }
 
@@ -379,6 +373,22 @@ fn stop_backend_process(app: &AppHandle, state: &AppState) {
     cleanup_stale_backend_processes(app);
 }
 
+fn store_backend_runtime(app: &AppHandle, runtime: BackendRuntime) {
+    let state = app.state::<AppState>();
+    let guard = state.backend_runtime.lock();
+    if let Ok(mut guard) = guard {
+        *guard = runtime;
+    }
+}
+
+fn store_backend_child(app: &AppHandle, child: Child) {
+    let state = app.state::<AppState>();
+    let guard = state.backend_child.lock();
+    if let Ok(mut guard) = guard {
+        *guard = Some(child);
+    }
+}
+
 fn quit_application(app: &AppHandle) {
     let state = app.state::<AppState>();
     state.quitting.store(true, Ordering::SeqCst);
@@ -457,21 +467,8 @@ fn main() {
             is_window_maximized
         ])
         .setup(|app| {
-            if let Some((child, runtime)) = spawn_backend_if_needed(app.handle()) {
-                let state = app.state::<AppState>();
-                {
-                    let guard = state.backend_child.lock();
-                    if let Ok(mut guard) = guard {
-                        *guard = Some(child);
-                    }
-                }
-                {
-                    let guard = state.backend_runtime.lock();
-                    if let Ok(mut guard) = guard {
-                        *guard = runtime;
-                    }
-                }
-            }
+            let runtime = backend_runtime_for_launch();
+            store_backend_runtime(app.handle(), runtime.clone());
 
             let app_icon = load_app_icon();
             if let (Some(window), Some(icon)) = (app.get_webview_window("main"), app_icon.clone()) {
@@ -489,7 +486,11 @@ fn main() {
                 .tooltip("Glimpse")
                 .menu(&tray_menu)
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        ..
+                    } = event
+                    {
                         show_main_window(tray.app_handle());
                     }
                 });
@@ -503,6 +504,15 @@ fn main() {
             }
 
             show_main_window(app.handle());
+
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Some(child) = spawn_backend_if_needed(&app_handle, &runtime) {
+                    store_backend_child(&app_handle, child);
+                    let _ = app_handle.emit("glimpse://backend-spawned", ());
+                }
+            });
+
             Ok(())
         })
         .on_menu_event(|app, event| match event.id().as_ref() {
