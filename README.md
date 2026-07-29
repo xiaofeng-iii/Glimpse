@@ -2,11 +2,12 @@
 
 AI 驱动的桌面记忆检索系统。支持截图、AI 摘要、精确检索、语义检索，以及基于 `Vue 3 + Tauri` 的桌面弹窗界面。
 
-当前仓库包含两套入口：
+当前仓库包含以下入口：
 
-- `python main.py`：默认启动当前主用的 `FastAPI + Vue 3 + Tauri` 桌面界面
-- `python main_legacy_qt.py`：保留的旧版 `PySide6` 桌面界面，主要用于回退和调试
-- `python main_api.py` + `glimpse-frontend/`：分别启动 API 和网页开发页的底层入口
+- `python main.py`：默认启动当前主用的 `Vue 3 + Tauri` 桌面界面，Tauri 按需启动 FastAPI 后端
+- `python main_api.py`：单独启动 FastAPI 后端，用于 API 或网页开发
+- `glimpse-frontend/`：Vue 网页开发与 Tauri 构建入口
+- `python main_legacy_qt.py`：保留的旧版 `PySide6` 界面，仅用于回退和调试
 
 ## 1. 环境要求
 
@@ -25,6 +26,8 @@ AI 驱动的桌面记忆检索系统。支持截图、AI 摘要、精确检索�
 ## 2. 安装依赖
 
 ### Python
+
+安装 Python 依赖：
 
 ```bash
 pip install -r requirements.txt
@@ -47,7 +50,8 @@ pip install -r requirements-packaging.txt
 
 ## 3. 配置 `.env`
 
-复制 `.env.example` 为 `.env`，至少填写：
+复制 `.env.example` 为 `.env`。应用可以在没有 AI 凭据的情况下启动；若要创建
+AI 记忆，需要填写：
 
 ```env
 OPENAI_API_KEY=your_api_key_here
@@ -138,11 +142,13 @@ cd D:\path\to\Glimpse
 
 ## 5. 常用脚本
 
-### Windows 一键启动 API + 网页开发页
+### Windows 一键启动桌面版
 
 ```powershell
 .\start.bat
 ```
+
+该脚本调用 `python main.py`，启动当前 Vue + Tauri 桌面界面。
 
 ### Windows 可见模式启动 Tauri
 
@@ -194,8 +200,8 @@ cd D:\path\to\Glimpse
 
 如果仍有问题，查看：
 
-- [`.logs/tauri-dev.log`](./.logs/tauri-dev.log)
-- [`.logs/backend-dev.log`](./.logs/backend-dev.log)
+- `.logs/tauri-dev.log`
+- `.logs/backend-dev.log`
 
 ### 4. 快捷键、截图或图片预览没有反应
 
@@ -232,9 +238,21 @@ Glimpse/
 ├── services/                 # 业务服务
 ├── ui/                       # 旧 PySide6 UI
 ├── glimpse-frontend/         # Vue 3 + Tauri 前端
-├── main.py                   # 旧桌面入口
-├── main_api.py               # 新 API 入口
-├── start.bat                 # 启动 API + 网页开发页
+├── docs/                     # 产品、架构与测试文档
+├── scripts/                  # 构建、环境与维护脚本
+├── main.py                   # Vue + Tauri 默认源码入口
+├── main_api.py               # FastAPI 后端入口
+├── main_legacy_qt.py         # 旧 PySide6 回退入口
+├── build_release.bat         # Windows 安装包构建
+├── start.bat                 # 一键启动当前桌面版
 ├── start_tauri.bat           # 静默启动 Tauri
 └── start_tauri_visible.bat   # 可见模式启动 Tauri
 ```
+
+## 9. 项目文档
+
+- [产品、架构与业务流程](./docs/README.md)
+- [测试与验证](./docs/TESTING.md)
+
+FastAPI 的现行请求和响应模型以运行时 `/docs` 页面为准。旧课程或团队协作
+材料位于 `docs/archive/`，不作为当前实现依据。

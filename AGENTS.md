@@ -33,6 +33,26 @@ conda run -n glimpse python -m py_compile main.py container.py
 
 The project is developed on Windows with a Tauri/Vue desktop shell and a Python API backend. The configured Python is expected to be `Python 3.10.x` inside the `glimpse` environment.
 
+## Documentation Placement
+
+- Put durable product, architecture, workflow, API-boundary, and testing
+  documentation under `docs/`. Keep the active set small and link it from
+  `docs/README.md`.
+- Keep short, durable AI working rules in this `AGENTS.md`. Put detailed
+  reusable agent context under `docs/agents/`, starting from
+  `docs/agents/README.md`.
+- Put one-off analysis, generated reports, render output, prompts, and session
+  scratch files under the project-root `.tmp/` or the system temp directory.
+  Delete them when the task ends; never place them in `docs/` or in the parent
+  workspace directory.
+- Keep tool indexes and caches such as `.codegraph/` at the project root and
+  out of Git.
+- Do not create documentation in `E:\project\Glimpse\`; the repository root is
+  `E:\project\Glimpse\Glimpse\`.
+- Before adding a new document, prefer updating an existing source of truth.
+  Archive superseded historical material under `docs/archive/` and label it
+  clearly.
+
 ## Runtime Entry Points
 
 - `main.py`: default source launcher. Loads `.env`, points Tauri at the current Python interpreter, and starts the Vue + Tauri desktop shell.
@@ -72,6 +92,7 @@ These are intentionally ignored or should remain untracked:
 - `docs/superpowers/`
 - `.codex/`, `.opencode/`, `.cursor/`, `.windsurf/`, `.claude/`
 - prompt scratch files and one-off AI helper scripts
+- `.tmp/` and tool indexes such as `.codegraph/`
 - runtime data under `GlimpseData/`
 
 Keep `AGENTS.md` tracked. It is the one generic document meant for the next AI session.

@@ -97,6 +97,9 @@ docs/_build/
 
 # AI assistant/session artifacts
 .omo/
+.tmp/
+.codegraph/
+/nul
 docs/superpowers/
 scripts/apply_prompt.py
 .codex/
