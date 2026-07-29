@@ -4,6 +4,7 @@ Serves REST API and WebSocket endpoints for Tauri frontend
 """
 import os
 import secrets
+from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,12 +17,13 @@ from api.desktop_actions import setup_cluster_processing
 from api.hotkeys import setup_global_hotkeys, shutdown_global_hotkeys
 from api.websocket import websocket_endpoint, setup_signal_forwarding, manager
 from container import container
+from runtime_env import get_app_version
 from services.bootstrap import configure_ai_client
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-APP_VERSION = "1.0.0"
+APP_VERSION = get_app_version(Path(__file__).resolve().parent.parent)
 AUTH_HEADER = "X-Glimpse-Auth"
 AUTH_QUERY_PARAM = "auth_token"
 

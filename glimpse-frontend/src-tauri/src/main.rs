@@ -30,6 +30,7 @@ use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use std::os::windows::process::CommandExt;
 
 const DEV_API_ORIGIN: &str = "http://127.0.0.1:8000";
+const APP_VERSION_ENV: &str = "GLIMPSE_APP_VERSION";
 #[cfg(not(debug_assertions))]
 const LOOPBACK_HOST: &str = "127.0.0.1";
 #[cfg(debug_assertions)]
@@ -196,7 +197,10 @@ fn build_backend_command(app: &AppHandle, runtime: &BackendRuntime) -> Option<Co
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| "python".to_string());
         let mut command = Command::new(python_executable);
-        command.arg("main_api.py").current_dir(root);
+        command
+            .arg("main_api.py")
+            .current_dir(root)
+            .env(APP_VERSION_ENV, env!("CARGO_PKG_VERSION"));
         return Some(command);
     }
 
@@ -218,7 +222,9 @@ fn build_backend_command(app: &AppHandle, runtime: &BackendRuntime) -> Option<Co
         }
 
         let mut command = Command::new(sidecar_exe);
-        command.current_dir(&sidecar_dir);
+        command
+            .current_dir(&sidecar_dir)
+            .env(APP_VERSION_ENV, env!("CARGO_PKG_VERSION"));
         let port = api_addr(&runtime.origin)?.port().to_string();
         command.arg("--host").arg(LOOPBACK_HOST);
         command.arg("--port").arg(port);

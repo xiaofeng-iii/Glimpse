@@ -218,6 +218,29 @@ cd D:\path\to\Glimpse
 1. 用 `PyInstaller` 构建 Python 后端 sidecar
 2. 用 `Tauri` 构建 NSIS 安装包
 
+应用版本只在 `glimpse-frontend/src-tauri/Cargo.toml` 的
+`[package].version` 中维护。Tauri 安装包和内置 Python API 都从该版本派生；
+`pyproject.toml` 中的版本仅作为 Python 包元数据镜像，`Cargo.lock` 中的根包版本
+由同步工具维护；这些镜像和锁文件都不要手工修改。
+
+同步版本号并检查重复版本字段：
+
+```powershell
+python scripts/set_version.py 0.1.5
+python scripts/set_version.py --check
+```
+
+一键提交当前改动、创建版本标签并推送到 GitHub：
+
+```powershell
+.\scripts\release.ps1 -Version 0.1.5
+```
+
+脚本会显示待提交文件，并要求输入 `v0.1.5` 确认。推送成功后，
+`.github/workflows/release.yml` 会在 GitHub 的 Windows 服务器上运行完整测试、
+构建 NSIS 安装包、生成 SHA-256 校验文件并创建 GitHub Release。
+可先使用 `-DryRun` 预览，或在无人值守环境中明确传入 `-Yes`。
+
 安装包输出目录：
 
 - `glimpse-frontend/src-tauri/target/release/bundle/nsis/`
