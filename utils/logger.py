@@ -56,12 +56,18 @@ def setup_logging(
     # Configure root logger
     root.setLevel(log_level)
 
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(log_level)
-    console_formatter = logging.Formatter(log_format, date_format)
-    console_handler.setFormatter(console_formatter)
-    root.addHandler(console_handler)
+    # PyInstaller --noconsole starts with stdout/stderr set to None. Never bind
+    # a StreamHandler to an invalid stream; the packaged entry point will call
+    # setup_logging() again after redirecting both streams to its log file.
+    console_stream = sys.stdout if sys.stdout is not None else sys.stderr
+    if console_stream is not None:
+        console_handler = logging.StreamHandler(console_stream)
+        console_handler.setLevel(log_level)
+        console_formatter = logging.Formatter(log_format, date_format)
+        console_handler.setFormatter(console_formatter)
+        root.addHandler(console_handler)
+    else:
+        root.addHandler(logging.NullHandler())
 
     # File handler (if specified)
     if log_file:

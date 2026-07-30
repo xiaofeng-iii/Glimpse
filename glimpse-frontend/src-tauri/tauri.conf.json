@@ -68,7 +68,7 @@
       "../../assets/icons/glimpse_16.png"
     ],
     "resources": [
-      "binaries/python-backend/"
+      "binaries/GlimpseRuntime/"
     ],
     "windows": {
       "nsis": {

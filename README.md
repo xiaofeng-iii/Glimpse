@@ -249,6 +249,7 @@ python scripts/set_version.py --check
 
 - 数据默认写入 `%LOCALAPPDATA%\Glimpse\GlimpseData`
 - 可将 `.env` 放在应用根目录，或放在 `%LOCALAPPDATA%\Glimpse\GlimpseData\.env`
+- 内置 API 进程文件名为 `GlimpseRuntime.exe`，Windows 友好名称为 `Glimpse 核心服务`
 
 ## 8. 目录结构
 

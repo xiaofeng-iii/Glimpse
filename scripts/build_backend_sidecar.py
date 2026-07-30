@@ -1,5 +1,5 @@
 """
-Build the Python API backend as a single-file sidecar binary for Tauri.
+Build the Python API backend as a branded onedir sidecar for Tauri.
 """
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -23,7 +24,17 @@ WORK_ROOT = PROJECT_ROOT / "build" / "backend-sidecar"
 PYINSTALLER_BUILD_DIR = WORK_ROOT / "build"
 PYINSTALLER_SPEC_DIR = WORK_ROOT / "spec"
 STAMP_FILE = WORK_ROOT / "backend-build-stamp.json"
-BUILD_NAME = "python-backend"
+WINDOWS_VERSION_FILE = WORK_ROOT / "windows-version-info.txt"
+CARGO_MANIFEST = PROJECT_ROOT / "glimpse-frontend" / "src-tauri" / "Cargo.toml"
+APP_ICON = PROJECT_ROOT / "assets" / "icons" / "glimpse.ico"
+BUILD_NAME = "GlimpseRuntime"
+LEGACY_BUILD_NAMES = ("glimpse-backend", "python-backend")
+WINDOWS_FILE_DESCRIPTION = "Glimpse 核心服务"
+WINDOWS_PRODUCT_NAME = "Glimpse"
+WINDOWS_COMPANY_NAME = "Glimpse Team"
+_STABLE_VERSION_PATTERN = re.compile(
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$"
+)
 
 HASH_INPUTS = [
     "main_api.py",
@@ -37,6 +48,8 @@ HASH_INPUTS = [
     "event_bus.py",
     "runtime_env.py",
     "requirements*.txt",
+    "assets/icons/glimpse.ico",
+    "glimpse-frontend/src-tauri/Cargo.toml",
     "scripts/build_backend_sidecar.py",
 ]
 
@@ -99,6 +112,103 @@ def sidecar_output_dir(build_name: str = BUILD_NAME) -> Path:
 def sidecar_exe_path(build_name: str = BUILD_NAME) -> Path:
     suffix = ".exe" if os.name == "nt" else ""
     return sidecar_output_dir(build_name) / f"{build_name}{suffix}"
+
+
+def read_package_version(manifest_path: Path = CARGO_MANIFEST) -> str:
+    try:
+        lines = manifest_path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise RuntimeError(
+            f"Unable to read canonical app version from {manifest_path}"
+        ) from exc
+
+    in_package_section = False
+    for raw_line in lines:
+        line = raw_line.split("#", 1)[0].strip()
+        if line.startswith("[") and line.endswith("]"):
+            in_package_section = line == "[package]"
+            continue
+        if not in_package_section:
+            continue
+
+        match = re.fullmatch(r'version\s*=\s*"([^"]+)"', line)
+        if match:
+            version = match.group(1)
+            if not _STABLE_VERSION_PATTERN.fullmatch(version):
+                raise RuntimeError(
+                    f"Cargo package version must be stable x.y.z, got: {version}"
+                )
+            return version
+
+    raise RuntimeError(f"Cargo package version was not found in {manifest_path}")
+
+
+def windows_version_tuple(version: str) -> tuple[int, int, int, int]:
+    match = _STABLE_VERSION_PATTERN.fullmatch(version)
+    if not match:
+        raise ValueError(f"Windows version must use stable x.y.z format: {version}")
+
+    components = tuple(int(value) for value in match.groups())
+    if any(value > 65535 for value in components):
+        raise ValueError(
+            f"Windows version components must be between 0 and 65535: {version}"
+        )
+    return (*components, 0)
+
+
+def write_windows_version_file(
+    version: str,
+    output_path: Path = WINDOWS_VERSION_FILE,
+) -> Path:
+    version_tuple = windows_version_tuple(version)
+    tuple_text = ", ".join(str(value) for value in version_tuple)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        f"""VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=({tuple_text}),
+    prodvers=({tuple_text}),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        u'080404B0',
+        [
+          StringStruct(u'CompanyName', u'{WINDOWS_COMPANY_NAME}'),
+          StringStruct(u'FileDescription', u'{WINDOWS_FILE_DESCRIPTION}'),
+          StringStruct(u'FileVersion', u'{version}'),
+          StringStruct(u'InternalName', u'{BUILD_NAME}'),
+          StringStruct(u'OriginalFilename', u'{BUILD_NAME}.exe'),
+          StringStruct(u'ProductName', u'{WINDOWS_PRODUCT_NAME}'),
+          StringStruct(u'ProductVersion', u'{version}')
+        ]
+      )
+    ]),
+    VarFileInfo([VarStruct(u'Translation', [2052, 1200])])
+  ]
+)
+""",
+        encoding="utf-8",
+    )
+    return output_path
+
+
+def windows_metadata_args(*, is_windows: bool | None = None) -> list[str]:
+    if is_windows is None:
+        is_windows = os.name == "nt"
+    if not is_windows:
+        return []
+    if not APP_ICON.is_file():
+        raise RuntimeError(f"Glimpse Windows icon not found: {APP_ICON}")
+
+    version_file = write_windows_version_file(read_package_version())
+    return [f"--icon={APP_ICON}", f"--version-file={version_file}"]
 
 
 def path_is_excluded(path: Path) -> bool:
@@ -355,8 +465,42 @@ def reexec_with_packaging_python() -> int | None:
     return None
 
 
-def build_backend_sidecar(build_name: str, build_hash: str) -> int:
+def build_pyinstaller_args(
+    build_name: str,
+    hiddenimports: list[str],
+    datas: list[tuple[str, str]],
+    binaries: list[tuple[str, str]],
+    *,
+    is_windows: bool | None = None,
+) -> list[str]:
     separator = resource_separator()
+    args = [
+        str(ENTRYPOINT),
+        "--noconfirm",
+        "--clean",
+        "--onedir",
+        "--noconsole",
+        f"--name={build_name}",
+        f"--distpath={BINARIES_DIR}",
+        f"--workpath={PYINSTALLER_BUILD_DIR}",
+        f"--specpath={PYINSTALLER_SPEC_DIR}",
+        f"--paths={PROJECT_ROOT}",
+    ]
+    args.extend(windows_metadata_args(is_windows=is_windows))
+
+    for hiddenimport in hiddenimports:
+        args.append(f"--hidden-import={hiddenimport}")
+
+    for source, destination in datas:
+        args.append(f"--add-data={source}{separator}{destination}")
+
+    for source, destination in binaries:
+        args.append(f"--add-binary={source}{separator}{destination}")
+
+    return args
+
+
+def build_backend_sidecar(build_name: str, build_hash: str) -> int:
 
     try:
         import PyInstaller.__main__
@@ -374,27 +518,7 @@ def build_backend_sidecar(build_name: str, build_hash: str) -> int:
     shutil.rmtree(PYINSTALLER_SPEC_DIR, ignore_errors=True)
     shutil.rmtree(sidecar_output_dir(build_name), ignore_errors=True)
 
-    args = [
-        str(ENTRYPOINT),
-        "--noconfirm",
-        "--clean",
-        "--onedir",
-        "--noconsole",
-        f"--name={build_name}",
-        f"--distpath={BINARIES_DIR}",
-        f"--workpath={PYINSTALLER_BUILD_DIR}",
-        f"--specpath={PYINSTALLER_SPEC_DIR}",
-        f"--paths={PROJECT_ROOT}",
-    ]
-
-    for hiddenimport in hiddenimports:
-        args.append(f"--hidden-import={hiddenimport}")
-
-    for source, destination in datas:
-        args.append(f"--add-data={source}{separator}{destination}")
-
-    for source, destination in binaries:
-        args.append(f"--add-binary={source}{separator}{destination}")
+    args = build_pyinstaller_args(build_name, hiddenimports, datas, binaries)
 
     print(f"Building backend sidecar: {build_name}")
     PyInstaller.__main__.run(args)
@@ -404,6 +528,9 @@ def build_backend_sidecar(build_name: str, build_hash: str) -> int:
     if not onedir_exe.exists():
         print(f"Expected sidecar output not found: {onedir_exe}")
         return 1
+
+    for legacy_build_name in LEGACY_BUILD_NAMES:
+        shutil.rmtree(sidecar_output_dir(legacy_build_name), ignore_errors=True)
 
     write_stamp(build_hash, build_name)
     print(f"Backend sidecar ready: {onedir_output}")

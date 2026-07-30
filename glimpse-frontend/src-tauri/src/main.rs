@@ -35,8 +35,17 @@ const APP_VERSION_ENV: &str = "GLIMPSE_APP_VERSION";
 const LOOPBACK_HOST: &str = "127.0.0.1";
 #[cfg(debug_assertions)]
 const BACKEND_IDENTITY_MARKER: &str = "Glimpse API";
+#[cfg(not(debug_assertions))]
+const BACKEND_BUNDLE_NAME: &str = "GlimpseRuntime";
 #[cfg(all(target_os = "windows", not(debug_assertions)))]
-const BACKEND_PROCESS_NAME: &str = "python-backend.exe";
+const BACKEND_PROCESS_NAME: &str = "GlimpseRuntime.exe";
+#[cfg(all(not(target_os = "windows"), not(debug_assertions)))]
+const BACKEND_PROCESS_NAME: &str = BACKEND_BUNDLE_NAME;
+#[cfg(all(target_os = "windows", not(debug_assertions)))]
+const LEGACY_BACKENDS: [(&str, &str); 2] = [
+    ("glimpse-backend", "glimpse-backend.exe"),
+    ("python-backend", "python-backend.exe"),
+];
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const APP_ICON_PNG: &[u8] = include_bytes!("../../../assets/icons/glimpse_256.png");
@@ -211,7 +220,7 @@ fn build_backend_command(app: &AppHandle, runtime: &BackendRuntime) -> Option<Co
         #[cfg(target_os = "windows")]
         let sidecar_exe = sidecar_dir.join(BACKEND_PROCESS_NAME);
         #[cfg(not(target_os = "windows"))]
-        let sidecar_exe = sidecar_dir.join("python-backend");
+        let sidecar_exe = sidecar_dir.join(BACKEND_BUNDLE_NAME);
 
         if !sidecar_exe.exists() {
             eprintln!(
@@ -238,7 +247,7 @@ fn build_backend_command(app: &AppHandle, runtime: &BackendRuntime) -> Option<Co
 #[cfg(not(debug_assertions))]
 fn bundled_backend_dir(app: &AppHandle) -> Option<PathBuf> {
     let resource_dir = app.path().resource_dir().ok()?;
-    Some(resource_dir.join("binaries").join("python-backend"))
+    Some(resource_dir.join("binaries").join(BACKEND_BUNDLE_NAME))
 }
 
 fn spawn_backend_if_needed(app: &AppHandle, runtime: &BackendRuntime) -> Option<Child> {
@@ -305,11 +314,13 @@ fn stop_tracked_backend_process(child: &mut Child) {
 }
 
 #[cfg(all(target_os = "windows", not(debug_assertions)))]
-fn cleanup_backend_processes_in_dir(sidecar_dir: &Path) {
+fn cleanup_backend_processes_in_dir(sidecar_dir: &Path, process_name: &str) {
     let script = r#"
-$backendDir = [System.IO.Path]::GetFullPath($args[0])
-Get-CimInstance Win32_Process -Filter "Name = 'python-backend.exe'" |
+$backendDir = [System.IO.Path]::GetFullPath($args[0]).TrimEnd('\') + '\'
+$processName = $args[1]
+Get-CimInstance Win32_Process |
   Where-Object {
+    $_.Name -ieq $processName -and
     $_.ExecutablePath -and
     ([System.IO.Path]::GetFullPath($_.ExecutablePath)).StartsWith(
       $backendDir,
@@ -330,17 +341,26 @@ Get-CimInstance Win32_Process -Filter "Name = 'python-backend.exe'" |
         .arg("Bypass")
         .arg("-Command")
         .arg(script)
-        .arg(sidecar_dir.as_os_str());
+        .arg(sidecar_dir.as_os_str())
+        .arg(process_name);
     run_hidden_command(&mut command);
 }
 
 #[cfg(all(not(target_os = "windows"), not(debug_assertions)))]
-fn cleanup_backend_processes_in_dir(_sidecar_dir: &Path) {}
+fn cleanup_backend_processes_in_dir(_sidecar_dir: &Path, _process_name: &str) {}
 
 #[cfg(not(debug_assertions))]
 fn cleanup_stale_backend_processes(app: &AppHandle) {
     if let Some(sidecar_dir) = bundled_backend_dir(app) {
-        cleanup_backend_processes_in_dir(&sidecar_dir);
+        cleanup_backend_processes_in_dir(&sidecar_dir, BACKEND_PROCESS_NAME);
+    }
+
+    #[cfg(target_os = "windows")]
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        for (bundle_name, process_name) in LEGACY_BACKENDS {
+            let legacy_sidecar_dir = resource_dir.join("binaries").join(bundle_name);
+            cleanup_backend_processes_in_dir(&legacy_sidecar_dir, process_name);
+        }
     }
 }
 

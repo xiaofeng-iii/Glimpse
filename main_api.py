@@ -7,11 +7,11 @@ Usage:
 
 Default: http://localhost:8000
 """
-import sys
 import os
+import sys
 from pathlib import Path
 
-from utils.logger import get_logger
+from utils.logger import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
@@ -19,16 +19,18 @@ logger = get_logger(__name__)
 def _packaged_log_path() -> Path:
     local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
-        return Path(local_app_data).resolve() / "Glimpse" / "logs" / "python-backend.log"
+        return Path(local_app_data).resolve() / "Glimpse" / "logs" / "glimpse-runtime.log"
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent / "python-backend.log"
-    return Path.cwd() / "python-backend.log"
+        return Path(sys.executable).resolve().parent / "glimpse-runtime.log"
+    return Path.cwd() / "glimpse-runtime.log"
 
 
+output_streams_redirected = False
 if sys.stdout is None:
     log_path = _packaged_log_path()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     sys.stdout = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
+    output_streams_redirected = True
 if sys.stderr is None:
     if sys.stdout is not None and getattr(sys.stdout, "name", None) != os.devnull:
         sys.stderr = sys.stdout
@@ -36,6 +38,10 @@ if sys.stderr is None:
         log_path = _packaged_log_path()
         log_path.parent.mkdir(parents=True, exist_ok=True)
         sys.stderr = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
+    output_streams_redirected = True
+
+if output_streams_redirected:
+    setup_logging()
 
 import argparse
 from runtime_env import get_env_file, get_runtime_root
