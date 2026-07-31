@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useMemoriesStore } from '@/stores/memories'
+import type { SearchOptions } from '@/api/client'
 import { t } from '@/utils/i18n'
 
 const props = defineProps<{
@@ -18,6 +19,14 @@ const memoriesStore = useMemoriesStore()
 const query = ref(props.modelValue || '')
 const source = ref('all')
 const searchInput = ref<HTMLInputElement | null>(null)
+const isDev = import.meta.env.DEV
+const devOptions = ref({
+  limit: 20,
+  semanticThreshold: 1.15,
+  candidateMultiplier: 2,
+  rrfK: 60,
+  debug: true,
+})
 
 const sources = [
   { value: 'all', labelKey: 'search.all' },
@@ -27,27 +36,59 @@ const sources = [
 
 let debounceTimeout: ReturnType<typeof setTimeout> | null = null
 
-watch(query, (newQuery) => {
-  emit('update:modelValue', newQuery)
+const clampNumber = (
+  value: unknown,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.min(maximum, Math.max(minimum, value))
+}
 
+const currentSearchOptions = (): SearchOptions => {
+  if (!isDev) return {}
+  return {
+    limit: clampNumber(devOptions.value.limit, 20, 1, 100),
+    semanticThreshold: clampNumber(devOptions.value.semanticThreshold, 1.15, 0, 4),
+    candidateMultiplier: clampNumber(devOptions.value.candidateMultiplier, 2, 1, 10),
+    rrfK: clampNumber(devOptions.value.rrfK, 60, 1, 200),
+    debug: devOptions.value.debug,
+  }
+}
+
+const scheduleSearch = () => {
   if (debounceTimeout) {
     clearTimeout(debounceTimeout)
   }
 
   debounceTimeout = setTimeout(() => {
-    if (newQuery.trim()) {
-      memoriesStore.search(newQuery, source.value)
+    if (query.value.trim()) {
+      memoriesStore.search(query.value, source.value, currentSearchOptions())
     } else {
       memoriesStore.load()
     }
   }, 300)
+}
+
+watch(query, (newQuery) => {
+  emit('update:modelValue', newQuery)
+  scheduleSearch()
 })
 
-watch(source, (newSource) => {
+watch(source, () => {
   if (query.value.trim()) {
-    memoriesStore.search(query.value, newSource)
+    scheduleSearch()
   }
 })
+
+if (isDev) {
+  watch(devOptions, () => {
+    if (query.value.trim()) {
+      scheduleSearch()
+    }
+  }, { deep: true })
+}
 
 const focus = () => {
   searchInput.value?.focus()
@@ -97,5 +138,68 @@ defineExpose({ focus })
         {{ t(s.labelKey) }}
       </button>
     </div>
+
+    <details
+      v-if="isDev"
+      open
+      class="mt-3 rounded-xl border border-amber-200/80 bg-amber-50/70 px-4 py-3 text-left"
+    >
+      <summary class="cursor-pointer select-none text-xs font-semibold text-amber-800">
+        {{ t('search.debugTitle') }}
+        <span class="ml-2 font-normal text-amber-700">{{ t('search.debugHint') }}</span>
+      </summary>
+
+      <div class="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <label class="text-xs text-slate-600">
+          <span class="mb-1 block">{{ t('search.resultLimit') }}</span>
+          <input
+            v-model.number="devOptions.limit"
+            type="number"
+            min="1"
+            max="100"
+            class="w-full rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-amber-400"
+          />
+        </label>
+
+        <label class="text-xs text-slate-600">
+          <span class="mb-1 block">{{ t('search.semanticThreshold') }}</span>
+          <input
+            v-model.number="devOptions.semanticThreshold"
+            type="number"
+            min="0"
+            max="4"
+            step="0.05"
+            class="w-full rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-amber-400"
+          />
+        </label>
+
+        <label class="text-xs text-slate-600">
+          <span class="mb-1 block">{{ t('search.candidateMultiplier') }}</span>
+          <input
+            v-model.number="devOptions.candidateMultiplier"
+            type="number"
+            min="1"
+            max="10"
+            class="w-full rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-amber-400"
+          />
+        </label>
+
+        <label class="text-xs text-slate-600">
+          <span class="mb-1 block">{{ t('search.rrfK') }}</span>
+          <input
+            v-model.number="devOptions.rrfK"
+            type="number"
+            min="1"
+            max="200"
+            class="w-full rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-amber-400"
+          />
+        </label>
+      </div>
+
+      <label class="mt-3 flex cursor-pointer items-center gap-2 text-xs text-amber-800">
+        <input v-model="devOptions.debug" type="checkbox" class="h-4 w-4 accent-amber-600" />
+        {{ t('search.showScores') }}
+      </label>
+    </details>
   </div>
 </template>

@@ -18,6 +18,22 @@ api.interceptors.request.use((config) => {
 })
 
 // Types
+export interface SearchDebugInfo {
+  mode: 'text' | 'vector' | 'hybrid'
+  text_rank?: number | null
+  semantic_rank?: number | null
+  semantic_distance?: number | null
+  rrf_score?: number | null
+}
+
+export interface SearchOptions {
+  limit?: number
+  semanticThreshold?: number
+  candidateMultiplier?: number
+  rrfK?: number
+  debug?: boolean
+}
+
 export interface Memory {
   id: string
   created_at: string
@@ -28,6 +44,7 @@ export interface Memory {
   extra_images?: string
   sync_status: string
   match_sources: string[]
+  search_debug?: SearchDebugInfo | null
 }
 
 export interface Settings {
@@ -91,8 +108,22 @@ export const memoriesApi = {
 
 // Search API
 export const searchApi = {
-  search: async (query: string, source = 'all', limit = 20): Promise<{ memories: Memory[], query: string, source: string }> => {
-    const response = await api.get(`/search?q=${encodeURIComponent(query)}&source=${source}&limit=${limit}`)
+  search: async (
+    query: string,
+    source = 'all',
+    options: SearchOptions = {},
+  ): Promise<{ memories: Memory[], query: string, source: string }> => {
+    const response = await api.get('/search', {
+      params: {
+        q: query,
+        source,
+        limit: options.limit ?? 20,
+        semantic_threshold: options.semanticThreshold,
+        candidate_multiplier: options.candidateMultiplier,
+        rrf_k: options.rrfK,
+        debug: options.debug,
+      },
+    })
     return response.data
   },
 

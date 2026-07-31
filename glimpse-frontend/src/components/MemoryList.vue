@@ -22,6 +22,7 @@ const emit = defineEmits<{
 
 const hasMemories = computed(() => props.memories.length > 0)
 const failedImages = ref<Record<string, boolean>>({})
+const isDev = import.meta.env.DEV
 
 const formatTime = (dateStr: string) => {
   const date = new Date(dateStr)
@@ -38,6 +39,9 @@ const truncate = (text: string, length: number) => {
   if (!text) return ''
   return text.length > length ? text.slice(0, length) + '...' : text
 }
+
+const formatScore = (value: number) => value.toFixed(5)
+const formatDistance = (value: number) => value.toFixed(4)
 
 const handleDelete = (memory: Memory) => {
   emit('delete', memory)
@@ -126,6 +130,27 @@ const markImageError = (memoryId: string) => {
                   </span>
                   <span class="text-xs text-gray-400">
                     {{ formatTime(memory.created_at) }}
+                  </span>
+                </div>
+
+                <div
+                  v-if="isDev && memory.search_debug"
+                  class="mt-2 flex flex-wrap gap-x-3 gap-y-1 rounded-lg bg-slate-100/80 px-2 py-1.5 font-mono text-[11px] text-slate-600"
+                >
+                  <span
+                    v-if="memory.search_debug.semantic_distance != null"
+                    :title="t('search.distanceHint')"
+                  >
+                    {{ t('search.semanticDistance') }} {{ formatDistance(memory.search_debug.semantic_distance) }}
+                  </span>
+                  <span v-if="memory.search_debug.rrf_score != null">
+                    RRF {{ formatScore(memory.search_debug.rrf_score) }}
+                  </span>
+                  <span v-if="memory.search_debug.text_rank != null">
+                    {{ t('search.textRank') }} #{{ memory.search_debug.text_rank }}
+                  </span>
+                  <span v-if="memory.search_debug.semantic_rank != null">
+                    {{ t('search.semanticRank') }} #{{ memory.search_debug.semantic_rank }}
                   </span>
                 </div>
 

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { memoriesApi, searchApi, type Memory } from '@/api/client'
+import { memoriesApi, searchApi, type Memory, type SearchOptions } from '@/api/client'
 import { createLogger } from '@/utils/logger'
 
 const logger = createLogger('stores/memories')
@@ -10,6 +10,7 @@ export const useMemoriesStore = defineStore('memories', () => {
   const selectedMemory = ref<Memory | null>(null)
   const searchQuery = ref('')
   const searchSource = ref('all')
+  const searchOptions = ref<SearchOptions>({})
   const isLoading = ref(false)
   const total = ref(0)
 
@@ -28,7 +29,7 @@ export const useMemoriesStore = defineStore('memories', () => {
     }
   }
 
-  const search = async (query: string, source = 'all') => {
+  const search = async (query: string, source = 'all', options: SearchOptions = {}) => {
     if (!query.trim()) {
       await load()
       return
@@ -37,9 +38,10 @@ export const useMemoriesStore = defineStore('memories', () => {
     isLoading.value = true
     searchQuery.value = query
     searchSource.value = source
+    searchOptions.value = { ...options }
 
     try {
-      const result = await searchApi.search(query, source)
+      const result = await searchApi.search(query, source, options)
       memories.value = result.memories
       total.value = result.memories.length
     } catch (error) {
@@ -70,7 +72,7 @@ export const useMemoriesStore = defineStore('memories', () => {
 
   const refresh = async () => {
     if (searchQuery.value) {
-      await search(searchQuery.value, searchSource.value)
+      await search(searchQuery.value, searchSource.value, searchOptions.value)
     } else {
       await load()
     }
@@ -81,6 +83,7 @@ export const useMemoriesStore = defineStore('memories', () => {
     selectedMemory,
     searchQuery,
     searchSource,
+    searchOptions,
     isLoading,
     total,
     hasMemories,
