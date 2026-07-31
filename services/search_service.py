@@ -60,9 +60,26 @@ class SearchService:
         )
         return result
 
-    def search(self, query: str, limit: int = 20, source_filter: Optional[str] = None) -> List:
+    def search(
+        self,
+        query: str,
+        limit: int = 20,
+        source_filter: Optional[str] = None,
+        semantic_threshold: Optional[float] = None,
+        candidate_multiplier: int = 2,
+        rrf_k: Optional[int] = None,
+        include_debug: bool = False,
+    ) -> List:
         if not query.strip():
             return self.get_recent_memories(limit=limit)
+
+        threshold = (
+            self._semantic_threshold
+            if semantic_threshold is None
+            else max(0.0, float(semantic_threshold))
+        )
+        candidate_multiplier = max(1, int(candidate_multiplier))
+        fusion_rrf_k = self._rrf_k if rrf_k is None else max(1, int(rrf_k))
 
         # source_filter overrides internal _search_mode if provided
         mode = self._search_mode
@@ -75,73 +92,149 @@ class SearchService:
             mode = "hybrid"
 
         if mode == "text":
-            return self._search_text(query, limit)
+            return self._search_text(query, limit, include_debug)
         elif mode == "vector":
-            return self._search_vector(query, limit)
+            return self._search_vector(
+                query,
+                limit,
+                threshold,
+                candidate_multiplier,
+                include_debug,
+            )
         else:
-            return self._search_hybrid(query, limit)
+            return self._search_hybrid(
+                query,
+                limit,
+                threshold,
+                candidate_multiplier,
+                fusion_rrf_k,
+                include_debug,
+            )
 
-    def _search_text(self, query: str, limit: int) -> List:
+    @staticmethod
+    def _set_search_metadata(
+        memory,
+        match_sources: List[str],
+        include_debug: bool,
+        *,
+        mode: str,
+        text_rank: Optional[int] = None,
+        semantic_rank: Optional[int] = None,
+        semantic_distance: Optional[float] = None,
+        rrf_score: Optional[float] = None,
+    ) -> None:
+        memory.match_sources = match_sources
+        memory.search_debug = (
+            {
+                "mode": mode,
+                "text_rank": text_rank,
+                "semantic_rank": semantic_rank,
+                "semantic_distance": semantic_distance,
+                "rrf_score": rrf_score,
+            }
+            if include_debug
+            else None
+        )
+
+    def _search_text(self, query: str, limit: int, include_debug: bool) -> List:
         results = self._sqlite_manager.search_memories(query, limit=limit)
-        for memory in results:
-            if not hasattr(memory, "match_sources"):
-                memory.match_sources = []
-            if "精确" not in memory.match_sources:
-                memory.match_sources.append("精确")
+        for rank, memory in enumerate(results, start=1):
+            self._set_search_metadata(
+                memory,
+                ["精确"],
+                include_debug,
+                mode="text",
+                text_rank=rank,
+            )
         return results
 
-    def _search_vector(self, query: str, limit: int) -> List:
+    def _search_vector(
+        self,
+        query: str,
+        limit: int,
+        semantic_threshold: float,
+        candidate_multiplier: int,
+        include_debug: bool,
+    ) -> List:
         embedding = self._embedding_client.get_embedding(query)
         if not embedding:
             return []
 
-        results = self._chroma_manager.search_similar(embedding, n_results=limit)
+        results = self._chroma_manager.search_similar(
+            embedding,
+            n_results=limit * candidate_multiplier,
+        )
         if not results:
             return []
 
         memories = []
-        for result in results:
+        for rank, result in enumerate(results, start=1):
             mem_id = result["id"]
             distance = result.get("distance")
 
             # 只有相似度超过阈值才认为是语义匹配
-            if distance is not None and distance > self._semantic_threshold:
+            if distance is not None and distance > semantic_threshold:
                 continue
 
             memory = self._sqlite_manager.get_memory_by_id(mem_id)
             if memory:
-                if not hasattr(memory, "match_sources"):
-                    memory.match_sources = []
-                if "语义" not in memory.match_sources:
-                    memory.match_sources.append("语义")
+                self._set_search_metadata(
+                    memory,
+                    ["语义"],
+                    include_debug,
+                    mode="vector",
+                    semantic_rank=rank,
+                    semantic_distance=distance,
+                )
                 memories.append(memory)
+                if len(memories) >= limit:
+                    break
 
         return memories
 
-    def _search_hybrid(self, query: str, limit: int) -> List:
-        text_results = self._sqlite_manager.search_memories(query, limit=limit * 2)
+    def _search_hybrid(
+        self,
+        query: str,
+        limit: int,
+        semantic_threshold: float,
+        candidate_multiplier: int,
+        rrf_k: int,
+        include_debug: bool,
+    ) -> List:
+        candidate_limit = limit * candidate_multiplier
+        text_results = self._sqlite_manager.search_memories(query, limit=candidate_limit)
 
         embedding = self._embedding_client.get_embedding(query)
         if not embedding:
-            for memory in text_results[:limit]:
-                if not hasattr(memory, "match_sources"):
-                    memory.match_sources = []
-                if "精确" not in memory.match_sources:
-                    memory.match_sources.append("精确")
+            for rank, memory in enumerate(text_results[:limit], start=1):
+                self._set_search_metadata(
+                    memory,
+                    ["精确"],
+                    include_debug,
+                    mode="hybrid",
+                    text_rank=rank,
+                )
             return text_results[:limit]
 
-        vector_results = self._chroma_manager.search_similar(embedding, n_results=limit * 2)
+        vector_results = self._chroma_manager.search_similar(
+            embedding,
+            n_results=candidate_limit,
+        )
 
         text_rank: Dict[str, float] = {}
+        text_position: Dict[str, int] = {}
         for rank, memory in enumerate(text_results):
-            text_rank[memory.id] = 1.0 / (self._rrf_k + rank + 1)
+            text_rank[memory.id] = 1.0 / (rrf_k + rank + 1)
+            text_position[memory.id] = rank + 1
 
         # 保存 vector result 的 distance 用于阈值判断
         vector_rank: Dict[str, float] = {}
+        vector_position: Dict[str, int] = {}
         vector_distance: Dict[str, float] = {}
         for rank, result in enumerate(vector_results):
             result_id = result["id"]
-            vector_rank[result_id] = 1.0 / (self._rrf_k + rank + 1)
+            vector_rank[result_id] = 1.0 / (rrf_k + rank + 1)
+            vector_position[result_id] = rank + 1
             if "distance" in result:
                 vector_distance[result_id] = result["distance"]
 
@@ -156,15 +249,27 @@ class SearchService:
         for mem_id in sorted_ids[:limit]:
             memory = self._sqlite_manager.get_memory_by_id(mem_id)
             if memory:
-                if not hasattr(memory, "match_sources"):
-                    memory.match_sources = []
-                if mem_id in text_rank and "精确" not in memory.match_sources:
-                    memory.match_sources.append("精确")
+                match_sources = []
+                if mem_id in text_rank:
+                    match_sources.append("精确")
                 # 只有 distance 存在且不超过阈值才打语义标签
                 distance = vector_distance.get(mem_id)
-                if mem_id in vector_rank and distance is not None and distance <= self._semantic_threshold:
-                    if "语义" not in memory.match_sources:
-                        memory.match_sources.append("语义")
+                if (
+                    mem_id in vector_rank
+                    and distance is not None
+                    and distance <= semantic_threshold
+                ):
+                    match_sources.append("语义")
+                self._set_search_metadata(
+                    memory,
+                    match_sources,
+                    include_debug,
+                    mode="hybrid",
+                    text_rank=text_position.get(mem_id),
+                    semantic_rank=vector_position.get(mem_id),
+                    semantic_distance=distance,
+                    rrf_score=rrf_scores[mem_id],
+                )
                 merged.append(memory)
 
         return merged

@@ -49,6 +49,7 @@ def memory_to_response(memory) -> dict:
         "extra_images": memory.extra_images,
         "sync_status": getattr(memory, "sync_status", "PENDING"),
         "match_sources": getattr(memory, "match_sources", []),
+        "search_debug": getattr(memory, "search_debug", None),
     }
 
 
@@ -57,11 +58,33 @@ async def search(
     q: str = Query(..., min_length=1, description="Search query"),
     source: str = Query("all", description="Filter source: all, exact, semantic"),
     limit: int = Query(20, ge=1, le=100),
+    semantic_threshold: float | None = Query(
+        None,
+        ge=0,
+        le=4,
+        description="Maximum Chroma distance accepted as a semantic match",
+    ),
+    candidate_multiplier: int = Query(
+        2,
+        ge=1,
+        le=10,
+        description="Candidate pool size as a multiple of limit",
+    ),
+    rrf_k: int = Query(60, ge=1, le=200, description="RRF rank constant"),
+    debug: bool = Query(False, description="Include development search scores"),
 ):
     """Search memories by query"""
     try:
         search_service = get_search_service()
-        memories = search_service.search(q, limit=limit, source_filter=source)
+        memories = search_service.search(
+            q,
+            limit=limit,
+            source_filter=source,
+            semantic_threshold=semantic_threshold,
+            candidate_multiplier=candidate_multiplier,
+            rrf_k=rrf_k,
+            include_debug=debug,
+        )
         return SearchResult(
             memories=[MemoryResponse(**memory_to_response(m)) for m in memories],
             query=q,

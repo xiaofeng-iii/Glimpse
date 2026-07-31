@@ -215,6 +215,95 @@ class TestSearchServiceSearch:
         assert "精确" not in mem2.match_sources
         assert "语义" in mem2.match_sources
 
+    def test_search_semantic_threshold_can_be_tuned_per_request(self, mock_services):
+        from services.search_service import SearchService
+        from db.sqlite_manager import MemoryRecord
+
+        ss = SearchService(**mock_services)
+        mock_memory = MemoryRecord(
+            id="1",
+            created_at="now",
+            image_path="path",
+            ai_summary="sum",
+            app_name="app",
+        )
+        mock_services["chroma_manager"].search_similar.return_value = [
+            {"id": "1", "distance": 1.2}
+        ]
+        mock_services["sqlite_manager"].get_memory_by_id.return_value = mock_memory
+
+        default_results = ss.search("test", source_filter="semantic")
+        tuned_results = ss.search(
+            "test",
+            source_filter="semantic",
+            semantic_threshold=1.25,
+            include_debug=True,
+        )
+
+        assert default_results == []
+        assert len(tuned_results) == 1
+        assert "语义" in tuned_results[0].match_sources
+        assert tuned_results[0].search_debug == {
+            "mode": "vector",
+            "text_rank": None,
+            "semantic_rank": 1,
+            "semantic_distance": 1.2,
+            "rrf_score": None,
+        }
+
+    def test_search_candidate_multiplier_expands_hybrid_candidate_pool(self, mock_services):
+        from services.search_service import SearchService
+
+        ss = SearchService(**mock_services)
+        ss.search("test", limit=10, candidate_multiplier=4)
+
+        mock_services["sqlite_manager"].search_memories.assert_called_once_with(
+            "test", limit=40
+        )
+        mock_services["chroma_manager"].search_similar.assert_called_once_with(
+            mock_services["embedding_client"].get_embedding.return_value,
+            n_results=40,
+        )
+
+    def test_hybrid_debug_explains_candidate_without_semantic_label(self, mock_services):
+        from services.search_service import SearchService
+        from db.sqlite_manager import MemoryRecord
+
+        ss = SearchService(**mock_services)
+        mock_memory = MemoryRecord(
+            id="1",
+            created_at="now",
+            image_path="path",
+            ai_summary="sum",
+            app_name="app",
+        )
+        mock_services["sqlite_manager"].search_memories.return_value = [mock_memory]
+        mock_services["chroma_manager"].search_similar.return_value = [
+            {"id": "1", "distance": 1.2}
+        ]
+        mock_services["sqlite_manager"].get_memory_by_id.return_value = mock_memory
+
+        results = ss.search("test", source_filter="all", include_debug=True)
+
+        assert len(results) == 1
+        assert results[0].match_sources == ["精确"]
+        assert results[0].search_debug == {
+            "mode": "hybrid",
+            "text_rank": 1,
+            "semantic_rank": 1,
+            "semantic_distance": 1.2,
+            "rrf_score": pytest.approx(2 / 61),
+        }
+
+        tuned_results = ss.search(
+            "test",
+            source_filter="all",
+            semantic_threshold=1.25,
+            include_debug=True,
+        )
+
+        assert tuned_results[0].match_sources == ["精确", "语义"]
+
 
 class TestSearchServiceQuery:
     def test_get_recent_memories(self, mock_services):

@@ -6,6 +6,15 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 
+class SearchDebugInfo(BaseModel):
+    """Development-only search ranking details."""
+    mode: str
+    text_rank: Optional[int] = None
+    semantic_rank: Optional[int] = None
+    semantic_distance: Optional[float] = None
+    rrf_score: Optional[float] = None
+
+
 class MemoryResponse(BaseModel):
     """Single memory record response"""
     id: str
@@ -17,6 +26,7 @@ class MemoryResponse(BaseModel):
     extra_images: Optional[str] = None
     sync_status: str = "PENDING"
     match_sources: List[str] = Field(default_factory=list)
+    search_debug: Optional[SearchDebugInfo] = None
 
     class Config:
         from_attributes = True
