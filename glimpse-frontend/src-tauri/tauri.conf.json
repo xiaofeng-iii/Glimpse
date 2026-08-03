@@ -31,7 +31,7 @@
       "capabilities": [
         {
           "identifier": "desktop-shell",
-          "description": "Allow the main desktop window to use core APIs and open external links.",
+          "description": "Allow the main desktop window to use the required core window APIs.",
           "windows": [
             "main"
           ],
@@ -44,8 +44,7 @@
             "core:window:allow-unminimize",
             "core:window:allow-is-maximized",
             "core:window:allow-toggle-maximize",
-            "core:window:allow-start-dragging",
-            "shell:allow-open"
+            "core:window:allow-start-dragging"
           ]
         }
       ]

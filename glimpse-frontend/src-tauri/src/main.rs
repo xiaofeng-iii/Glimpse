@@ -481,7 +481,6 @@ fn load_app_icon() -> Option<Image<'static>> {
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
-        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             quit_app,
             get_backend_runtime,
