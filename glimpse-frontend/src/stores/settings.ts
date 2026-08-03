@@ -23,9 +23,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const update = async (newSettings: Partial<Settings>) => {
     try {
       await settingsApi.update(newSettings)
-      if (settings.value) {
-        settings.value = { ...settings.value, ...newSettings } as Settings
-      }
+      await load()
     } catch (error) {
       logger.error('Failed to update settings: %s', error)
       throw error

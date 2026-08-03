@@ -1,0 +1,270 @@
+<script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from 'vue'
+import {
+  AdjustmentsHorizontalIcon,
+  CameraIcon,
+  MagnifyingGlassIcon,
+  ArrowPathIcon,
+  XMarkIcon,
+} from '@heroicons/vue/24/outline'
+import type { SearchOptions } from '@/api/client'
+import { useMemoriesStore } from '@/stores/memories'
+import { t } from '@/utils/i18n'
+
+const props = withDefaults(defineProps<{
+  modelValue?: string
+  shortcutLabel?: string
+  captureShortcutLabel?: string
+  capturing?: boolean
+  captureDisabled?: boolean
+  refreshing?: boolean
+}>(), {
+  modelValue: '',
+  shortcutLabel: 'Ctrl+F',
+  captureShortcutLabel: 'Ctrl+Shift+G',
+  capturing: false,
+  captureDisabled: false,
+  refreshing: false,
+})
+
+const emit = defineEmits<{
+  (event: 'update:modelValue', value: string): void
+  (event: 'capture'): void
+  (event: 'refresh'): void
+  (event: 'debug-panel-change', open: boolean): void
+}>()
+
+const memoriesStore = useMemoriesStore()
+const query = ref(props.modelValue)
+const source = ref(memoriesStore.searchSource || 'all')
+const searchInput = ref<HTMLInputElement | null>(null)
+const debugPanelOpen = ref(false)
+const isDev = import.meta.env.DEV
+const devOptions = ref({
+  limit: memoriesStore.searchOptions.limit ?? 20,
+  semanticThreshold: memoriesStore.searchOptions.semanticThreshold ?? 1.15,
+  candidateMultiplier: memoriesStore.searchOptions.candidateMultiplier ?? 2,
+  rrfK: memoriesStore.searchOptions.rrfK ?? 60,
+  debug: memoriesStore.searchOptions.debug ?? true,
+})
+
+const sources = [
+  { value: 'all', labelKey: 'search.all' },
+  { value: 'exact', labelKey: 'search.exactOnly' },
+  { value: 'semantic', labelKey: 'search.semanticOnly' },
+] as const
+
+let debounceTimer: ReturnType<typeof window.setTimeout> | null = null
+
+const clampNumber = (value: unknown, fallback: number, minimum: number, maximum: number) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.min(maximum, Math.max(minimum, value))
+}
+
+const currentOptions = (): SearchOptions => {
+  if (!isDev) return {}
+  return {
+    limit: clampNumber(devOptions.value.limit, 20, 1, 100),
+    semanticThreshold: clampNumber(devOptions.value.semanticThreshold, 1.15, 0, 4),
+    candidateMultiplier: clampNumber(devOptions.value.candidateMultiplier, 2, 1, 10),
+    rrfK: clampNumber(devOptions.value.rrfK, 60, 1, 200),
+    debug: devOptions.value.debug,
+  }
+}
+
+const executeSearch = () => {
+  const normalized = query.value.trim()
+  if (normalized) {
+    void memoriesStore.search(normalized, source.value, currentOptions())
+  } else {
+    void memoriesStore.load()
+  }
+}
+
+const scheduleSearch = () => {
+  memoriesStore.invalidatePendingRequests()
+  if (debounceTimer) window.clearTimeout(debounceTimer)
+  debounceTimer = window.setTimeout(executeSearch, 300)
+}
+
+const handleDebugToggle = (event: Event) => {
+  debugPanelOpen.value = (event.currentTarget as HTMLDetailsElement).open
+  emit('debug-panel-change', debugPanelOpen.value)
+}
+
+watch(
+  () => props.modelValue,
+  (value) => {
+    if (value !== query.value) query.value = value
+  },
+)
+
+watch(query, (value) => {
+  emit('update:modelValue', value)
+  scheduleSearch()
+})
+
+watch(source, () => {
+  if (query.value.trim()) scheduleSearch()
+})
+
+if (isDev) {
+  watch(devOptions, () => {
+    if (query.value.trim()) scheduleSearch()
+  }, { deep: true })
+}
+
+const clear = () => {
+  query.value = ''
+  searchInput.value?.focus()
+}
+
+const focus = () => {
+  searchInput.value?.focus()
+  searchInput.value?.select()
+}
+
+onBeforeUnmount(() => {
+  if (debounceTimer) window.clearTimeout(debounceTimer)
+  if (debugPanelOpen.value) emit('debug-panel-change', false)
+})
+
+defineExpose({ focus, clear })
+</script>
+
+<template>
+  <section class="border-b border-[var(--shell-line)] bg-[var(--shell-frame-bg)] px-5 py-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="relative min-w-[260px] flex-1">
+        <MagnifyingGlassIcon
+          class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--shell-muted)]"
+          aria-hidden="true"
+        />
+        <input
+          ref="searchInput"
+          v-model="query"
+          type="search"
+          class="h-12 w-full rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-12 pr-24 text-base text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+          :placeholder="t('search.placeholder')"
+          @keydown.esc.stop.prevent="clear"
+        />
+        <div class="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
+          <button
+            v-if="query"
+            type="button"
+            class="rounded-lg p-1 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+            :aria-label="t('search.clear')"
+            @click="clear"
+          >
+            <XMarkIcon class="h-4 w-4" aria-hidden="true" />
+          </button>
+          <kbd class="rounded-lg border border-[var(--shell-line)] px-2 py-1 text-xs text-[var(--shell-muted)]">
+            {{ shortcutLabel }}
+          </kbd>
+        </div>
+      </div>
+
+      <div
+        class="inline-flex h-12 items-center rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-1"
+        role="group"
+        :aria-label="t('search.sourceLabel')"
+      >
+        <button
+          v-for="item in sources"
+          :key="item.value"
+          type="button"
+          class="h-10 rounded-xl px-4 text-sm font-medium transition"
+          :class="source === item.value
+            ? 'bg-blue-600 text-white shadow-sm'
+            : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
+          :aria-pressed="source === item.value"
+          @click="source = item.value"
+        >
+          {{ t(item.labelKey) }}
+        </button>
+      </div>
+
+      <div class="toolbar-actions flex shrink-0 items-center gap-3">
+        <button
+          type="button"
+          class="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-control-bg)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:opacity-50"
+          :aria-label="t('action.refresh')"
+          :disabled="refreshing"
+          @click="emit('refresh')"
+        >
+          <ArrowPathIcon class="h-5 w-5" :class="{ 'animate-spin': refreshing }" aria-hidden="true" />
+        </button>
+
+        <details
+          v-if="isDev"
+          class="relative"
+          @toggle="handleDebugToggle"
+        >
+          <summary
+            class="flex h-12 cursor-pointer list-none items-center gap-1.5 rounded-2xl border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
+            :aria-label="t('search.debugTitle')"
+          >
+            <AdjustmentsHorizontalIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+            <span class="text-[10px] font-bold tracking-wide">DEV</span>
+          </summary>
+          <div
+            class="absolute right-0 top-[calc(100%+.65rem)] z-50 w-[min(440px,calc(100vw-2.5rem))] rounded-2xl border border-amber-200/80 bg-[var(--shell-card)] p-4 text-left shadow-2xl"
+          >
+            <div class="flex items-start gap-2 text-xs text-amber-800">
+              <AdjustmentsHorizontalIcon class="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+              <div>
+                <p class="font-semibold">{{ t('search.debugTitle') }}</p>
+                <p class="mt-0.5 text-[var(--shell-muted)]">{{ t('search.debugHint') }}</p>
+              </div>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <label v-for="field in [
+                { key: 'limit', label: t('search.resultLimit'), min: 1, max: 100, step: 1 },
+                { key: 'semanticThreshold', label: t('search.semanticThreshold'), min: 0, max: 4, step: .05 },
+                { key: 'candidateMultiplier', label: t('search.candidateMultiplier'), min: 1, max: 10, step: 1 },
+                { key: 'rrfK', label: t('search.rrfK'), min: 1, max: 200, step: 1 },
+              ]" :key="field.key" class="text-xs text-[var(--shell-muted)]">
+                <span class="mb-1 block">{{ field.label }}</span>
+                <input
+                  v-model.number="devOptions[field.key as keyof typeof devOptions]"
+                  type="number"
+                  :min="field.min"
+                  :max="field.max"
+                  :step="field.step"
+                  class="w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 py-1.5 text-sm text-[var(--shell-ink)] outline-none focus:border-amber-400"
+                />
+              </label>
+            </div>
+            <label class="mt-3 flex cursor-pointer items-center gap-2 text-xs text-amber-800">
+              <input v-model="devOptions.debug" type="checkbox" class="h-4 w-4 accent-amber-600" />
+              {{ t('search.showScores') }}
+            </label>
+          </div>
+        </details>
+
+        <button
+          type="button"
+          class="capture-button inline-flex h-12 items-center gap-2 rounded-2xl bg-orange-500 px-5 font-semibold text-white shadow-lg shadow-orange-500/15 transition hover:-translate-y-0.5 hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-55"
+          :disabled="capturing || captureDisabled"
+          @click="emit('capture')"
+        >
+          <CameraIcon class="h-5 w-5" aria-hidden="true" />
+          {{ capturing ? t('action.processing') : t('action.capture') }}
+          <kbd class="capture-shortcut rounded-lg bg-white/18 px-2 py-1 text-xs">{{ captureShortcutLabel }}</kbd>
+        </button>
+      </div>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+@media (max-width: 1024px) {
+  .capture-button {
+    padding-inline: 1rem;
+  }
+
+  .capture-shortcut {
+    display: none;
+  }
+}
+</style>

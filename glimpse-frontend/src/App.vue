@@ -6,6 +6,8 @@ import { useSettingsStore } from '@/stores/settings'
 import { whenBackendRuntimeReady } from '@/config/runtime'
 import { applyThemePreference, watchSystemTheme } from '@/utils/theme'
 import { setLanguagePreference } from '@/utils/i18n'
+import DesktopShell from '@/components/DesktopShell.vue'
+import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 import NotificationToast from '@/components/NotificationToast.vue'
 
 const websocket = useWebSocket()
@@ -36,11 +38,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="h-screen min-h-0 overflow-hidden">
-    <RouterView />
+  <div class="app-root">
+    <DesktopShell>
+      <RouterView />
+    </DesktopShell>
+    <ImagePreviewModal />
     <NotificationToast />
   </div>
 </template>
-
-<style scoped>
-</style>

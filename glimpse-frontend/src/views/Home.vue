@@ -1,87 +1,61 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useMemoriesStore } from '@/stores/memories'
-import { useClusterStore } from '@/stores/cluster'
-import { useNotificationStore } from '@/stores/notification'
-import { screenshotApi, clusterApi, healthApi, settingsApi, searchApi, type Memory } from '@/api/client'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import type { Memory } from '@/api/client'
+import { clusterApi, screenshotApi, searchApi, settingsApi } from '@/api/client'
 import { whenBackendRuntimeReady } from '@/config/runtime'
-import { createLogger } from '@/utils/logger'
 import {
-  closeDesktopWindow,
-  getDesktopWindowMaximized,
   focusDesktopWindow,
-  hideDesktopWindow,
   isDesktopShell,
-  listenForDesktopCloseRequests,
   minimizeDesktopWindow,
-  toggleDesktopMaximize,
 } from '@/platform/desktop'
-import SearchBar from '@/components/SearchBar.vue'
-import MemoryList from '@/components/MemoryList.vue'
-import DetailPanel from '@/components/DetailPanel.vue'
-import ClusterBar from '@/components/ClusterBar.vue'
-import CloseActionDialog from '@/components/CloseActionDialog.vue'
-import glimpseLogo from '@/assets/glimpse.svg'
+import { useBackendStatusStore } from '@/stores/backendStatus'
+import { useClusterStore } from '@/stores/cluster'
+import { useMemoriesStore } from '@/stores/memories'
+import { useNotificationStore } from '@/stores/notification'
+import { createLogger } from '@/utils/logger'
 import { t } from '@/utils/i18n'
+import ClusterBar from '@/components/ClusterBar.vue'
+import MemoryInspector from '@/components/MemoryInspector.vue'
+import MemoryWall from '@/components/MemoryWall.vue'
+import SearchToolbar from '@/components/SearchToolbar.vue'
 
-type SearchBarExpose = {
+type SearchToolbarExpose = {
   focus: () => void
+  clear: () => void
 }
 
-type CloseAction = 'ask' | 'minimize' | 'exit'
+type MemoryInspectorExpose = {
+  canLeave: () => Promise<boolean>
+}
 
 const router = useRouter()
 const memoriesStore = useMemoriesStore()
 const clusterStore = useClusterStore()
-const notificationStore = useNotificationStore()
-
-const selectedMemory = computed(() => memoriesStore.selectedMemory)
-const searchBar = ref<SearchBarExpose | null>(null)
-const isCapturing = ref(false)
-const backendReady = ref(false)
-const isCheckingBackend = ref(false)
-const deletingMemoryId = ref<string | null>(null)
-const closeAction = ref<CloseAction>('ask')
-const closeDialogOpen = ref(false)
-const isDesktop = isDesktopShell()
-const isWindowMaximized = ref(false)
-const screenshotShortcutLabel = ref('Ctrl+Shift+G')
-const searchShortcutLabel = 'Ctrl+F'
-const clusterModeEnabled = ref(false)
-let removeDesktopCloseListener: (() => void) | null = null
-let semanticWarmupTimer: ReturnType<typeof window.setTimeout> | null = null
-let homeUnmounted = false
-
+const notifications = useNotificationStore()
+const backendStatus = useBackendStatusStore()
 const logger = createLogger('views/Home')
 
-type ScreenshotTriggerOptions = {
-  initiatedByHotkey?: boolean
-}
+const searchToolbar = ref<SearchToolbarExpose | null>(null)
+const memoryInspector = ref<MemoryInspectorExpose | null>(null)
+const query = ref(memoriesStore.searchQuery)
+const isCapturing = ref(false)
+const isRefreshing = ref(false)
+const showSearchDebug = ref(false)
+const clusterModeEnabled = ref(false)
+const screenshotShortcutLabel = ref('Ctrl+Shift+G')
+const wideLayout = ref(window.innerWidth >= 1180)
+const isDesktop = isDesktopShell()
+let semanticWarmupTimer: ReturnType<typeof window.setTimeout> | null = null
+let unmounted = false
 
-const wait = (ms: number) =>
-  new Promise<void>((resolve) => {
-    window.setTimeout(resolve, ms)
-  })
+const selectedMemory = computed(() => memoriesStore.selectedMemory)
 
-const scheduleSemanticWarmup = () => {
-  if (semanticWarmupTimer) {
-    return
-  }
-
-  semanticWarmupTimer = window.setTimeout(() => {
-    semanticWarmupTimer = null
-    void searchApi.warmup().catch((error) => {
-      console.error('Semantic search warmup failed:', error)
-    })
-  }, 2000)
-}
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds))
 
 const formatShortcutLabel = (hotkey?: string, fallback = '') => {
-  if (!hotkey) {
-    return fallback
-  }
-
+  if (!hotkey) return fallback
   const labels: Record<string, string> = {
     ctrl: 'Ctrl',
     shift: 'Shift',
@@ -89,56 +63,34 @@ const formatShortcutLabel = (hotkey?: string, fallback = '') => {
     cmd: 'Win',
     escape: 'Esc',
     enter: 'Enter',
-    tab: 'Tab',
     space: 'Space',
     backspace: 'Backspace',
-    delete: 'Delete',
-    insert: 'Insert',
-    home: 'Home',
-    end: 'End',
-    page_up: 'Page Up',
-    page_down: 'Page Down',
-    up: 'Up',
-    down: 'Down',
-    left: 'Left',
-    right: 'Right',
   }
-
   return hotkey
     .split('+')
     .map((part) => {
       const normalized = part.trim().replace(/^<|>$/g, '').toLowerCase()
-      if (labels[normalized]) {
-        return labels[normalized]
-      }
-      if (/^f([1-9]|1[0-9]|2[0-4])$/.test(normalized)) {
-        return normalized.toUpperCase()
-      }
-      return normalized.length === 1 ? normalized.toUpperCase() : normalized
+      return labels[normalized] ?? (normalized.length === 1 ? normalized.toUpperCase() : normalized)
     })
     .join('+')
 }
 
 const focusSearch = async () => {
   await nextTick()
-  searchBar.value?.focus()
+  searchToolbar.value?.focus()
 }
 
-const loadMemories = async () => {
-  await memoriesStore.load()
-  if (!memoriesStore.selectedMemory && memoriesStore.memories.length > 0) {
-    memoriesStore.select(memoriesStore.memories[0])
-  }
+const scheduleSemanticWarmup = () => {
+  if (semanticWarmupTimer) return
+  semanticWarmupTimer = window.setTimeout(() => {
+    semanticWarmupTimer = null
+    void searchApi.warmup().catch((error) => logger.warn('Semantic warmup failed: %s', error))
+  }, 2000)
 }
 
 const loadUiSettings = async () => {
   try {
     const settings = await settingsApi.get()
-    const configuredCloseAction = settings.ui?.close_action
-    if (configuredCloseAction === 'ask' || configuredCloseAction === 'minimize' || configuredCloseAction === 'exit') {
-      closeAction.value = configuredCloseAction
-    }
-
     screenshotShortcutLabel.value = formatShortcutLabel(
       settings.hotkeys?.screenshot,
       'Ctrl+Shift+G',
@@ -149,53 +101,33 @@ const loadUiSettings = async () => {
   }
 }
 
-const checkBackendHealth = async () => {
-  if (isCheckingBackend.value) {
-    return backendReady.value
-  }
-
-  isCheckingBackend.value = true
-  try {
-    const result = await healthApi.check()
-    backendReady.value = result.status === 'healthy'
-  } catch (error) {
-    backendReady.value = false
-  } finally {
-    isCheckingBackend.value = false
-  }
-
-  return backendReady.value
-}
-
-const waitForBackendReady = async (timeoutMs = 30000) => {
-  const deadline = Date.now() + timeoutMs
-
-  while (!homeUnmounted && Date.now() < deadline) {
-    if (await checkBackendHealth()) {
-      return true
-    }
+const waitForBackend = async (timeout = 30_000) => {
+  const deadline = Date.now() + timeout
+  while (!unmounted && Date.now() < deadline) {
+    if (await backendStatus.check()) return true
     await wait(500)
   }
-
-  return !homeUnmounted && (await checkBackendHealth())
+  return false
 }
 
-const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
+const loadMemories = async () => {
+  await memoriesStore.load()
+  if (wideLayout.value && !memoriesStore.selectedMemory && memoriesStore.memories.length) {
+    memoriesStore.select(memoriesStore.memories[0])
+  }
+}
+
+const handleScreenshot = async (initiatedByHotkey = false) => {
   if (isCapturing.value) {
-    if (options.initiatedByHotkey) {
-      notificationStore.show(t('message.busyCapture'), 'warning', 2800)
-    }
+    if (initiatedByHotkey) notifications.show(t('message.busyCapture'), 'warning', 2800)
     return
   }
 
-  const healthy = await checkBackendHealth()
-  if (!healthy) {
-      notificationStore.show(
-      options.initiatedByHotkey
-        ? t('message.backendOfflineHotkey')
-        : t('message.backendOffline'),
+  if (!(await backendStatus.check())) {
+    notifications.show(
+      initiatedByHotkey ? t('message.backendOfflineHotkey') : t('message.backendOffline'),
       'error',
-      4500,
+      4200,
     )
     return
   }
@@ -203,13 +135,11 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
   await loadUiSettings()
   isCapturing.value = true
   if (!clusterModeEnabled.value) {
-  notificationStore.show(
-    options.initiatedByHotkey
-      ? t('message.captureStartedHotkey')
-      : t('message.captureStarted'),
-    'info',
-    1800,
-  )
+    notifications.show(
+      initiatedByHotkey ? t('message.captureStartedHotkey') : t('message.captureStarted'),
+      'info',
+      1800,
+    )
   }
 
   try {
@@ -217,417 +147,199 @@ const handleScreenshot = async (options: ScreenshotTriggerOptions = {}) => {
       await minimizeDesktopWindow()
       await wait(300)
     }
-
     const result = await screenshotApi.triggerAndAnalyze()
     if (!result.success) {
-      notificationStore.show(
-        options.initiatedByHotkey
-          ? `${t('message.captureFailed')}${result.message ? ` ${result.message}` : ''}`
-          : result.message || t('message.captureFailed'),
-        'error',
-        4500,
-      )
-      return
-    }
-
-    if (!result.clustered && !clusterModeEnabled.value) {
-      notificationStore.show(
-      options.initiatedByHotkey
-        ? result.message || t('message.captureSubmitted')
-        : t('message.captureSubmitted'),
-      'success',
-        2400,
-      )
+      notifications.show(result.message || t('message.captureFailed'), 'error', 4200)
+    } else if (!result.clustered && !clusterModeEnabled.value) {
+      notifications.show(result.message || t('message.captureSubmitted'), 'success', 2200)
     }
   } catch (error) {
     logger.error('Screenshot failed: %s', error)
-    notificationStore.show(
-      options.initiatedByHotkey
-        ? t('message.checkBackendLogs')
-        : t('message.checkBackendLogs'),
-      'error',
-      4500,
-    )
+    notifications.show(t('message.checkBackendLogs'), 'error', 4200)
   } finally {
-    if (isDesktop) {
-      await focusDesktopWindow()
-    }
+    if (isDesktop) await focusDesktopWindow()
     isCapturing.value = false
   }
 }
 
-const handleCaptureButtonClick = () => {
-  void handleScreenshot()
-}
+const confirmInspectorLeave = () =>
+  memoryInspector.value?.canLeave() ?? Promise.resolve(true)
 
-const handleSelectMemory = (memory: Memory) => {
+const handleSelectMemory = async (memory: Memory) => {
+  if (memory.id === memoriesStore.selectedId) return
+  if (!(await confirmInspectorLeave())) return
   memoriesStore.select(memory)
 }
 
-const handleOpenMemoryDetail = (memoryId: string) => {
-  router.push(`/memory/${memoryId}`)
+const handleCloseInspector = async () => {
+  if (!(await confirmInspectorLeave())) return
+  memoriesStore.select(null)
 }
 
-const handleOpenSettings = () => {
-  router.push('/settings')
-}
-
-const handleClusterSubmit = async () => {
-  await clusterApi.submit()
-}
-
-const handleClusterCancel = async () => {
-  await clusterApi.cancel()
-}
-
-const handleHideWindow = async () => {
-  await hideDesktopWindow()
-}
-
-const handleMinimizeWindow = async () => {
-  await minimizeDesktopWindow()
-}
-
-const syncDesktopWindowState = async () => {
-  if (!isDesktop) {
-    isWindowMaximized.value = false
-    return
-  }
-
-  isWindowMaximized.value = await getDesktopWindowMaximized()
-}
-
-const handleToggleMaximizeWindow = async () => {
-  await toggleDesktopMaximize()
-  await syncDesktopWindowState()
-}
-
-const performCloseAction = async (action: Exclude<CloseAction, 'ask'>) => {
-  if (action === 'minimize') {
-    await hideDesktopWindow()
-    return
-  }
-
-  await closeDesktopWindow()
-}
-
-const requestWindowClose = async () => {
-  if (closeDialogOpen.value) {
-    return
-  }
-
-  if (closeAction.value === 'ask') {
-    closeDialogOpen.value = true
-    return
-  }
-
-  try {
-    await performCloseAction(closeAction.value)
-  } catch (error) {
-    logger.error('Close window failed: %s', error)
-    notificationStore.show(t('message.exitFailed'), 'error', 3200)
-  }
-}
-
-const handleCloseWindow = async () => {
-  await requestWindowClose()
-}
-
-const handleCloseDialogChoice = async (payload: {
-  action: 'minimize' | 'exit'
-  remember: boolean
-}) => {
-  closeDialogOpen.value = false
-
-  try {
-    if (payload.remember) {
-      try {
-        await settingsApi.update({
-          ui: {
-            close_action: payload.action,
-          },
-        })
-        closeAction.value = payload.action
-      } catch (error) {
-        logger.error('Saving close action failed: %s', error)
-        notificationStore.show(t('message.closePreferenceFailed'), 'warning', 3200)
-      }
-    }
-
-    await performCloseAction(payload.action)
-  } catch (error) {
-    logger.error('Applying close action failed: %s', error)
-    notificationStore.show(t('message.closeActionFailed'), 'error', 3200)
-  }
+const handleOpenMemory = async (memory: Memory | string) => {
+  if (!(await confirmInspectorLeave())) return
+  const id = typeof memory === 'string' ? memory : memory.id
+  await router.push(`/memory/${id}`)
 }
 
 const handleRefresh = async () => {
-  const healthy = await checkBackendHealth()
-  if (!healthy) {
-    return
+  if (!(await backendStatus.check())) return
+  isRefreshing.value = true
+  try {
+    scheduleSemanticWarmup()
+    await memoriesStore.refresh()
+  } finally {
+    isRefreshing.value = false
   }
-  scheduleSemanticWarmup()
-  await memoriesStore.refresh()
 }
 
-const handleDeleteMemory = async (memory: Memory) => {
-  if (deletingMemoryId.value) {
-    return
-  }
-
-  const confirmed = window.confirm(t('message.deleteConfirm'))
-  if (!confirmed) {
-    return
-  }
-
-  deletingMemoryId.value = memory.id
-  try {
-    await memoriesStore.remove(memory.id)
-    notificationStore.show(t('message.deleted'), 'success', 2200)
-  } catch (error) {
-    logger.error('Delete memory failed: %s', error)
-    notificationStore.show(t('message.deleteFailed'), 'error', 3200)
-  } finally {
-    deletingMemoryId.value = null
+const handleResize = () => {
+  const wasWide = wideLayout.value
+  wideLayout.value = window.innerWidth >= 1180
+  if (!wasWide && wideLayout.value && !memoriesStore.selectedMemory && memoriesStore.memories.length) {
+    memoriesStore.select(memoriesStore.memories[0])
   }
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
   const key = event.key.toLowerCase()
-  if (event.ctrlKey && event.shiftKey && key === 'g') {
-    if (isDesktop) {
-      return
-    }
+  const target = event.target as HTMLElement | null
+  const dialogOpen = Boolean(document.querySelector('[role="dialog"][aria-modal="true"]'))
+  const editingText = target instanceof HTMLTextAreaElement || Boolean(target?.isContentEditable)
+
+  if (key === 'escape' && query.value && !dialogOpen && !editingText) {
+    event.preventDefault()
+    searchToolbar.value?.clear()
+  } else if (event.ctrlKey && event.shiftKey && key === 'g' && !isDesktop) {
     event.preventDefault()
     void handleScreenshot()
-    return
-  }
-
-  if (event.ctrlKey && key === 'f') {
+  } else if (event.ctrlKey && key === 'f') {
     event.preventDefault()
     void focusSearch()
-    return
-  }
-
-  if (key === 'escape' && isDesktop) {
-    event.preventDefault()
-    void handleHideWindow()
   }
 }
 
-const handleFocusSearchEvent = async () => {
-  await focusSearch()
+const handleFocusSearchEvent = () => void focusSearch()
+const handleShortcutCapture = () => {
+  if (isDesktop) void handleScreenshot(true)
 }
 
-const handleShortcutScreenshotEvent = async () => {
-  if (!isDesktop) {
-    return
-  }
-
-  await handleScreenshot({
-    initiatedByHotkey: true,
-  })
-}
+onBeforeRouteLeave(async () => confirmInspectorLeave())
 
 onMounted(async () => {
-  homeUnmounted = false
-
-  if (isDesktop) {
-    await focusDesktopWindow()
-    await syncDesktopWindowState()
-    removeDesktopCloseListener = await listenForDesktopCloseRequests(() => {
-      void requestWindowClose()
-    })
-  }
-
+  unmounted = false
+  window.addEventListener('resize', handleResize)
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('glimpse:focus-search', handleFocusSearchEvent)
-  window.addEventListener('glimpse:shortcut-screenshot', handleShortcutScreenshotEvent)
-  await focusSearch()
+  window.addEventListener('glimpse:shortcut-screenshot', handleShortcutCapture)
+
   await whenBackendRuntimeReady()
-
-  const healthy = await waitForBackendReady()
-  if (!healthy) {
-    return
-  }
-
-  await loadUiSettings()
-  await loadMemories()
+  if (!(await waitForBackend())) return
+  await Promise.all([loadUiSettings(), loadMemories()])
   scheduleSemanticWarmup()
   await focusSearch()
 })
 
 onUnmounted(() => {
-  homeUnmounted = true
-
-  if (semanticWarmupTimer) {
-    window.clearTimeout(semanticWarmupTimer)
-    semanticWarmupTimer = null
-  }
-
+  unmounted = true
+  if (semanticWarmupTimer) window.clearTimeout(semanticWarmupTimer)
+  window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('glimpse:focus-search', handleFocusSearchEvent)
-  window.removeEventListener('glimpse:shortcut-screenshot', handleShortcutScreenshotEvent)
-  removeDesktopCloseListener?.()
-  removeDesktopCloseListener = null
+  window.removeEventListener('glimpse:shortcut-screenshot', handleShortcutCapture)
 })
 </script>
 
 <template>
-  <div class="shell-frame flex h-screen min-h-0 flex-col overflow-hidden">
-    <div class="shell-card flex h-full min-h-0 w-full flex-col overflow-hidden">
-      <header class="shell-header relative flex items-center justify-between gap-4 px-5 py-4">
-        <div class="shell-titlebar-drag-layer" data-tauri-drag-region></div>
-        <div class="shell-drag-zone flex items-center gap-3" data-tauri-drag-region>
-          <div class="logo-badge flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl">
-            <img class="h-full w-full object-cover" :src="glimpseLogo" alt="Glimpse" draggable="false" />
-          </div>
-          <div data-tauri-drag-region>
-            <h1 class="text-lg font-semibold text-slate-900">Glimpse</h1>
-            <p class="text-xs text-slate-500">{{ t('app.subtitle') }}</p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <span
-            data-tauri-drag-region
-            :class="[
-              'status-pill',
-              backendReady ? 'status-pill-ready' : 'status-pill-offline',
-            ]"
-          >
-            {{ backendReady ? t('status.ready') : t('status.offline') }}
-          </span>
-        </div>
-
-        <div class="shell-window-controls flex items-center gap-2">
-          <button
-            class="shell-icon-button"
-            :disabled="isCheckingBackend || memoriesStore.isLoading"
-            @click="handleRefresh"
-            :title="t('action.refresh')"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582M20 20v-5h-.581M5.59 9A7.97 7.97 0 0112 6c2.075 0 3.963.79 5.375 2.083L20 11M4 13l2.625 2.917A7.965 7.965 0 0012 18a7.97 7.97 0 005.41-2.1" />
-            </svg>
-          </button>
-
-          <button
-            class="capture-button"
-            :disabled="isCapturing"
-            @click="handleCaptureButtonClick"
-          >
-            <svg v-if="!isCapturing" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span v-else class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/35 border-t-white"></span>
-            <span>{{ isCapturing ? t('action.processing') : t('action.capture') }}</span>
-            <kbd>{{ screenshotShortcutLabel }}</kbd>
-          </button>
-
-          <button
-            class="shell-icon-button"
-            @click="handleOpenSettings"
-            :title="t('action.settings')"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-
-          <button
-            v-if="isDesktop"
-            class="shell-icon-button"
-            @click="handleMinimizeWindow"
-            :title="t('action.minimize')"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
-            </svg>
-          </button>
-
-          <button
-            v-if="isDesktop"
-            class="shell-icon-button"
-            @click="handleToggleMaximizeWindow"
-            :title="isWindowMaximized ? t('action.restore') : t('action.maximize')"
-          >
-            <svg
-              v-if="!isWindowMaximized"
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <rect x="5" y="5" width="14" height="14" rx="1.5" stroke-width="2" />
-            </svg>
-            <svg
-              v-else
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9h10v10H9z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15V5h10" />
-            </svg>
-          </button>
-
-          <button
-            v-if="isDesktop"
-            class="shell-icon-button shell-icon-button-danger"
-            @click="handleCloseWindow"
-            :title="t('action.close')"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </header>
-
-      <main class="min-h-0 flex-1 overflow-hidden px-5 pb-5 pt-3">
-        <div class="mx-auto flex h-full min-h-0 max-w-6xl flex-col gap-4">
-          <SearchBar ref="searchBar" :shortcut-label="searchShortcutLabel" />
-
-          <ClusterBar
-            v-if="clusterStore.state === 'COLLECTING'"
-            @submit="handleClusterSubmit"
-            @cancel="handleClusterCancel"
-          />
-
-          <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden md:grid-cols-[minmax(300px,3fr)_minmax(0,5fr)]">
-            <MemoryList
-              :memories="memoriesStore.memories"
-              :is-loading="memoriesStore.isLoading"
-              :selected-id="selectedMemory?.id"
-              :deleting-id="deletingMemoryId"
-              :shortcut-label="screenshotShortcutLabel"
-              @select="handleSelectMemory"
-              @open="handleOpenMemoryDetail($event.id)"
-              @delete="handleDeleteMemory"
-            />
-
-            <DetailPanel
-              v-if="selectedMemory"
-              :memory="selectedMemory"
-              @close="memoriesStore.select(null)"
-              @open="handleOpenMemoryDetail"
-            />
-            <div v-else class="card flex h-full min-h-0 items-center justify-center p-8 text-sm text-slate-500">
-              {{ t('memory.selectHint') }}
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-
-    <CloseActionDialog
-      :open="closeDialogOpen"
-      @close="closeDialogOpen = false"
-      @choose="handleCloseDialogChoice"
+  <main class="relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--shell-window-bg)]">
+    <SearchToolbar
+      ref="searchToolbar"
+      v-model="query"
+      shortcut-label="Ctrl+F"
+      :capture-shortcut-label="screenshotShortcutLabel"
+      :capturing="isCapturing"
+      :capture-disabled="!backendStatus.isReady"
+      :refreshing="isRefreshing"
+      @capture="handleScreenshot()"
+      @refresh="handleRefresh"
+      @debug-panel-change="showSearchDebug = $event"
     />
-  </div>
+
+    <ClusterBar
+      v-if="clusterStore.isCollecting"
+      class="mx-5 mt-4"
+      @submit="clusterApi.submit()"
+      @cancel="clusterApi.cancel()"
+    />
+
+    <div class="relative flex min-h-0 flex-1 overflow-hidden">
+      <MemoryWall
+        :memories="memoriesStore.memories"
+        :total="memoriesStore.total"
+        :loading="memoriesStore.isLoading"
+        :selected-id="memoriesStore.selectedId"
+        :query="query"
+        :inspector-open="Boolean(selectedMemory)"
+        :show-search-debug="showSearchDebug"
+        @select="handleSelectMemory"
+        @open="handleOpenMemory"
+        @capture="handleScreenshot()"
+      />
+
+      <Transition name="inspector">
+        <div
+          v-if="selectedMemory"
+          class="inspector-panel z-30 border-l border-[var(--shell-line)] shadow-[-18px_0_40px_rgba(15,23,42,.08)]"
+        >
+          <MemoryInspector
+            ref="memoryInspector"
+            :memory="selectedMemory"
+            @close="handleCloseInspector"
+            @open="handleOpenMemory"
+          />
+        </div>
+      </Transition>
+    </div>
+  </main>
 </template>
+
+<style scoped>
+.inspector-panel {
+  width: 380px;
+  flex: 0 0 380px;
+  min-height: 0;
+}
+
+@media (max-width: 1179px) {
+  .inspector-panel {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(420px, 100%);
+  }
+}
+
+@media (max-width: 819px) {
+  .inspector-panel {
+    inset: 0;
+    width: 100%;
+  }
+}
+
+.inspector-enter-active,
+.inspector-leave-active {
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.inspector-enter-from,
+.inspector-leave-to {
+  transform: translateX(24px);
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inspector-enter-active,
+  .inspector-leave-active {
+    transition: none;
+  }
+}
+</style>

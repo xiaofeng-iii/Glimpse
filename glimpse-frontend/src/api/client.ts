@@ -65,6 +65,25 @@ export interface IndexRepairResult {
   rebuilt?: boolean
 }
 
+export interface OcrBackfillResult {
+  status?: string
+  total?: number
+  processed: number
+  updated?: number
+  succeeded?: number
+  skipped: number
+  failed: number
+  index_failed?: number
+}
+
+export interface OcrBackfillStatus {
+  task_id: string
+  status: 'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+  running: boolean
+  result: OcrBackfillResult | null
+  error: string | null
+}
+
 export interface IndexRepairStatus {
   task_id: string
   status: 'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
@@ -102,6 +121,11 @@ export const memoriesApi = {
 
   delete: async (id: string): Promise<{ success: boolean }> => {
     const response = await api.delete(`/memories/${id}`)
+    return response.data
+  },
+
+  updateSummary: async (id: string, aiSummary: string): Promise<Memory> => {
+    const response = await api.patch(`/memories/${id}`, { ai_summary: aiSummary })
     return response.data
   },
 }
@@ -189,6 +213,19 @@ export const indexApi = {
 
   status: async (): Promise<IndexRepairStatus> => {
     const response = await api.get('/settings/index/repair')
+    return response.data
+  },
+}
+
+// Local OCR maintenance API
+export const ocrApi = {
+  backfill: async (): Promise<OcrBackfillStatus> => {
+    const response = await api.post('/settings/ocr/backfill')
+    return response.data
+  },
+
+  status: async (): Promise<OcrBackfillStatus> => {
+    const response = await api.get('/settings/ocr/backfill')
     return response.data
   },
 }

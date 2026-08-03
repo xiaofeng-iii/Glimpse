@@ -155,17 +155,3 @@ export const listenForDesktopCloseRequests = async (
     return () => {}
   }
 }
-
-export const openExternalTarget = async (target: string) => {
-  if (isDesktopShell()) {
-    try {
-      const module = await import('@tauri-apps/plugin-shell')
-      await module.open(target)
-      return
-    } catch (error) {
-      console.error('Failed to open external target via Tauri shell:', error)
-    }
-  }
-
-  window.open(target, '_blank', 'noopener,noreferrer')
-}

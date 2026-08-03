@@ -21,7 +21,7 @@ const countdownText = computed(() => {
 </script>
 
 <template>
-  <div class="card p-4 mb-6 bg-gradient-to-r from-violet-50 to-pink-50 border-violet-200">
+  <div class="card mb-6 border-violet-200 bg-violet-50 p-4">
     <div class="flex items-center justify-between">
       <!-- Status -->
       <div class="flex items-center gap-3">
@@ -35,7 +35,7 @@ const countdownText = computed(() => {
       <div class="flex gap-2">
         <button
           @click="$emit('submit')"
-          class="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-pink-600 text-white text-sm font-medium hover:scale-105 transition-transform"
+          class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-transform hover:scale-105"
         >
           {{ t('cluster.submit') }}
         </button>
@@ -52,7 +52,7 @@ const countdownText = computed(() => {
     <div class="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
       <div
         :style="{ width: `${(clusterStore.count / clusterStore.maxCount) * 100}%` }"
-        class="h-full bg-gradient-to-r from-violet-500 to-pink-500 transition-all duration-300"
+        class="h-full bg-violet-500 transition-all duration-300"
       ></div>
     </div>
   </div>
