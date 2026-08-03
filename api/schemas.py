@@ -2,7 +2,7 @@
 API Schemas - Pydantic models for request/response validation
 """
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 
 
@@ -36,6 +36,22 @@ class MemoryListResponse(BaseModel):
     """List of memories response"""
     memories: List[MemoryResponse]
     total: int
+
+
+class MemoryUpdateRequest(BaseModel):
+    """Editable fields for one memory."""
+
+    ai_summary: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("ai_summary", mode="before")
+    @classmethod
+    def normalize_summary(cls, value):
+        if not isinstance(value, str):
+            raise ValueError("ai_summary must be a string")
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("ai_summary must not be blank")
+        return normalized
 
 
 class SearchQuery(BaseModel):

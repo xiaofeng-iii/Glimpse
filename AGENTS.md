@@ -73,7 +73,11 @@ The project is developed on Windows with a Tauri/Vue desktop shell and a Python 
 6. `services/search_service.py` combines exact and semantic search results.
 7. UI renders list/detail state and hides placeholder app names such as empty strings or `unknown`.
 
-OCR engine code still exists in `services/ocr_engine.py` and is registered in `container.py`, but the current `MemoryService` implementation does not call it. If OCR is re-enabled, update this guide and the relevant memory-service tests together.
+OCR is enabled before AI summarization through the injected `OCREngine`.
+`services/ocr_engine.py` uses RapidOCR 3.9.2 with the bundled
+PP-OCRv6-small detection/recognition models and ONNX Runtime CPU. OCR failures
+must not prevent a memory from being saved. Historical rows are processed only
+through the manual maintenance backfill; never add automatic startup backfill.
 
 ## Important Conventions
 

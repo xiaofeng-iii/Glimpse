@@ -60,6 +60,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Glimpse API Server...")
     container.initialize_defaults()
     configure_ai_client(container.get("ai_client"), container.get("settings_manager"))
+    # Older databases may contain valid vectors whose legacy rows never moved
+    # beyond PENDING. The conditional check only queues a non-destructive vector
+    # repair; it never runs OCR or blocks startup on the repair itself.
+    container.get("memory_service").maybe_schedule_vector_index_repair()
 
     # Initialize signal forwarding for WebSocket
     loop = asyncio.get_running_loop()

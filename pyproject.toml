@@ -54,7 +54,8 @@ dependencies = [
     "mss==9.0.1",
     "Pillow==10.2.0",
     "pynput==1.7.6",
-    "rapidocr-onnxruntime==1.4.4",
+    "rapidocr==3.9.2",
+    "onnxruntime==1.23.2",
 
     # API
     "openai==1.13.3",
@@ -336,7 +337,7 @@ collect-data = [
     "certifi",
     "chromadb",
     "onnxruntime",
-    "rapidocr_onnxruntime",
+    "rapidocr",
     "sentence_transformers",
     "transformers",
     "tokenizers",
@@ -352,6 +353,6 @@ copy-metadata = [
     "openai",
     "fastapi",
     "uvicorn",
-    "rapidocr-onnxruntime",
+    "rapidocr",
     "onnxruntime",
 ]

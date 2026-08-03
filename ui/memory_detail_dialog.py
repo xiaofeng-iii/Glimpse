@@ -69,6 +69,51 @@ def _make_placeholder_image(size: int = 160) -> QPixmap:
     return pixmap
 
 
+class _ImagePreviewDialog(QDialog):
+    """Application-owned modal preview for a captured image."""
+
+    def __init__(self, image_path: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(t("detail.open_image"))
+        self.setModal(True)
+        self.setWindowFlags(
+            self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
+        )
+
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            self.resize(
+                min(1100, max(640, int(available.width() * 0.8))),
+                min(820, max(480, int(available.height() * 0.8))),
+            )
+        else:
+            self.resize(960, 720)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        image_label = QLabel()
+        image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pixmap = QPixmap(image_path)
+        image_label.setPixmap(
+            pixmap if not pixmap.isNull() else _make_placeholder_image(640)
+        )
+        image_label.adjustSize()
+
+        scroll_area = QScrollArea()
+        scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        scroll_area.setWidget(image_label)
+        scroll_area.setWidgetResizable(False)
+        layout.addWidget(scroll_area, 1)
+
+        close_button = QPushButton(t("settings.cancel"))
+        close_button.setObjectName("secondaryBtn")
+        close_button.clicked.connect(self.accept)
+        layout.addWidget(close_button, 0, Qt.AlignmentFlag.AlignRight)
+
+
 class MemoryDetailDialog(QDialog):
     """Polished detail dialog for a memory record."""
 
@@ -205,17 +250,11 @@ class MemoryDetailDialog(QDialog):
         QApplication.clipboard().setText(text)
 
     def _on_open_image(self):
-        """Open the screenshot with the system viewer."""
+        """Open the screenshot in an application-owned modal preview."""
         path = getattr(self._memory, "image_path", "")
         if path and os.path.exists(path):
-            import subprocess
-            import sys
-            if sys.platform == "win32":
-                os.startfile(path)
-            elif sys.platform == "darwin":
-                subprocess.run(["open", path])
-            else:
-                subprocess.run(["xdg-open", path])
+            preview = _ImagePreviewDialog(path, self)
+            preview.exec()
 
     def _on_delete(self):
         """Confirm and emit delete signal."""

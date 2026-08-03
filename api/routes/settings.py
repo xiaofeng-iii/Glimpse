@@ -18,6 +18,7 @@ from services.ai_client import AIClient
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 INDEX_REPAIR_TASK_ID = "vector_index_repair_full"
+OCR_BACKFILL_TASK_ID = "ocr_backfill"
 
 
 def task_is_active(task) -> bool:
@@ -50,6 +51,28 @@ def index_repair_status_response(task=None) -> dict:
     except Exception as exc:
         payload.update({"stats_error": str(exc)})
     return payload
+
+
+def serialize_ocr_backfill_task(task) -> dict:
+    if not task:
+        return {
+            "task_id": OCR_BACKFILL_TASK_ID,
+            "status": "idle",
+            "running": False,
+            "result": None,
+            "error": None,
+        }
+
+    result = task.result
+    if task_is_active(task):
+        result = get_memory_service().get_ocr_backfill_progress()
+    return {
+        "task_id": task.id,
+        "status": task.status.name.lower(),
+        "running": task_is_active(task),
+        "result": result,
+        "error": task.error,
+    }
 
 
 def get_default_settings() -> dict:
@@ -243,6 +266,11 @@ async def start_index_repair():
         existing = task_queue.get_task(INDEX_REPAIR_TASK_ID)
         if task_is_active(existing):
             return index_repair_status_response(existing)
+        if task_is_active(task_queue.get_task(OCR_BACKFILL_TASK_ID)):
+            raise HTTPException(
+                status_code=409,
+                detail="OCR backfill is running; wait before repairing the vector index",
+            )
 
         memory_service = get_memory_service()
         task = task_queue.submit(
@@ -251,6 +279,8 @@ async def start_index_repair():
             force_rebuild=True,
         )
         return index_repair_status_response(task)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -261,6 +291,41 @@ async def get_index_repair_status():
     try:
         task = get_task_queue().get_task(INDEX_REPAIR_TASK_ID)
         return index_repair_status_response(task)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ocr/backfill")
+async def start_ocr_backfill():
+    """Fill OCR text for legacy memories in one background maintenance task."""
+    try:
+        task_queue = get_task_queue()
+        existing = task_queue.get_task(OCR_BACKFILL_TASK_ID)
+        if task_is_active(existing):
+            return serialize_ocr_backfill_task(existing)
+        if task_is_active(task_queue.get_task(INDEX_REPAIR_TASK_ID)):
+            raise HTTPException(
+                status_code=409,
+                detail="Vector index repair is running; wait before starting OCR backfill",
+            )
+
+        task = task_queue.submit(
+            OCR_BACKFILL_TASK_ID,
+            get_memory_service().backfill_ocr,
+        )
+        return serialize_ocr_backfill_task(task)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ocr/backfill")
+async def get_ocr_backfill_status():
+    """Return the latest OCR backfill task and live progress counters."""
+    try:
+        task = get_task_queue().get_task(OCR_BACKFILL_TASK_ID)
+        return serialize_ocr_backfill_task(task)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

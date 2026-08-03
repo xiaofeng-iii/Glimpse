@@ -12,7 +12,7 @@ import pytest
 class TestCaptureToStorage:
     """测试截图捕获到双数据库存储的完整流程"""
 
-    def test_create_memory_stores_in_sqlite(self, memory_service, sample_image_path):
+    def test_create_memory_stores_in_sqlite(self, memory_service, sample_image_path, mock_ocr_engine):
         """截图处理后应写入 SQLite"""
         memory_id = memory_service.create_memory(sample_image_path, app_name="test_app")
 
@@ -21,7 +21,8 @@ class TestCaptureToStorage:
         assert record is not None
         assert record.app_name == "test_app"
         assert record.ai_summary == "这是一张包含文字内容的截图摘要"
-        assert record.text_content == ""
+        assert record.text_content == mock_ocr_engine.extract_text.return_value
+        mock_ocr_engine.extract_text.assert_called_once_with(str(sample_image_path))
 
     def test_create_memory_stores_in_chroma(self, memory_service, sample_image_path, chroma_manager):
         """截图处理后应写入 ChromaDB 向量数据库"""

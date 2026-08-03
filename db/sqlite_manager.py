@@ -133,12 +133,22 @@ class SQLiteManager:
             END
         """)
 
-        # Migration: add extra_images column if not exists
+        # Lightweight additive migrations for databases created by older builds.
         cursor.execute("PRAGMA table_info(memories)")
         columns = [col[1] for col in cursor.fetchall()]
         if "extra_images" not in columns:
             cursor.execute("ALTER TABLE memories ADD COLUMN extra_images TEXT")
-            self._conn.commit()
+        if "sync_status" not in columns:
+            cursor.execute(
+                "ALTER TABLE memories ADD COLUMN sync_status TEXT DEFAULT 'PENDING'"
+            )
+        cursor.execute(
+            """
+            UPDATE memories
+            SET sync_status = 'PENDING'
+            WHERE sync_status IS NULL OR TRIM(sync_status) = ''
+            """
+        )
 
         self._conn.commit()
 
@@ -216,19 +226,109 @@ class SQLiteManager:
         rows = cursor.fetchall()
         return [MemoryRecord.from_row(row) for row in rows]
 
-    def update_memory_summary(self, memory_id: str, summary: str) -> bool:
+    def update_memory_summary(
+        self,
+        memory_id: str,
+        summary: str,
+        sync_status: str = "PENDING",
+    ) -> bool:
         with self._write_lock:
             try:
                 cursor = self._conn.cursor()
                 cursor.execute(
-                    "UPDATE memories SET ai_summary = ? WHERE id = ?",
-                    (summary, memory_id),
+                    """
+                    UPDATE memories
+                    SET ai_summary = ?, sync_status = ?
+                    WHERE id = ?
+                    """,
+                    (summary, sync_status, memory_id),
                 )
                 self._conn.commit()
                 return cursor.rowcount > 0
             except Exception as e:
                 logger.error("Update memory error: %s", e)
                 return False
+
+    def update_memory_text_content(
+        self,
+        memory_id: str,
+        text_content: str,
+        sync_status: str = "PENDING",
+    ) -> bool:
+        with self._write_lock:
+            try:
+                cursor = self._conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE memories
+                    SET text_content = ?, sync_status = ?
+                    WHERE id = ?
+                    """,
+                    (text_content, sync_status, memory_id),
+                )
+                self._conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                logger.error("Update memory OCR text error: %s", e)
+                return False
+
+    def update_memory_sync_status(self, memory_id: str, sync_status: str) -> bool:
+        with self._write_lock:
+            try:
+                cursor = self._conn.cursor()
+                cursor.execute(
+                    "UPDATE memories SET sync_status = ? WHERE id = ?",
+                    (sync_status, memory_id),
+                )
+                self._conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                logger.error("Update memory sync status error: %s", e)
+                return False
+
+    def compare_and_set_memory_sync_status(
+        self,
+        memory_id: str,
+        *,
+        expected_ai_summary: Optional[str],
+        expected_text_content: Optional[str],
+        sync_status: str,
+    ) -> bool:
+        """Update index status only while the indexed content snapshot is current."""
+        with self._write_lock:
+            try:
+                cursor = self._conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE memories
+                    SET sync_status = ?
+                    WHERE id = ?
+                      AND ai_summary IS ?
+                      AND text_content IS ?
+                    """,
+                    (
+                        sync_status,
+                        memory_id,
+                        expected_ai_summary,
+                        expected_text_content,
+                    ),
+                )
+                self._conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                logger.error("Compare-and-set memory sync status error: %s", e)
+                return False
+
+    def get_memories_without_text(self) -> List[MemoryRecord]:
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            SELECT * FROM memories
+            WHERE text_content IS NULL OR TRIM(text_content) = ''
+            ORDER BY created_at ASC, id ASC
+            """
+        )
+        return [MemoryRecord.from_row(row) for row in cursor.fetchall()]
 
     def delete_memory(self, memory_id: str) -> bool:
         with self._write_lock:
@@ -244,6 +344,16 @@ class SQLiteManager:
     def get_memories_count(self) -> int:
         cursor = self._conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM memories")
+        return cursor.fetchone()[0]
+
+    def get_unsynced_memories_count(self) -> int:
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            SELECT COUNT(*) FROM memories
+            WHERE sync_status IS NULL OR sync_status != 'SYNCED'
+            """
+        )
         return cursor.fetchone()[0]
 
     def close(self):

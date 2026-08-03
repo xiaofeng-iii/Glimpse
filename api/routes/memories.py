@@ -4,7 +4,7 @@ Memory Routes - CRUD operations for memories
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 
-from api.schemas import MemoryResponse, MemoryListResponse
+from api.schemas import MemoryListResponse, MemoryResponse, MemoryUpdateRequest
 from api.dependencies import get_search_service, get_memory_service
 from api.websocket import broadcast_event
 from utils.logger import get_logger
@@ -59,6 +59,33 @@ async def get_memory(memory_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{memory_id}", response_model=MemoryResponse)
+async def update_memory(memory_id: str, request: MemoryUpdateRequest):
+    """Update a user-editable memory summary and queue semantic reindexing."""
+    try:
+        memory_service = get_memory_service()
+        memory = memory_service.update_memory_summary(
+            memory_id,
+            request.ai_summary,
+        )
+        if memory is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Memory {memory_id} not found",
+            )
+
+        # MemoryService emits PENDING before it starts the serial reindex worker;
+        # that worker emits the terminal SYNCED/FAILED event. Broadcasting again
+        # here could race and deliver a late PENDING event after the terminal one.
+        return MemoryResponse(**memory_to_response(memory))
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.delete("/{memory_id}")
