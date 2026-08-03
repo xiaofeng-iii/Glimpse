@@ -4,6 +4,13 @@ on:
   push:
     tags:
       - "v[0-9]{8}"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Preview version as YYYYMMDD"
+        required: true
+        default: "20260803"
+        type: string
 
 permissions:
   contents: write
@@ -41,13 +48,20 @@ jobs:
       - name: Verify preview tag and synchronized version
         shell: pwsh
         run: |
-          $tag = $env:GITHUB_REF_NAME
-          if ($tag -notmatch '^v[0-9]{8}$') {
-            throw "Preview tag must be vYYYYMMDD, got: $tag"
+          $version = if ($env:GITHUB_EVENT_NAME -eq "push") {
+            if ($env:GITHUB_REF_NAME -notmatch '^v([0-9]{8})$') {
+              throw "Preview tag must be vYYYYMMDD, got: $env:GITHUB_REF_NAME"
+            }
+            $Matches[1]
+          } else {
+            "${{ github.event.inputs.version }}"
           }
-          $year = $tag.Substring(1, 4)
-          $month = [int]$tag.Substring(5, 2)
-          $day = [int]$tag.Substring(7, 2)
+          if ($version -notmatch '^[0-9]{8}$') {
+            throw "Preview version must be YYYYMMDD, got: $version"
+          }
+          $year = $version.Substring(0, 4)
+          $month = [int]$version.Substring(4, 2)
+          $day = [int]$version.Substring(6, 2)
           $expected = "$year.$month.$day"
           python scripts/set_version.py --check --expected $expected
 
@@ -86,13 +100,19 @@ jobs:
           Set-Content -Path $checksumPath -Value $checksumLines -Encoding ascii
 
           $assets = @($installers.FullName) + @((Resolve-Path $checksumPath).Path)
-          gh release view $env:GITHUB_REF_NAME *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $env:GITHUB_REF_NAME @assets --clobber
+          $version = if ($env:GITHUB_EVENT_NAME -eq "push") {
+            $env:GITHUB_REF_NAME.Substring(1)
           } else {
-            gh release create $env:GITHUB_REF_NAME @assets `
+            "${{ github.event.inputs.version }}"
+          }
+          $releaseTag = "v$version"
+          gh release view $releaseTag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $releaseTag @assets --clobber
+          } else {
+            gh release create $releaseTag @assets `
               --draft `
-              --verify-tag `
+              --target "$env:GITHUB_SHA" `
               --generate-notes `
-              --title "Glimpse $env:GITHUB_REF_NAME (private preview)"
+              --title "Glimpse $releaseTag (private preview)"
           }
