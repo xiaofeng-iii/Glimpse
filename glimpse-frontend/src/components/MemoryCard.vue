@@ -39,10 +39,10 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 <template>
   <article
-    class="memory-card group cursor-pointer overflow-hidden rounded-2xl border bg-[var(--shell-card)] outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-blue-500"
+    class="memory-card group cursor-pointer overflow-hidden rounded-lg border bg-[var(--shell-card)] outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
     :class="selected
-      ? 'border-blue-600 shadow-[0_10px_28px_rgba(37,99,235,.12)] ring-1 ring-blue-600'
-      : 'border-[var(--shell-line)] hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg'"
+      ? 'border-[var(--color-primary)] shadow-[0_4px_14px_rgba(59,86,201,.10)] ring-1 ring-[var(--color-primary)]'
+      : 'border-[var(--shell-line)] hover:border-[var(--color-border-strong)] hover:shadow-md'"
     tabindex="0"
     :aria-selected="selected"
     @click="emit('select', memory)"
@@ -54,31 +54,31 @@ const handleKeydown = (event: KeyboardEvent) => {
         v-if="imageUrl && !imageFailed"
         :src="imageUrl"
         :alt="memory.ai_summary"
-        class="h-full w-full object-contain transition duration-300 group-hover:scale-[1.015]"
+        class="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
         loading="lazy"
         @error="imageFailed = true"
       />
       <PhotoIcon v-else class="h-9 w-9 text-[var(--shell-muted)]" aria-hidden="true" />
       <CheckCircleIcon
         v-if="selected"
-        class="absolute left-3 top-3 h-6 w-6 rounded-full bg-white text-blue-600"
+        class="absolute left-2.5 top-2.5 h-5 w-5 rounded-full bg-white text-[var(--color-primary)]"
         aria-hidden="true"
       />
     </div>
 
-    <div class="p-4">
-      <p class="line-clamp-2 min-h-12 text-sm leading-6 text-[var(--shell-ink)]">
+    <div class="p-3.5">
+      <p class="line-clamp-2 min-h-10 text-[13px] leading-5 text-[var(--shell-ink)]">
         {{ memory.ai_summary || t('memory.noContent') }}
       </p>
-      <div class="mt-3 flex min-h-6 items-center gap-2">
+      <div class="mt-2.5 flex min-h-6 items-center gap-2">
         <template v-if="searching">
           <span
             v-for="kind in matchSourceKinds"
             :key="kind"
-            class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            class="rounded px-2 py-0.5 text-[11px] font-semibold"
             :class="kind === 'exact'
-              ? 'bg-blue-50 text-blue-700'
-              : 'bg-violet-50 text-violet-700'"
+              ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
+              : 'bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] text-[var(--color-accent-hover)]'"
           >
             {{ t(kind === 'exact' ? 'match.exact' : 'match.semantic') }}
           </span>

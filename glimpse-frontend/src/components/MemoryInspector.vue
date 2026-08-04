@@ -68,16 +68,16 @@ defineExpose({ canLeave })
 
 <template>
   <aside class="flex h-full min-h-0 w-full flex-col bg-[var(--shell-frame-bg)]">
-    <header class="flex items-start justify-between border-b border-[var(--shell-line)] px-5 py-4">
+    <header class="flex items-start justify-between border-b border-[var(--shell-line)] px-5 py-3.5">
       <div>
-        <h2 class="text-lg font-semibold text-[var(--shell-ink)]">{{ t('memory.detail') }}</h2>
-        <time class="mt-1 block text-sm text-[var(--shell-muted)]" :datetime="memory.created_at">
+        <h2 class="text-base font-semibold text-[var(--shell-ink)]">{{ t('memory.detail') }}</h2>
+        <time class="mt-0.5 block text-xs text-[var(--shell-muted)]" :datetime="memory.created_at">
           {{ formatDate(memory.created_at) }}
         </time>
       </div>
       <button
         type="button"
-        class="rounded-xl p-2 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+        class="rounded-md p-1.5 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
         :aria-label="t('action.close')"
         @click="emit('close')"
       >
@@ -85,19 +85,19 @@ defineExpose({ canLeave })
       </button>
     </header>
 
-    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
+    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
       <MediaGallery :memory="memory" compact />
 
       <div
         v-if="memoriesStore.selectedOutsideSearch"
-        class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm leading-6 text-amber-800"
       >
         {{ t('memory.savedOutsideSearch') }}
       </div>
 
       <SummaryEditor ref="summaryEditor" :memory="memory" compact />
 
-      <div class="memory-inspector__summary-actions grid grid-cols-2 gap-3">
+      <div class="memory-inspector__summary-actions grid grid-cols-2 gap-2.5">
         <button type="button" class="btn-secondary min-h-10 justify-center" @click="copySummary">
           <ClipboardDocumentIcon class="h-5 w-5 flex-none" aria-hidden="true" />
           {{ t('action.copySummary') }}
@@ -112,7 +112,7 @@ defineExpose({ canLeave })
 
       <button
         type="button"
-        class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-medium text-red-600 transition hover:bg-red-50"
+        class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md text-sm font-medium text-red-600 transition hover:bg-red-50"
         @click="deleteDialogOpen = true"
       >
         <TrashIcon class="h-5 w-5 flex-none" aria-hidden="true" />

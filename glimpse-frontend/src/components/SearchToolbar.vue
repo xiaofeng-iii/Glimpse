@@ -133,18 +133,18 @@ defineExpose({ focus, clear })
 </script>
 
 <template>
-  <section class="border-b border-[var(--shell-line)] bg-[var(--shell-frame-bg)] px-5 py-4">
-    <div class="flex flex-wrap items-center gap-3">
+  <section class="border-b border-[var(--shell-line)] bg-[var(--shell-frame-bg)] px-5 py-3">
+    <div class="flex flex-wrap items-center gap-2.5">
       <div class="relative min-w-[260px] flex-1">
         <MagnifyingGlassIcon
-          class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--shell-muted)]"
+          class="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--shell-muted)]"
           aria-hidden="true"
         />
         <input
           ref="searchInput"
           v-model="query"
           type="search"
-          class="h-12 w-full rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-12 pr-24 text-base text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+          class="h-11 w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]"
           :placeholder="t('search.placeholder')"
           @keydown.esc.stop.prevent="clear"
         />
@@ -152,20 +152,20 @@ defineExpose({ focus, clear })
           <button
             v-if="query"
             type="button"
-            class="rounded-lg p-1 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+            class="rounded-md p-1 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
             :aria-label="t('search.clear')"
             @click="clear"
           >
             <XMarkIcon class="h-4 w-4" aria-hidden="true" />
           </button>
-          <kbd class="rounded-lg border border-[var(--shell-line)] px-2 py-1 text-xs text-[var(--shell-muted)]">
+          <kbd class="rounded-md border border-[var(--shell-line)] px-1.5 py-0.5 text-xs text-[var(--shell-muted)]">
             {{ shortcutLabel }}
           </kbd>
         </div>
       </div>
 
       <div
-        class="inline-flex h-12 items-center rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-1"
+        class="inline-flex h-11 items-center rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-1"
         role="group"
         :aria-label="t('search.sourceLabel')"
       >
@@ -173,9 +173,9 @@ defineExpose({ focus, clear })
           v-for="item in sources"
           :key="item.value"
           type="button"
-          class="h-10 rounded-xl px-4 text-sm font-medium transition"
+          class="h-9 rounded-md px-3.5 text-sm font-medium transition"
           :class="source === item.value
-            ? 'bg-blue-600 text-white shadow-sm'
+            ? 'bg-[var(--color-primary)] text-white shadow-sm'
             : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
           :aria-pressed="source === item.value"
           @click="source = item.value"
@@ -184,10 +184,10 @@ defineExpose({ focus, clear })
         </button>
       </div>
 
-      <div class="toolbar-actions flex shrink-0 items-center gap-3">
+      <div class="toolbar-actions flex shrink-0 items-center gap-2.5">
         <button
           type="button"
-          class="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-control-bg)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:opacity-50"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:opacity-50"
           :aria-label="t('action.refresh')"
           :disabled="refreshing"
           @click="emit('refresh')"
@@ -201,14 +201,14 @@ defineExpose({ focus, clear })
           @toggle="handleDebugToggle"
         >
           <summary
-            class="flex h-12 cursor-pointer list-none items-center gap-1.5 rounded-2xl border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
+            class="flex h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
             :aria-label="t('search.debugTitle')"
           >
             <AdjustmentsHorizontalIcon class="h-4 w-4 flex-none" aria-hidden="true" />
             <span class="text-[10px] font-bold tracking-wide">DEV</span>
           </summary>
           <div
-            class="absolute right-0 top-[calc(100%+.65rem)] z-50 w-[min(440px,calc(100vw-2.5rem))] rounded-2xl border border-amber-200/80 bg-[var(--shell-card)] p-4 text-left shadow-2xl"
+            class="absolute right-0 top-[calc(100%+.5rem)] z-50 w-[min(440px,calc(100vw-2.5rem))] rounded-lg border border-amber-200/80 bg-[var(--shell-card)] p-4 text-left shadow-2xl"
           >
             <div class="flex items-start gap-2 text-xs text-amber-800">
               <AdjustmentsHorizontalIcon class="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
@@ -231,7 +231,7 @@ defineExpose({ focus, clear })
                   :min="field.min"
                   :max="field.max"
                   :step="field.step"
-                  class="w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 py-1.5 text-sm text-[var(--shell-ink)] outline-none focus:border-amber-400"
+                  class="w-full rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 py-1.5 text-sm text-[var(--shell-ink)] outline-none focus:border-amber-400"
                 />
               </label>
             </div>
@@ -244,13 +244,13 @@ defineExpose({ focus, clear })
 
         <button
           type="button"
-          class="capture-button inline-flex h-12 items-center gap-2 rounded-2xl bg-orange-500 px-5 font-semibold text-white shadow-lg shadow-orange-500/15 transition hover:-translate-y-0.5 hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-55"
+          class="capture-button inline-flex h-11 items-center gap-2 rounded-lg px-4 font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-55"
           :disabled="capturing || captureDisabled"
           @click="emit('capture')"
         >
           <CameraIcon class="h-5 w-5" aria-hidden="true" />
           {{ capturing ? t('action.processing') : t('action.capture') }}
-          <kbd class="capture-shortcut rounded-lg bg-white/18 px-2 py-1 text-xs">{{ captureShortcutLabel }}</kbd>
+          <kbd class="capture-shortcut rounded-md bg-white/18 px-1.5 py-0.5 text-xs">{{ captureShortcutLabel }}</kbd>
         </button>
       </div>
     </div>

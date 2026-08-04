@@ -21,7 +21,7 @@ const getTypeClass = (type: string) => {
     case 'warning':
       return 'bg-yellow-500'
     default:
-      return 'bg-violet-500'
+      return 'bg-[var(--color-primary)]'
   }
 }
 
@@ -45,7 +45,7 @@ const getIcon = (type: string) => {
       <div
         v-for="notification in notifications"
         :key="notification.id"
-        class="glass flex min-w-[280px] items-center gap-3 rounded-xl px-4 py-3 shadow-lg animate-slide-up"
+        class="glass flex min-w-[280px] items-center gap-2.5 rounded-md px-3.5 py-2.5 shadow-lg animate-slide-up"
       >
         <!-- Icon -->
         <div :class="['flex h-6 w-6 flex-none items-center justify-center rounded-full', getTypeClass(notification.type)]">

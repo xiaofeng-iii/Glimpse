@@ -267,7 +267,7 @@ onUnmounted(() => {
 
     <ClusterBar
       v-if="clusterStore.isCollecting"
-      class="mx-5 mt-4"
+      class="mx-5 mt-3"
       @submit="clusterApi.submit()"
       @cancel="clusterApi.cancel()"
     />
@@ -289,7 +289,7 @@ onUnmounted(() => {
       <Transition name="inspector">
         <div
           v-if="selectedMemory"
-          class="inspector-panel z-30 border-l border-[var(--shell-line)] shadow-[-18px_0_40px_rgba(15,23,42,.08)]"
+          class="inspector-panel z-30 border-l border-[var(--shell-line)] shadow-[-12px_0_28px_rgba(15,23,42,.06)]"
         >
           <MemoryInspector
             ref="memoryInspector"

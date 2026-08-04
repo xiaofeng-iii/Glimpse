@@ -21,12 +21,12 @@ const countdownText = computed(() => {
 </script>
 
 <template>
-  <div class="card mb-6 border-violet-200 bg-violet-50 p-4">
+  <div class="card mb-4 border-[color-mix(in_srgb,var(--color-primary)_22%,transparent)] bg-[var(--color-primary-soft)] p-3.5">
     <div class="flex items-center justify-between">
       <!-- Status -->
-      <div class="flex items-center gap-3">
-        <div class="w-3 h-3 rounded-full bg-violet-500 animate-pulse-soft"></div>
-        <span class="text-violet-700 font-medium">
+      <div class="flex items-center gap-2.5">
+        <div class="w-2.5 h-2.5 rounded-full bg-[var(--color-primary)] animate-pulse-soft"></div>
+        <span class="text-sm font-medium text-[var(--color-primary-hover)]">
           {{ t('cluster.progress', { progress: progressText, countdown: countdownText }) }}
         </span>
       </div>
@@ -35,13 +35,13 @@ const countdownText = computed(() => {
       <div class="flex gap-2">
         <button
           @click="$emit('submit')"
-          class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-transform hover:scale-105"
+          class="rounded-md bg-[var(--color-primary)] px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-hover)]"
         >
           {{ t('cluster.submit') }}
         </button>
         <button
           @click="$emit('cancel')"
-          class="px-4 py-2 rounded-lg bg-white text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors"
+          class="px-3.5 py-1.5 rounded-md bg-white text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors"
         >
           {{ t('action.cancel') }}
         </button>
@@ -49,10 +49,10 @@ const countdownText = computed(() => {
     </div>
 
     <!-- Progress Bar -->
-    <div class="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
+    <div class="mt-2.5 h-1.5 bg-gray-200 rounded-full overflow-hidden">
       <div
         :style="{ width: `${(clusterStore.count / clusterStore.maxCount) * 100}%` }"
-        class="h-full bg-violet-500 transition-all duration-300"
+        class="h-full bg-[var(--color-primary)] transition-all duration-300"
       ></div>
     </div>
   </div>

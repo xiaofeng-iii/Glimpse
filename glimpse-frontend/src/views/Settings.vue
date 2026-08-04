@@ -396,14 +396,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="h-full min-h-0 overflow-y-auto bg-[var(--shell-window-bg)] p-5 sm:p-7">
+  <main class="h-full min-h-0 overflow-y-auto bg-[var(--shell-window-bg)] p-5 sm:p-6">
     <div class="mx-auto max-w-[1420px]">
-      <header class="mb-6">
-        <h1 class="text-2xl font-semibold text-[var(--shell-ink)]">{{ t('settings.title') }}</h1>
+      <header class="mb-5">
+        <h1 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('settings.title') }}</h1>
       </header>
 
       <div v-if="loading" class="flex min-h-[65vh] items-center justify-center">
-        <ArrowPathIcon class="h-8 w-8 animate-spin text-blue-600" :aria-label="t('settings.loading')" />
+        <ArrowPathIcon class="h-8 w-8 animate-spin text-[var(--color-primary)]" :aria-label="t('settings.loading')" />
       </div>
 
       <div v-else class="settings-layout">
@@ -412,25 +412,25 @@ onUnmounted(() => {
             v-for="section in sections"
             :key="section.id"
             type="button"
-            class="flex min-h-14 w-full items-center gap-3 rounded-2xl px-4 text-left text-sm font-medium transition"
+            class="flex min-h-12 w-full items-center gap-3 rounded-lg px-3.5 text-left text-sm font-medium transition"
             :class="activeSection === section.id
-              ? 'bg-blue-50 text-blue-700'
+              ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
               : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
             :aria-current="activeSection === section.id ? 'page' : undefined"
             @click="activeSection = section.id"
           >
-            <component :is="section.icon" class="h-6 w-6 flex-none" aria-hidden="true" />
+            <component :is="section.icon" class="h-5 w-5 flex-none" aria-hidden="true" />
             {{ t(section.labelKey) }}
           </button>
         </nav>
 
         <section class="settings-content">
-          <div class="border-b border-[var(--shell-line)] px-6 py-6 sm:px-8">
-            <h2 class="text-2xl font-semibold text-[var(--shell-ink)]">{{ t(currentSection.labelKey) }}</h2>
-            <p class="mt-2 text-sm leading-6 text-[var(--shell-muted)]">{{ t(currentSection.descriptionKey) }}</p>
+          <div class="border-b border-[var(--shell-line)] px-6 py-5 sm:px-7">
+            <h2 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t(currentSection.labelKey) }}</h2>
+            <p class="mt-1.5 text-sm leading-6 text-[var(--shell-muted)]">{{ t(currentSection.descriptionKey) }}</p>
           </div>
 
-          <div class="min-h-[500px] space-y-6 px-6 py-6 sm:px-8">
+          <div class="min-h-[500px] space-y-5 px-6 py-5 sm:px-7">
             <template v-if="activeSection === 'hotkeys'">
               <div class="setting-row">
                 <div>
@@ -439,8 +439,8 @@ onUnmounted(() => {
                 </div>
                 <button
                   type="button"
-                  class="setting-input flex min-h-12 items-center justify-between text-left"
-                  :class="{ 'border-blue-500 ring-2 ring-blue-500/15': recordingHotkey }"
+                  class="setting-input flex min-h-11 items-center justify-between text-left"
+                  :class="{ 'border-[var(--color-primary)] ring-2 ring-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]': recordingHotkey }"
                   @click="recordingHotkey = true"
                   @keydown="recordHotkey"
                 >
@@ -471,15 +471,15 @@ onUnmounted(() => {
                 <input v-model.number="clusterThreshold" class="setting-input" type="number" min="1" max="20" />
               </label>
 
-              <div class="rounded-2xl border border-[var(--shell-line)] p-5">
+              <div class="rounded-lg border border-[var(--shell-line)] p-4">
                 <label class="flex cursor-pointer items-center justify-between gap-4">
                   <span>
                     <span class="setting-label">{{ t('settings.enableCluster') }}</span>
                     <span class="setting-help">{{ t('settings.clusterScreenshotHint') }}</span>
                   </span>
-                  <input v-model="clusterMode" type="checkbox" class="h-5 w-5 accent-blue-600" />
+                  <input v-model="clusterMode" type="checkbox" class="h-5 w-5 accent-[var(--color-primary)]" />
                 </label>
-                <div class="mt-5 grid gap-4 sm:grid-cols-3" :class="{ 'opacity-50': !clusterMode }">
+                <div class="mt-4 grid gap-3.5 sm:grid-cols-3" :class="{ 'opacity-50': !clusterMode }">
                   <label>
                     <span class="setting-label">{{ t('settings.maxImages') }}</span>
                     <input v-model.number="clusterMaxImages" class="setting-input mt-2" type="number" min="2" max="20" :disabled="!clusterMode" />
@@ -489,7 +489,7 @@ onUnmounted(() => {
                     <input v-model.number="clusterTimeout" class="setting-input mt-2" type="number" min="1" max="120" :disabled="!clusterMode" />
                   </label>
                   <label class="flex items-center gap-3 pt-8">
-                    <input v-model="clusterAutoSubmit" type="checkbox" class="h-5 w-5 accent-blue-600" :disabled="!clusterMode" />
+                    <input v-model="clusterAutoSubmit" type="checkbox" class="h-5 w-5 accent-[var(--color-primary)]" :disabled="!clusterMode" />
                     <span class="setting-label">{{ t('settings.autoSubmit') }}</span>
                   </label>
                 </div>
@@ -512,7 +512,7 @@ onUnmounted(() => {
                   />
                   <button
                     type="button"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--shell-muted)] hover:bg-[var(--shell-control-hover)]"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[var(--shell-muted)] hover:bg-[var(--shell-control-hover)]"
                     :aria-label="showApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')"
                     @click="showApiKey = !showApiKey"
                   >
@@ -544,7 +544,7 @@ onUnmounted(() => {
                 <input v-model.number="aiTimeout" class="setting-input" type="number" min="1" max="600" />
               </label>
 
-              <div class="flex flex-wrap items-center gap-4">
+              <div class="flex flex-wrap items-center gap-3">
                 <button type="button" class="btn-secondary min-h-10" :disabled="testingAi" @click="testAi">
                   <ArrowPathIcon v-if="testingAi" class="h-5 w-5 flex-none animate-spin" aria-hidden="true" />
                   <ServerStackIcon v-else class="h-5 w-5 flex-none" aria-hidden="true" />
@@ -560,16 +560,16 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <div class="rounded-2xl border border-blue-200 bg-blue-50/70 p-5">
-                <div class="flex items-center gap-2 text-sm font-semibold text-blue-800">
+              <div class="rounded-lg border border-[color-mix(in_srgb,var(--color-primary)_20%,transparent)] bg-[var(--color-primary-soft)] p-4">
+                <div class="flex items-center gap-2 text-sm font-semibold text-[var(--color-primary-hover)]">
                   <CpuChipIcon class="h-5 w-5 flex-none" aria-hidden="true" />
                   {{ t('settings.localOcr') }}
                 </div>
-                <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                  <div><dt class="text-blue-700/70">{{ t('settings.ocrModel') }}</dt><dd class="mt-1 font-medium text-blue-950">PP-OCRv6-small</dd></div>
-                  <div><dt class="text-blue-700/70">{{ t('settings.ocrFramework') }}</dt><dd class="mt-1 font-medium text-blue-950">RapidOCR 3.9.2</dd></div>
-                  <div><dt class="text-blue-700/70">{{ t('settings.ocrRuntime') }}</dt><dd class="mt-1 font-medium text-blue-950">ONNX Runtime CPU</dd></div>
-                  <div><dt class="text-blue-700/70">{{ t('settings.dataPrivacy') }}</dt><dd class="mt-1 font-medium text-blue-950">{{ t('settings.localNoUpload') }}</dd></div>
+                <dl class="mt-3 grid gap-2.5 text-sm sm:grid-cols-2">
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrModel') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">PP-OCRv6-small</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrFramework') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">RapidOCR 3.9.2</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrRuntime') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">ONNX Runtime CPU</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.dataPrivacy') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">{{ t('settings.localNoUpload') }}</dd></div>
                 </dl>
               </div>
             </template>
@@ -585,8 +585,8 @@ onUnmounted(() => {
                       { value: 'system', label: t('settings.themeSystem') },
                     ]"
                     :key="option.value"
-                    class="cursor-pointer rounded-2xl border p-4 text-center text-sm font-medium transition"
-                    :class="themePreference === option.value ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-[var(--shell-line)]'"
+                    class="cursor-pointer rounded-lg border p-3.5 text-center text-sm font-medium transition"
+                    :class="themePreference === option.value ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]' : 'border-[var(--shell-line)]'"
                   >
                     <input v-model="themePreference" class="sr-only" type="radio" :value="option.value" />
                     {{ option.label }}
@@ -613,11 +613,11 @@ onUnmounted(() => {
             <template v-else>
               <div class="maintenance-card">
                 <div class="flex items-start gap-4">
-                  <CircleStackIcon class="mt-1 h-6 w-6 flex-none text-blue-600" aria-hidden="true" />
+                  <CircleStackIcon class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.semanticIndex') }}</h3>
                     <p class="setting-help">{{ t('settings.semanticIndexHint') }}</p>
-                    <p v-if="indexStatus?.running" class="mt-3 text-sm text-blue-600">{{ t('settings.indexRepairRunning') }}</p>
+                    <p v-if="indexStatus?.running" class="mt-3 text-sm text-[var(--color-primary)]">{{ t('settings.indexRepairRunning') }}</p>
                     <p v-else-if="indexStatus?.result" class="mt-3 text-sm text-[var(--shell-muted)]">
                       {{ t('settings.indexRepairLastResult', {
                         processed: indexStatus.result.processed,
@@ -646,11 +646,11 @@ onUnmounted(() => {
 
               <div class="maintenance-card">
                 <div class="flex items-start gap-4">
-                  <CpuChipIcon class="mt-1 h-6 w-6 flex-none text-violet-600" aria-hidden="true" />
+                  <CpuChipIcon class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.ocrBackfill') }}</h3>
                     <p class="setting-help">{{ t('settings.ocrBackfillHint') }}</p>
-                    <p v-if="ocrStatus?.running" class="mt-3 text-sm text-violet-600">
+                    <p v-if="ocrStatus?.running" class="mt-3 text-sm text-[var(--color-primary)]">
                       {{ t('settings.ocrBackfillRunning', {
                         processed: ocrStatus.result?.processed ?? 0,
                         total: ocrStatus.result?.total ?? 0,
@@ -679,13 +679,13 @@ onUnmounted(() => {
             </template>
           </div>
 
-          <footer class="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--shell-line)] px-6 py-5 sm:px-8">
-            <button type="button" class="min-h-10 rounded-xl px-3 text-sm font-medium text-red-600 hover:bg-red-50" @click="openConfirmation('reset')">
+          <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--shell-line)] px-6 py-4 sm:px-7">
+            <button type="button" class="min-h-10 rounded-md px-3 text-sm font-medium text-red-600 hover:bg-red-50" @click="openConfirmation('reset')">
               {{ t('action.reset') }}
             </button>
-            <div class="flex gap-3">
-              <button type="button" class="btn-secondary min-h-10 px-5" @click="router.push('/')">{{ t('action.cancel') }}</button>
-              <button type="button" class="btn-primary min-h-10 px-5" :disabled="saving || !dirty" @click="handleSave">
+            <div class="flex gap-2.5">
+              <button type="button" class="btn-secondary min-h-10 px-4" @click="router.push('/')">{{ t('action.cancel') }}</button>
+              <button type="button" class="btn-primary min-h-10 px-4" :disabled="saving || !dirty" @click="handleSave">
                 <ArrowPathIcon v-if="saving" class="h-5 w-5 flex-none animate-spin" aria-hidden="true" />
                 {{ saving ? t('settings.saving') : t('settings.saveChanges') }}
               </button>
@@ -725,7 +725,7 @@ onUnmounted(() => {
 .settings-layout {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
-  gap: 1.75rem;
+  gap: 1.25rem;
 }
 
 .settings-nav,
@@ -739,22 +739,22 @@ onUnmounted(() => {
   align-self: start;
   display: flex;
   flex-direction: column;
-  gap: .5rem;
-  border-radius: 24px;
-  padding: 1rem;
+  gap: .375rem;
+  border-radius: var(--radius-xl);
+  padding: .75rem;
 }
 
 .settings-content {
   min-width: 0;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: var(--radius-xl);
 }
 
 .setting-row {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(260px, 1fr);
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .setting-label {
@@ -775,19 +775,19 @@ onUnmounted(() => {
 .setting-input,
 .setting-readonly {
   width: 100%;
-  min-height: 2.875rem;
+  min-height: 2.625rem;
   border: 1px solid var(--shell-line);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--shell-control-bg);
-  padding: .65rem .9rem;
+  padding: .55rem .85rem;
   color: var(--shell-ink);
   outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .setting-input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, .13);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
 }
 
 .setting-readonly {
@@ -797,8 +797,8 @@ onUnmounted(() => {
 
 .maintenance-card {
   border: 1px solid var(--shell-line);
-  border-radius: 20px;
-  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  padding: 1rem;
 }
 
 @media (max-width: 900px) {

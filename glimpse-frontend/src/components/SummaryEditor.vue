@@ -159,12 +159,12 @@ defineExpose({
 
 <template>
   <section class="summary-editor" :aria-label="t('memory.summary')">
-    <div class="mb-3 flex min-h-10 items-center justify-between gap-3">
-      <h3 class="flex-none text-base font-semibold text-[var(--shell-ink)]">{{ t('memory.summary') }}</h3>
+    <div class="mb-2.5 flex min-h-10 items-center justify-between gap-3">
+      <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ t('memory.summary') }}</h3>
       <button
         v-if="!editing"
         type="button"
-        class="summary-editor__edit-action inline-flex h-10 w-28 flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-[var(--shell-line)] px-2 text-[13px] font-medium leading-none text-blue-600 transition hover:bg-blue-50"
+        class="summary-editor__edit-action inline-flex h-10 w-28 flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--shell-line)] px-2 text-[13px] font-medium leading-none text-[var(--color-primary)] transition hover:bg-[var(--color-primary-soft)]"
         @click="startEditing"
       >
         <PencilSquareIcon class="h-5 w-5 flex-none" aria-hidden="true" />
@@ -173,7 +173,7 @@ defineExpose({
       <div v-else class="summary-editor__edit-actions flex flex-none items-center gap-2">
         <button
           type="button"
-          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center whitespace-nowrap rounded-xl border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 text-[13px] font-medium leading-none text-blue-600 transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center whitespace-nowrap rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 text-[13px] font-medium leading-none text-[var(--color-primary)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="saving"
           @click="cancelEditing"
         >
@@ -181,7 +181,7 @@ defineExpose({
         </button>
         <button
           type="button"
-          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-blue-600 bg-blue-600 px-2 text-[13px] font-medium leading-none text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)] px-2 text-[13px] font-medium leading-none text-white transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!canSave"
           @click="save"
         >
@@ -207,11 +207,11 @@ defineExpose({
       />
       <div
         aria-hidden="true"
-        class="pointer-events-none absolute -inset-2 z-0 rounded-2xl border transition-[border-color,background-color,box-shadow]"
+        class="pointer-events-none absolute -inset-2 z-0 rounded-lg border transition-[border-color,background-color,box-shadow]"
         :class="editing
           ? validationMessage
             ? 'border-red-400 bg-[var(--shell-control-bg)]'
-            : 'border-[var(--shell-line)] bg-[var(--shell-control-bg)] peer-focus:border-blue-500 peer-focus:ring-2 peer-focus:ring-blue-500/15'
+            : 'border-[var(--shell-line)] bg-[var(--shell-control-bg)] peer-focus:border-[var(--color-primary)] peer-focus:ring-2 peer-focus:ring-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]'
           : 'border-transparent bg-transparent'"
       />
 
@@ -233,7 +233,7 @@ defineExpose({
       <textarea
         v-if="editing"
         v-model="draft"
-        class="min-h-32 w-full resize-y rounded-2xl border bg-[var(--shell-control-bg)] px-4 py-3 text-sm leading-6 text-[var(--shell-ink)] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+        class="min-h-32 w-full resize-y rounded-lg border bg-[var(--shell-control-bg)] px-3.5 py-2.5 text-sm leading-6 text-[var(--shell-ink)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]"
         :class="validationMessage ? 'border-red-400' : 'border-[var(--shell-line)]'"
         :aria-invalid="Boolean(validationMessage)"
         aria-describedby="summary-editor-feedback summary-editor-shortcut"

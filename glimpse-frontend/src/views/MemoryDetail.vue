@@ -96,11 +96,11 @@ const confirmDelete = async () => {
 </script>
 
 <template>
-  <main class="h-full min-h-0 overflow-y-auto bg-[var(--shell-window-bg)] px-5 py-5 sm:px-7">
+  <main class="h-full min-h-0 overflow-y-auto bg-[var(--shell-window-bg)] px-5 py-4 sm:px-6">
     <div class="mx-auto max-w-[1440px]">
-      <header class="mb-5 flex flex-wrap items-center justify-between gap-4">
+      <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h1 class="text-xl font-semibold text-[var(--shell-ink)]">{{ t('memory.detail') }}</h1>
+          <h1 class="text-lg font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('memory.detail') }}</h1>
           <time v-if="memory" class="text-sm text-[var(--shell-muted)]" :datetime="memory.created_at">
             {{ formatDate(memory.created_at) }}
           </time>
@@ -109,7 +109,7 @@ const confirmDelete = async () => {
         <button
           v-if="memory"
           type="button"
-          class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-medium text-red-600 transition hover:bg-red-50"
+          class="inline-flex min-h-10 items-center gap-2 rounded-md border border-red-200 px-3.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
           @click="deleteDialogOpen = true"
         >
           <TrashIcon class="h-5 w-5 flex-none" aria-hidden="true" />
@@ -118,7 +118,7 @@ const confirmDelete = async () => {
       </header>
 
       <div v-if="loading" class="flex min-h-[65vh] items-center justify-center">
-        <ArrowPathIcon class="h-8 w-8 animate-spin text-blue-600" :aria-label="t('memory.loading')" />
+        <ArrowPathIcon class="h-8 w-8 animate-spin text-[var(--color-primary)]" :aria-label="t('memory.loading')" />
       </div>
 
       <div
@@ -127,7 +127,7 @@ const confirmDelete = async () => {
       >
         <h2 class="text-lg font-semibold text-[var(--shell-ink)]">{{ t('memory.missing') }}</h2>
         <p class="mt-2 text-sm text-[var(--shell-muted)]">{{ t('memory.loadFailedHint') }}</p>
-        <button type="button" class="btn-primary mt-5 min-h-10" @click="loadMemory">
+        <button type="button" class="btn-primary mt-4 min-h-10" @click="loadMemory">
           <ArrowPathIcon class="h-5 w-5 flex-none" aria-hidden="true" />
           {{ t('action.retry') }}
         </button>
@@ -138,7 +138,7 @@ const confirmDelete = async () => {
           <MediaGallery :memory="memory" />
         </section>
 
-        <section class="min-w-0 space-y-6">
+        <section class="min-w-0 space-y-5">
           <SummaryEditor ref="summaryEditor" :memory="memory" />
 
           <button type="button" class="btn-secondary min-h-10" @click="copySummary">
@@ -146,7 +146,7 @@ const confirmDelete = async () => {
             {{ t('action.copySummary') }}
           </button>
 
-          <div class="border-t border-[var(--shell-line)] pt-6">
+          <div class="border-t border-[var(--shell-line)] pt-5">
             <OcrText :text="memory.text_content" />
           </div>
 
@@ -176,7 +176,7 @@ const confirmDelete = async () => {
 .detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 @media (max-width: 960px) {

@@ -22,13 +22,13 @@ const copyText = async () => {
 </script>
 
 <template>
-  <section class="ocr-text rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-4">
-    <div class="mb-3 flex items-center justify-between gap-3">
-      <h3 class="text-base font-semibold text-[var(--shell-ink)]">{{ t('memory.text') }}</h3>
+  <section class="ocr-text rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-3.5">
+    <div class="mb-2.5 flex items-center justify-between gap-3">
+      <h3 class="text-sm font-semibold text-[var(--shell-ink)]">{{ t('memory.text') }}</h3>
       <button
         v-if="text"
         type="button"
-        class="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+        class="inline-flex min-h-9 items-center gap-2 rounded-md px-2.5 text-sm text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
         @click="copyText"
       >
         <CheckIcon v-if="copied" class="h-4 w-4 flex-none text-emerald-600" aria-hidden="true" />

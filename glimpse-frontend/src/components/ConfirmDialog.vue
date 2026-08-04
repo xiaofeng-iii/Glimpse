@@ -114,7 +114,7 @@ onBeforeUnmount(() => {
     >
       <section
         ref="dialogPanel"
-        class="w-full max-w-md rounded-[24px] border border-[var(--shell-line)] bg-[var(--shell-frame-bg)] p-6 shadow-2xl"
+        class="w-full max-w-md rounded-xl border border-[var(--shell-line)] bg-[var(--shell-frame-bg)] p-5 shadow-2xl"
         role="alertdialog"
         aria-modal="true"
         :aria-busy="busy"
@@ -122,27 +122,27 @@ onBeforeUnmount(() => {
         :aria-describedby="`${$attrs.id ?? 'confirm'}-description`"
         tabindex="-1"
       >
-        <div class="flex items-start gap-4">
+        <div class="flex items-start gap-3.5">
           <div
-            class="flex h-11 w-11 flex-none items-center justify-center rounded-2xl"
+            class="flex h-10 w-10 flex-none items-center justify-center rounded-lg"
             :class="destructive ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'"
           >
-            <ExclamationTriangleIcon class="h-6 w-6" aria-hidden="true" />
+            <ExclamationTriangleIcon class="h-5 w-5" aria-hidden="true" />
           </div>
           <div class="min-w-0 flex-1">
-            <h2 :id="`${$attrs.id ?? 'confirm'}-title`" class="text-lg font-semibold text-[var(--shell-ink)]">
+            <h2 :id="`${$attrs.id ?? 'confirm'}-title`" class="text-base font-semibold text-[var(--shell-ink)]">
               {{ title }}
             </h2>
             <p
               :id="`${$attrs.id ?? 'confirm'}-description`"
-              class="mt-2 text-sm leading-6 text-[var(--shell-muted)]"
+              class="mt-1.5 text-sm leading-6 text-[var(--shell-muted)]"
             >
               {{ description }}
             </p>
           </div>
           <button
             type="button"
-            class="rounded-xl p-2 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+            class="rounded-md p-1.5 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
             :aria-label="cancelLabel"
             :disabled="busy"
             @click="cancel"
@@ -151,14 +151,14 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div class="mt-6 flex justify-end gap-3">
-          <button ref="cancelButton" type="button" class="btn-secondary min-h-10 px-5" :disabled="busy" @click="cancel">
+        <div class="mt-5 flex justify-end gap-2.5">
+          <button ref="cancelButton" type="button" class="btn-secondary min-h-10 px-4" :disabled="busy" @click="cancel">
             {{ cancelLabel }}
           </button>
           <button
             type="button"
-            class="min-h-10 rounded-xl px-5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
-            :class="destructive ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'"
+            class="min-h-10 rounded-md px-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+            :class="destructive ? 'bg-red-600 hover:bg-red-700' : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]'"
             :disabled="busy"
             @click="emit('confirm')"
           >

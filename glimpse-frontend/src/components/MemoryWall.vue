@@ -68,9 +68,9 @@ const groups = computed<MemoryGroup[]>(() => {
 </script>
 
 <template>
-  <section class="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5" aria-live="polite">
-    <div class="mb-4">
-      <h1 class="text-lg font-semibold text-[var(--shell-ink)]">
+  <section class="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4" aria-live="polite">
+    <div class="mb-3">
+      <h1 class="text-base font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">
         {{
           searching
             ? t('memory.searchCount', { count: memories.length })
@@ -84,25 +84,25 @@ const groups = computed<MemoryGroup[]>(() => {
     </div>
 
     <div v-else-if="!memories.length" class="flex min-h-[52vh] flex-col items-center justify-center text-center">
-      <div class="flex h-16 w-16 items-center justify-center rounded-3xl bg-blue-50 text-blue-600">
-        <MagnifyingGlassIcon v-if="searching" class="h-8 w-8" aria-hidden="true" />
-        <CameraIcon v-else class="h-8 w-8" aria-hidden="true" />
+      <div class="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
+        <MagnifyingGlassIcon v-if="searching" class="h-7 w-7" aria-hidden="true" />
+        <CameraIcon v-else class="h-7 w-7" aria-hidden="true" />
       </div>
-      <h2 class="mt-5 text-lg font-semibold text-[var(--shell-ink)]">
+      <h2 class="mt-4 text-base font-semibold text-[var(--shell-ink)]">
         {{ searching ? t('memory.noSearchResults') : t('memory.emptyTitle') }}
       </h2>
-      <p class="mt-2 max-w-sm text-sm leading-6 text-[var(--shell-muted)]">
+      <p class="mt-1.5 max-w-sm text-sm leading-6 text-[var(--shell-muted)]">
         {{ searching ? t('memory.noSearchResultsHint') : t('memory.emptyHint') }}
       </p>
-      <button v-if="!searching" type="button" class="btn-primary mt-5 min-h-10" @click="emit('capture')">
+      <button v-if="!searching" type="button" class="btn-primary mt-4 min-h-10" @click="emit('capture')">
         <CameraIcon class="h-5 w-5" aria-hidden="true" />
         {{ t('action.capture') }}
       </button>
     </div>
 
-    <div v-else class="space-y-6">
+    <div v-else class="space-y-5">
       <section v-for="group in groups" :key="group.key">
-        <h2 v-if="group.label" class="mb-3 text-sm font-medium text-[var(--shell-muted)]">
+        <h2 v-if="group.label" class="mb-2.5 text-xs font-semibold tracking-wide text-[var(--shell-muted)]">
           {{ group.label }}
         </h2>
         <div
@@ -129,7 +129,7 @@ const groups = computed<MemoryGroup[]>(() => {
 .memory-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 @media (min-width: 1180px) {

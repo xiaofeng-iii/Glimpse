@@ -46,7 +46,7 @@ const markImageError = (url: string) => {
 <template>
   <section>
     <div
-      class="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl border border-[var(--shell-line)] bg-slate-100/70 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500"
+      class="group relative flex w-full items-center justify-center overflow-hidden rounded-lg border border-[var(--shell-line)] bg-slate-100/70 outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
       :class="compact ? 'h-64' : 'h-[min(54vh,560px)] min-h-80'"
       role="button"
       tabindex="0"
@@ -68,7 +68,7 @@ const markImageError = (url: string) => {
       </div>
       <span
         v-if="activeImage"
-        class="pointer-events-none absolute bottom-3 rounded-full bg-slate-950/55 px-3 py-1.5 text-xs text-white opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-visible:opacity-100"
+        class="pointer-events-none absolute bottom-3 rounded-md bg-slate-950/55 px-2.5 py-1 text-xs text-white opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-visible:opacity-100"
       >
         {{ t('preview.hint') }}
       </span>
@@ -78,7 +78,7 @@ const markImageError = (url: string) => {
       {{ t('preview.hint') }}
     </p>
 
-    <div v-if="images.length > 1" class="mt-3 flex items-center gap-3">
+    <div v-if="images.length > 1" class="mt-2.5 flex items-center gap-2.5">
       <span class="w-11 flex-none text-sm tabular-nums text-[var(--shell-muted)]">
         {{ activeIndex + 1 }} / {{ images.length }}
       </span>
@@ -87,8 +87,8 @@ const markImageError = (url: string) => {
           v-for="(image, index) in images"
           :key="`${image}-${index}`"
           type="button"
-          class="media-gallery__thumbnail flex h-14 w-[4.5rem] flex-none items-center justify-center overflow-hidden rounded-xl border bg-slate-100/70 p-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-          :class="activeIndex === index ? 'border-blue-600 ring-1 ring-inset ring-blue-600' : 'border-[var(--shell-line)]'"
+          class="media-gallery__thumbnail flex h-14 w-[4.5rem] flex-none items-center justify-center overflow-hidden rounded-md border bg-slate-100/70 p-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+          :class="activeIndex === index ? 'border-[var(--color-primary)] ring-1 ring-inset ring-[var(--color-primary)]' : 'border-[var(--shell-line)]'"
           :aria-label="t('preview.thumbnail', { index: index + 1 })"
           @click="activeIndex = index"
         >
