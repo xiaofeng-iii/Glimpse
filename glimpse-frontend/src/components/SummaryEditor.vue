@@ -33,9 +33,43 @@ const saving = ref(false)
 const errorMessage = ref('')
 const discardDialogOpen = ref(false)
 const compactEditor = ref<HTMLTextAreaElement | null>(null)
+const compactFrame = ref<HTMLElement | null>(null)
+const compactHeight = ref(80)
+const compactOverflowing = ref(false)
 let discardResolver: ((confirmed: boolean) => void) | null = null
 let pendingDiscardPromise: Promise<boolean> | null = null
 let unregisterGuard: (() => boolean) | null = null
+let compactResizeObserver: ResizeObserver | null = null
+
+const COMPACT_MIN_HEIGHT = 80
+const COMPACT_MAX_HEIGHT = 256
+
+const compactHeightLimit = () => {
+  const viewportHeight = typeof window === 'undefined' ? 720 : window.innerHeight
+  return Math.max(160, Math.min(COMPACT_MAX_HEIGHT, Math.floor(viewportHeight * 0.36)))
+}
+
+const resizeCompactEditor = () => {
+  if (!props.compact) return
+  const editor = compactEditor.value
+  if (!editor) return
+
+  editor.style.height = 'auto'
+  const naturalHeight = Math.ceil(editor.scrollHeight)
+  const maximumHeight = compactHeightLimit()
+  compactHeight.value = Math.min(maximumHeight, Math.max(COMPACT_MIN_HEIGHT, naturalHeight))
+  compactOverflowing.value = naturalHeight > maximumHeight
+  editor.style.height = '100%'
+}
+
+const scheduleCompactEditorResize = async () => {
+  await nextTick()
+  resizeCompactEditor()
+}
+
+const handleViewportResize = () => {
+  void scheduleCompactEditorResize()
+}
 
 const normalizedDraft = computed(() => draft.value.trim())
 const dirty = computed(() => normalizedDraft.value !== props.memory.ai_summary.trim())
@@ -64,6 +98,12 @@ watch(
   },
 )
 
+watch(
+  [draft, () => props.memory.ai_summary, editing],
+  () => void scheduleCompactEditorResize(),
+  { flush: 'post' },
+)
+
 const startEditing = async () => {
   draft.value = props.memory.ai_summary
   errorMessage.value = ''
@@ -71,6 +111,8 @@ const startEditing = async () => {
   await nextTick()
   const editor = compactEditor.value
   if (!editor) return
+
+  resizeCompactEditor()
 
   const scrollTop = editor.scrollTop
   const scrollLeft = editor.scrollLeft
@@ -144,11 +186,27 @@ const canLeave = async () => {
 
 onMounted(() => {
   unregisterGuard = unsavedChanges.register(canLeave)
+  void scheduleCompactEditorResize()
+
+  if (typeof ResizeObserver !== 'undefined' && compactFrame.value) {
+    let previousWidth = compactFrame.value.getBoundingClientRect().width
+    compactResizeObserver = new ResizeObserver(([entry]) => {
+      const nextWidth = entry?.contentRect.width ?? 0
+      if (Math.abs(nextWidth - previousWidth) < 0.5) return
+      previousWidth = nextWidth
+      void scheduleCompactEditorResize()
+    })
+    compactResizeObserver.observe(compactFrame.value)
+  }
+
+  window.addEventListener('resize', handleViewportResize)
 })
 
 onBeforeUnmount(() => {
   unregisterGuard?.()
   discardResolver?.(false)
+  compactResizeObserver?.disconnect()
+  window.removeEventListener('resize', handleViewportResize)
 })
 
 defineExpose({
@@ -159,21 +217,21 @@ defineExpose({
 
 <template>
   <section class="summary-editor" :aria-label="t('memory.summary')">
-    <div class="mb-2.5 flex min-h-10 items-center justify-between gap-3">
+    <div class="summary-editor__header mb-2.5 flex min-h-10 items-center justify-between gap-3">
       <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ t('memory.summary') }}</h3>
       <button
         v-if="!editing"
         type="button"
-        class="summary-editor__edit-action inline-flex h-10 w-28 flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--shell-line)] px-2 text-[13px] font-medium leading-none text-[var(--color-primary)] transition hover:bg-[var(--color-primary-soft)]"
+        class="summary-editor__edit-action inline-flex h-10 w-28 flex-none items-center justify-center gap-0.5 whitespace-nowrap rounded-md border border-[var(--shell-line)] px-1 text-sm font-semibold leading-5 text-[var(--color-primary)] transition hover:bg-[var(--color-primary-soft)]"
         @click="startEditing"
       >
-        <PencilSquareIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+        <PencilSquareIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
         {{ t('summary.edit') }}
       </button>
       <div v-else class="summary-editor__edit-actions flex flex-none items-center gap-2">
         <button
           type="button"
-          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center whitespace-nowrap rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 text-[13px] font-medium leading-none text-[var(--color-primary)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center whitespace-nowrap rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 text-sm font-semibold leading-5 text-[var(--color-primary)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="saving"
           @click="cancelEditing"
         >
@@ -181,7 +239,7 @@ defineExpose({
         </button>
         <button
           type="button"
-          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)] px-2 text-[13px] font-medium leading-none text-white transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)] px-2 text-sm font-semibold leading-5 text-white transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!canSave"
           @click="save"
         >
@@ -191,13 +249,26 @@ defineExpose({
       </div>
     </div>
 
-    <div v-if="compact" class="relative isolate h-20">
+    <div
+      v-if="compact"
+      ref="compactFrame"
+      class="summary-editor__compact-frame relative isolate min-h-20 overflow-hidden rounded-lg border transition-[border-color,background-color,box-shadow]"
+      :class="editing
+        ? validationMessage
+          ? 'border-red-400 bg-[var(--shell-control-bg)]'
+          : 'summary-editor__compact-frame--editing border-[var(--shell-line)] bg-[var(--shell-control-bg)]'
+        : compactOverflowing
+          ? 'summary-editor__compact-frame--scrollable border-transparent bg-transparent'
+          : 'border-transparent bg-transparent'"
+      :style="{ height: `${compactHeight}px` }"
+    >
       <textarea
         ref="compactEditor"
         v-model="draft"
-        class="peer relative z-10 block h-full w-full resize-none overflow-y-auto border-0 bg-transparent p-0 pb-5 text-sm leading-7 text-[var(--shell-ink)] outline-none"
+        class="summary-editor__compact-control relative z-10 block h-full w-full resize-none border-0 bg-transparent px-3 py-2 pb-7 text-sm leading-7 text-[var(--shell-ink)] outline-none"
+        :class="compactOverflowing ? 'overflow-y-auto' : 'overflow-y-hidden'"
         :readonly="!editing"
-        :tabindex="editing ? 0 : -1"
+        :tabindex="editing || compactOverflowing ? 0 : -1"
         :aria-label="t('memory.summary')"
         :aria-readonly="!editing"
         :aria-invalid="editing && Boolean(validationMessage)"
@@ -205,20 +276,11 @@ defineExpose({
         maxlength="4001"
         @keydown="handleEditorKeydown"
       />
-      <div
-        aria-hidden="true"
-        class="pointer-events-none absolute -inset-2 z-0 rounded-lg border transition-[border-color,background-color,box-shadow]"
-        :class="editing
-          ? validationMessage
-            ? 'border-red-400 bg-[var(--shell-control-bg)]'
-            : 'border-[var(--shell-line)] bg-[var(--shell-control-bg)] peer-focus:border-[var(--color-primary)] peer-focus:ring-2 peer-focus:ring-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]'
-          : 'border-transparent bg-transparent'"
-      />
 
       <div
         v-if="editing"
         id="summary-editor-feedback"
-        class="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 text-xs"
+        class="pointer-events-none absolute inset-x-3 bottom-2 z-20 flex items-center justify-between gap-3 text-xs"
       >
         <p class="min-w-0 truncate text-red-600">
           {{ validationMessage || errorMessage }}
@@ -233,7 +295,7 @@ defineExpose({
       <textarea
         v-if="editing"
         v-model="draft"
-        class="min-h-32 w-full resize-y rounded-lg border bg-[var(--shell-control-bg)] px-3.5 py-2.5 text-sm leading-6 text-[var(--shell-ink)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]"
+        class="min-h-32 w-full resize-y rounded-lg border bg-[var(--shell-control-bg)] px-3.5 py-2.5 text-sm leading-6 text-[var(--shell-ink)] outline-none transition"
         :class="validationMessage ? 'border-red-400' : 'border-[var(--shell-line)]'"
         :aria-invalid="Boolean(validationMessage)"
         aria-describedby="summary-editor-feedback summary-editor-shortcut"
@@ -290,3 +352,39 @@ defineExpose({
     />
   </section>
 </template>
+
+<style scoped>
+.summary-editor {
+  container-type: inline-size;
+}
+
+.summary-editor__compact-frame--editing:focus-within,
+.summary-editor__compact-frame--scrollable:focus-within {
+  border-color: var(--color-focus);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-focus) 28%, transparent);
+}
+
+.summary-editor__compact-control:focus,
+.summary-editor__compact-control:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+@container (max-width: 20rem) {
+  .summary-editor__header {
+    align-items: flex-start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .summary-editor__header > .summary-editor__edit-action {
+    justify-self: end;
+  }
+
+  .summary-editor__edit-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+</style>

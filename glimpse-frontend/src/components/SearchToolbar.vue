@@ -144,7 +144,7 @@ defineExpose({ focus, clear })
           ref="searchInput"
           v-model="query"
           type="search"
-          class="h-11 w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]"
+          class="h-11 w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)]"
           :placeholder="t('search.placeholder')"
           @keydown.esc.stop.prevent="clear"
         />
@@ -165,7 +165,7 @@ defineExpose({ focus, clear })
       </div>
 
       <div
-        class="inline-flex h-11 items-center rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-1"
+        class="search-toolbar__source-switcher inline-grid h-11 grid-flow-col auto-cols-fr items-center rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-[3px]"
         role="group"
         :aria-label="t('search.sourceLabel')"
       >
@@ -173,7 +173,7 @@ defineExpose({ focus, clear })
           v-for="item in sources"
           :key="item.value"
           type="button"
-          class="h-9 rounded-md px-3.5 text-sm font-medium transition"
+          class="search-toolbar__source-button h-9 min-h-0 rounded-md px-3.5 text-sm font-medium transition"
           :class="source === item.value
             ? 'bg-[var(--color-primary)] text-white shadow-sm'
             : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"

@@ -39,7 +39,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 <template>
   <article
-    class="memory-card group cursor-pointer overflow-hidden rounded-lg border bg-[var(--shell-card)] outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+    class="memory-card group cursor-pointer overflow-hidden rounded-lg border bg-[var(--shell-card)] outline-none transition duration-200"
     :class="selected
       ? 'border-[var(--color-primary)] shadow-[0_4px_14px_rgba(59,86,201,.10)] ring-1 ring-[var(--color-primary)]'
       : 'border-[var(--shell-line)] hover:border-[var(--color-border-strong)] hover:shadow-md'"

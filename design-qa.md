@@ -15,6 +15,15 @@
   - `C:\Users\RXiaoen\AppData\Local\Temp\codex-clipboard-b7e8d083-fa93-4d2f-9737-aa96fa43a43d.png` — active thumbnail outline clipping, 620 x 172
   - `C:\Users\RXiaoen\AppData\Local\Temp\codex-clipboard-c4beaa12-3775-453f-bc3e-b7cbf846cbc4.png` — editing summary text movement, 702 x 318
   - `C:\Users\RXiaoen\AppData\Local\Temp\codex-clipboard-25358703-92fd-46f2-892f-26b233c1f053.png` — default summary reference, 716 x 300
+- Current polish evidence:
+  - `C:\Users\RXiaoen\AppData\Local\Temp\codex-clipboard-e361fc2f-67cc-49e2-87f3-724f106fbb4f.png` — uneven search-source inset, 564 x 124.
+  - `C:\Users\RXiaoen\AppData\Local\Temp\codex-clipboard-7e50efba-a8db-4cdc-8d98-1e675da84a0f.png` — intrusive search focus treatment, 1668 x 190.
+  - `C:\Users\RXiaoen\AppData\Local\Temp\codex-clipboard-d7083fbf-36f8-464a-aa95-bacd1863d0e5.png` — intrusive summary focus treatment and disproportionate actions, 758 x 326.
+- Current implementation evidence:
+  - `E:\project\Glimpse\Glimpse\.tmp\ui-qa\comparison.png` — combined before/after evidence, 1600 x 1200.
+  - `E:\project\Glimpse\Glimpse\.tmp\ui-qa\home-improved-1440.png` and `home-long-summary-edit-1440.png` — full views, 1440 x 900 CSS/pixels at deviceScaleFactor 1.
+  - `E:\project\Glimpse\Glimpse\.tmp\ui-qa\segment-improved.png` (276 x 60), `search-focus-improved.png` (814 x 64), and `summary-edit-improved.png` (351 x 334) — focused implementation regions.
+  - `E:\project\Glimpse\Glimpse\.tmp\ui-qa\home-1024x720-long-summary-edit.png` and `home-820x560-long-summary-edit.png` — responsive edit-state evidence at deviceScaleFactor 1.
 - Final implementation screenshots: `E:\project\Glimpse\Glimpse\.tmp\design-qa\iteration-5\*.png`.
 - Full-view source/implementation composites: `E:\project\Glimpse\Glimpse\.tmp\design-qa\iteration-5\comparisons\*.png`.
 - Focused before/after inspector composites: `E:\project\Glimpse\Glimpse\.tmp\design-qa\iteration-5\refinement-comparisons\*.png`.
@@ -72,6 +81,29 @@
   - lower summary actions: top 786 px;
   - OCR card: top 851.03125 px.
 - The active thumbnail begins at least 4 px inside the scroll clip and its computed ring is inset. No P0, P1, or P2 findings remain.
+
+### Iteration 6 — spacing, focus containment, and long-summary reading
+
+- [P2] The search-source frame used 4 px padding around nominally 36 px controls, but the global 40 px button minimum overrode those controls and reduced the vertical inset to 1 px.
+  - Fix: the three options now use a 44 px frame, an exact 3 px inset, and three equal 36 x 84 px grid cells with a local `min-height: 0` override.
+- [P1] Search and summary fields combined component rings, the global outline, and an 8 px negative summary decoration inset. The result extended into neighboring visual space.
+  - Fix: form focus is now one border plus a two-pixel inset treatment. The summary frame owns its one-pixel inset focus treatment, has no negative inset, and preserves the same geometry in read and edit states.
+- [P1] Compact summaries stayed at 80 px regardless of content length.
+  - Fix: the persistent textarea now measures its real wrapped `scrollHeight`, grows from 80 px up to 256 px (or 36% of a short viewport), and only then becomes internally scrollable. Width changes are remeasured through `ResizeObserver`; the observer and viewport listener are removed on unmount.
+- [P2] Cancel and Save used 13 px medium text inside 112 x 40 px controls, making the controls look under-filled.
+  - Fix: Edit, Cancel, and Save retain the established 112 x 40 px geometry and now share 14 px / 600 / 20 px typography. A container-query fallback wraps the two edit actions only when the summary component is narrower than 320 px.
+- Independent review found two accessibility follow-ups before acceptance:
+  - Primary controls now receive a two-tone inset keyboard focus ring, so focus remains visible on both white and primary-colored surfaces without consuming outside space.
+  - A capped, overflowing read-only summary receives `tabindex="0"`, enabling keyboard scrolling; non-overflowing read-only summaries remain outside the tab order.
+- Chrome geometry after the final pass:
+  - source switcher: 3 px inset, 44 px frame, three equal 36 x 84 px controls;
+  - focused search: primary border and two-pixel inset shadow, no outside outline;
+  - long summary: 232 px natural height at 1440 x 900, 204 px cap at 1024 x 720, and 201 px cap at 820 x 560;
+  - Cancel and Save: each 112 x 40 px with 14 px / 600 / 20 px typography;
+  - no horizontal overflow at 1024 x 720 or 820 x 560;
+  - 24/24 Vitest checks, TypeScript/Vite production build, and `git diff --check` pass;
+  - no console, runtime, or network errors were recorded in the accepted Chrome run.
+- The combined evidence is `E:\project\Glimpse\Glimpse\.tmp\ui-qa\comparison.png`. No actionable P0, P1, or P2 findings remain.
 
 ## Required fidelity surfaces
 

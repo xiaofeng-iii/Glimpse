@@ -46,7 +46,7 @@ const markImageError = (url: string) => {
 <template>
   <section>
     <div
-      class="group relative flex w-full items-center justify-center overflow-hidden rounded-lg border border-[var(--shell-line)] bg-slate-100/70 outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+      class="group relative flex w-full items-center justify-center overflow-hidden rounded-lg border border-[var(--shell-line)] bg-slate-100/70 outline-none transition"
       :class="compact ? 'h-64' : 'h-[min(54vh,560px)] min-h-80'"
       role="button"
       tabindex="0"
@@ -87,7 +87,7 @@ const markImageError = (url: string) => {
           v-for="(image, index) in images"
           :key="`${image}-${index}`"
           type="button"
-          class="media-gallery__thumbnail flex h-14 w-[4.5rem] flex-none items-center justify-center overflow-hidden rounded-md border bg-slate-100/70 p-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+          class="media-gallery__thumbnail flex h-14 w-[4.5rem] flex-none items-center justify-center overflow-hidden rounded-md border bg-slate-100/70 p-1 transition"
           :class="activeIndex === index ? 'border-[var(--color-primary)] ring-1 ring-inset ring-[var(--color-primary)]' : 'border-[var(--shell-line)]'"
           :aria-label="t('preview.thumbnail', { index: index + 1 })"
           @click="activeIndex = index"

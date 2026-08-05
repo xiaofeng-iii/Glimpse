@@ -5,6 +5,7 @@ import type { Memory } from '@/api/client'
 import MemoryCard from '@/components/MemoryCard.vue'
 import MediaGallery from '@/components/MediaGallery.vue'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
+import SearchToolbar from '@/components/SearchToolbar.vue'
 import SummaryEditor from '@/components/SummaryEditor.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useImagePreviewStore } from '@/stores/imagePreview'
@@ -88,6 +89,19 @@ describe('memory components', () => {
     expect(wrapper.text()).toContain('0.56789')
   })
 
+  it('keeps search source segments equally inset inside their frame', () => {
+    const wrapper = mount(SearchToolbar)
+    const group = wrapper.get('.search-toolbar__source-switcher')
+    const buttons = group.findAll('.search-toolbar__source-button')
+
+    expect(group.classes()).toEqual(expect.arrayContaining(['inline-grid', 'auto-cols-fr', 'p-[3px]']))
+    expect(buttons).toHaveLength(3)
+    expect(buttons.map((button) => button.attributes('aria-pressed'))).toEqual(['true', 'false', 'false'])
+    for (const button of buttons) {
+      expect(button.classes()).toEqual(expect.arrayContaining(['h-9', 'min-h-0']))
+    }
+  })
+
   it('opens the shared in-app preview from a double-click', async () => {
     const wrapper = mount(MediaGallery, {
       props: { memory: createMemory() },
@@ -164,6 +178,47 @@ describe('memory components', () => {
     const cancelledControl = wrapper.get('textarea').element as HTMLTextAreaElement
     expect(cancelledControl).toBe(originalControl)
     expect(cancelledControl.readOnly).toBe(true)
+  })
+
+  it('grows a compact summary within its reading cap and keeps all header actions proportionate', async () => {
+    const wrapper = mount(SummaryEditor, {
+      props: { memory: createMemory({ ai_summary: 'A longer summary' }), compact: true },
+      attachTo: document.body,
+    })
+    const originalControl = wrapper.get('textarea').element as HTMLTextAreaElement
+    let measuredHeight = 220
+    Object.defineProperty(originalControl, 'scrollHeight', {
+      configurable: true,
+      get: () => measuredHeight,
+    })
+
+    const editButton = wrapper.get('.summary-editor__edit-action')
+    expect(editButton.classes()).toEqual(expect.arrayContaining(['h-10', 'w-28', 'text-sm', 'font-semibold', 'leading-5']))
+
+    await editButton.trigger('click')
+    await flushPromises()
+
+    const frame = wrapper.get('.summary-editor__compact-frame')
+    expect(frame.attributes('style')).toContain('height: 220px')
+    expect(document.activeElement).toBe(originalControl)
+    for (const button of wrapper.findAll('.summary-editor__edit-action')) {
+      expect(button.classes()).toEqual(expect.arrayContaining(['h-10', 'w-28', 'text-sm', 'font-semibold', 'leading-5']))
+    }
+
+    measuredHeight = 600
+    await wrapper.get('textarea').setValue('A much longer summary that needs more room')
+    await flushPromises()
+
+    expect(frame.attributes('style')).toContain('height: 256px')
+    expect(wrapper.get('textarea').classes()).toContain('overflow-y-auto')
+
+    await wrapper.get('textarea').trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+    expect(wrapper.get('textarea').element.readOnly).toBe(true)
+    expect(wrapper.get('textarea').attributes('tabindex')).toBe('0')
+    expect(frame.classes()).toContain('summary-editor__compact-frame--scrollable')
+    wrapper.get('textarea').element.focus()
+    expect(document.activeElement).toBe(wrapper.get('textarea').element)
   })
 
   it('validates blank, unchanged, and oversized summaries before saving', async () => {
