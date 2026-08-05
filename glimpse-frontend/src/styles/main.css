@@ -59,6 +59,8 @@
   --shell-filter-bg: var(--color-surface);
   --shell-filter-text: var(--color-text-secondary);
   --shell-filter-hover: var(--color-surface-hover);
+  --shell-scrollbar-thumb: rgba(95, 109, 134, 0.32);
+  --shell-scrollbar-thumb-hover: rgba(95, 109, 134, 0.5);
 }
 
 :root[data-theme='dark'] {
@@ -113,6 +115,8 @@
   --shell-filter-bg: var(--color-surface-raised);
   --shell-filter-text: var(--color-text-secondary);
   --shell-filter-hover: var(--color-surface-hover);
+  --shell-scrollbar-thumb: rgba(148, 163, 184, 0.28);
+  --shell-scrollbar-thumb-hover: rgba(148, 163, 184, 0.46);
 }
 
 html,
@@ -676,6 +680,13 @@ kbd {
   color: #8491a7;
 }
 
+/* 自定义滚动条：桌面端（WebView2）与网页端（Chromium）共用 WebKit 语法，
+   Firefox 通过 scrollbar-width/scrollbar-color 兜底。颜色跟随主题变量。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--shell-scrollbar-thumb) transparent;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -686,12 +697,20 @@ kbd {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(95, 109, 134, 0.32);
+  background: var(--shell-scrollbar-thumb);
+  border: 2px solid transparent;
   border-radius: 999px;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(95, 109, 134, 0.5);
+  background: var(--shell-scrollbar-thumb-hover);
+  border-color: transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .spinner {

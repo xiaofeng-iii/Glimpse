@@ -279,7 +279,6 @@ onUnmounted(() => {
         :loading="memoriesStore.isLoading"
         :selected-id="memoriesStore.selectedId"
         :query="query"
-        :inspector-open="Boolean(selectedMemory)"
         :show-search-debug="showSearchDebug"
         @select="handleSelectMemory"
         @open="handleOpenMemory"

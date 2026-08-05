@@ -12,7 +12,6 @@ const props = defineProps<{
   loading?: boolean
   selectedId?: string | null
   query?: string
-  inspectorOpen?: boolean
   showSearchDebug?: boolean
 }>()
 
@@ -68,7 +67,7 @@ const groups = computed<MemoryGroup[]>(() => {
 </script>
 
 <template>
-  <section class="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4" aria-live="polite">
+  <section class="memory-wall-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4" aria-live="polite">
     <div class="mb-3">
       <h1 class="text-base font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">
         {{
@@ -105,10 +104,7 @@ const groups = computed<MemoryGroup[]>(() => {
         <h2 v-if="group.label" class="mb-2.5 text-xs font-semibold tracking-wide text-[var(--shell-muted)]">
           {{ group.label }}
         </h2>
-        <div
-          class="memory-grid"
-          :class="{ 'memory-grid--with-inspector': inspectorOpen }"
-        >
+        <div class="memory-grid">
           <MemoryCard
             v-for="memory in group.memories"
             :key="memory.id"
@@ -126,27 +122,28 @@ const groups = computed<MemoryGroup[]>(() => {
 </template>
 
 <style scoped>
+.memory-wall-scroll {
+  container-type: inline-size;
+}
+
 .memory-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0.75rem;
 }
 
-@media (min-width: 1180px) {
-  .memory-grid--with-inspector {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 820px) and (max-width: 1179px) {
+/* 列数由网格容器的实际可用宽度决定，桌面端与网页端保持一致。
+   两条规则用显式区间互斥，避免同时命中时后写规则覆盖列数；
+   容器查询不生效的旧引擎会自动回退到上面的 auto-fill 网格。 */
+@container (min-width: 480px) and (max-width: 759px) {
   .memory-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 819px) {
+@container (min-width: 760px) {
   .memory-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 </style>

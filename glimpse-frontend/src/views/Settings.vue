@@ -396,9 +396,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="h-full min-h-0 overflow-y-auto bg-[var(--shell-window-bg)] p-5 sm:p-6">
-    <div class="mx-auto max-w-[1420px]">
-      <header class="mb-5">
+  <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-5 sm:p-6">
+    <div class="mx-auto flex h-full min-h-0 max-w-[1420px] flex-col">
+      <header class="mb-5 flex-none">
         <h1 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('settings.title') }}</h1>
       </header>
 
@@ -406,8 +406,8 @@ onUnmounted(() => {
         <ArrowPathIcon class="h-8 w-8 animate-spin text-[var(--color-primary)]" :aria-label="t('settings.loading')" />
       </div>
 
-      <div v-else class="settings-layout">
-        <nav class="settings-nav" :aria-label="t('settings.sectionNavigation')">
+      <div v-else class="settings-layout min-h-0 flex-1">
+        <nav class="settings-nav min-h-0 overflow-y-auto" :aria-label="t('settings.sectionNavigation')">
           <button
             v-for="section in sections"
             :key="section.id"
@@ -424,13 +424,13 @@ onUnmounted(() => {
           </button>
         </nav>
 
-        <section class="settings-content">
-          <div class="border-b border-[var(--shell-line)] px-6 py-5 sm:px-7">
+        <section class="settings-content min-h-0">
+          <header class="flex-none border-b border-[var(--shell-line)] px-6 py-5 sm:px-7">
             <h2 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t(currentSection.labelKey) }}</h2>
             <p class="mt-1.5 text-sm leading-6 text-[var(--shell-muted)]">{{ t(currentSection.descriptionKey) }}</p>
-          </div>
+          </header>
 
-          <div class="min-h-[500px] space-y-5 px-6 py-5 sm:px-7">
+          <div class="settings-content__body min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5 sm:px-7">
             <template v-if="activeSection === 'hotkeys'">
               <div class="setting-row">
                 <div>
@@ -679,7 +679,7 @@ onUnmounted(() => {
             </template>
           </div>
 
-          <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--shell-line)] px-6 py-4 sm:px-7">
+          <footer class="flex flex-none flex-wrap items-center justify-between gap-3 border-t border-[var(--shell-line)] px-6 py-4 sm:px-7">
             <button type="button" class="min-h-10 rounded-md px-3 text-sm font-medium text-red-600 hover:bg-red-50" @click="openConfirmation('reset')">
               {{ t('action.reset') }}
             </button>
@@ -724,8 +724,14 @@ onUnmounted(() => {
 <style scoped>
 .settings-layout {
   display: grid;
+  min-height: 0;
   grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 1.25rem;
+}
+
+.settings-page {
+  overflow-y: auto;
 }
 
 .settings-nav,
@@ -736,8 +742,8 @@ onUnmounted(() => {
 }
 
 .settings-nav {
-  align-self: start;
   display: flex;
+  min-height: 0;
   flex-direction: column;
   gap: .375rem;
   border-radius: var(--radius-xl);
@@ -745,6 +751,9 @@ onUnmounted(() => {
 }
 
 .settings-content {
+  display: flex;
+  min-height: 500px;
+  flex-direction: column;
   min-width: 0;
   overflow: hidden;
   border-radius: var(--radius-xl);
@@ -802,14 +811,29 @@ onUnmounted(() => {
 }
 
 @media (max-width: 900px) {
+  .settings-page {
+    overflow-y: auto;
+  }
+
   .settings-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: none;
   }
 
   .settings-nav {
     display: grid;
+    align-self: auto;
     grid-template-columns: repeat(5, minmax(115px, 1fr));
     overflow-x: auto;
+  }
+
+  .settings-content {
+    overflow: visible;
+  }
+
+  .settings-content__body {
+    flex: none;
+    overflow: visible;
   }
 }
 
