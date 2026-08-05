@@ -92,6 +92,40 @@ class TestSQLiteManagerInit:
         assert mgr.get_memories_count() == 0
         mgr.close()
 
+    def test_migrates_legacy_database_without_sync_status(self, mock_path_manager):
+        connection = sqlite3.connect(str(mock_path_manager.sqlite_path))
+        connection.execute(
+            """
+            CREATE TABLE memories (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                image_path TEXT NOT NULL,
+                ai_summary TEXT,
+                app_name TEXT,
+                text_content TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO memories
+            (id, created_at, image_path, ai_summary, app_name, text_content)
+            VALUES ('legacy', '2026-01-01', 'legacy.png', 'summary', 'app', '')
+            """
+        )
+        connection.commit()
+        connection.close()
+
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        columns = {
+            row[1] for row in mgr._conn.execute("PRAGMA table_info(memories)")
+        }
+        assert {"extra_images", "sync_status"}.issubset(columns)
+        assert mgr.get_memory_by_id("legacy").sync_status == "PENDING"
+        mgr.close()
+
 
 class TestSQLiteManagerInsert:
     def test_insert_memory_success(self, mock_path_manager):
@@ -221,6 +255,85 @@ class TestSQLiteManagerUpdateDelete:
         mgr.update_memory_summary("u-1", "updated")
         found = mgr.get_memory_by_id("u-1")
         assert found.ai_summary == "updated"
+        assert found.sync_status == "PENDING"
+        assert mgr.search_memories("original") == []
+        assert [item.id for item in mgr.search_memories("updated")] == ["u-1"]
+        mgr.close()
+
+    def test_update_memory_text_content_refreshes_fts_and_status(
+        self,
+        mock_path_manager,
+    ):
+        from db.sqlite_manager import MemoryRecord, SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        mgr.insert_memory(
+            MemoryRecord(
+                id="ocr-1",
+                created_at="2026-01-01",
+                image_path="/img.png",
+                ai_summary="summary",
+                app_name="test",
+                text_content="oldword",
+                sync_status="SYNCED",
+            )
+        )
+
+        assert mgr.update_memory_text_content("ocr-1", "newword") is True
+        found = mgr.get_memory_by_id("ocr-1")
+        assert found.text_content == "newword"
+        assert found.sync_status == "PENDING"
+        assert mgr.search_memories("oldword") == []
+        assert [item.id for item in mgr.search_memories("newword")] == ["ocr-1"]
+
+        assert mgr.update_memory_sync_status("ocr-1", "SYNCED") is True
+        assert mgr.get_unsynced_memories_count() == 0
+        mgr.close()
+
+    def test_sync_status_compare_and_set_requires_same_summary_and_ocr(
+        self,
+        mock_path_manager,
+    ):
+        from db.sqlite_manager import MemoryRecord, SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        mgr.insert_memory(
+            MemoryRecord(
+                id="cas-1",
+                created_at="2026-01-01",
+                image_path="/img.png",
+                ai_summary="summary-v1",
+                app_name="test",
+                text_content="ocr-v1",
+                sync_status="PENDING",
+            )
+        )
+
+        assert mgr.compare_and_set_memory_sync_status(
+            "cas-1",
+            expected_ai_summary="summary-v1",
+            expected_text_content="ocr-v1",
+            sync_status="SYNCED",
+        )
+        assert mgr.get_memory_by_id("cas-1").sync_status == "SYNCED"
+
+        assert mgr.update_memory_summary("cas-1", "summary-v2")
+        assert not mgr.compare_and_set_memory_sync_status(
+            "cas-1",
+            expected_ai_summary="summary-v1",
+            expected_text_content="ocr-v1",
+            sync_status="SYNCED",
+        )
+        assert mgr.get_memory_by_id("cas-1").sync_status == "PENDING"
+
+        assert mgr.update_memory_text_content("cas-1", "ocr-v2")
+        assert not mgr.compare_and_set_memory_sync_status(
+            "cas-1",
+            expected_ai_summary="summary-v2",
+            expected_text_content="ocr-v1",
+            sync_status="FAILED",
+        )
+        assert mgr.get_memory_by_id("cas-1").sync_status == "PENDING"
         mgr.close()
 
     def test_update_nonexistent_returns_false(self, mock_path_manager):

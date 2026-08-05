@@ -1,16 +1,4 @@
-import sys
-import types
-from unittest.mock import AsyncMock, MagicMock
-
-desktop_actions_stub = types.ModuleType("api.desktop_actions")
-desktop_actions_stub.capture_and_analyze = AsyncMock()
-
-websocket_stub = types.ModuleType("api.websocket")
-websocket_stub.broadcast_event = AsyncMock()
-websocket_stub.has_active_connections = MagicMock(return_value=False)
-
-sys.modules.setdefault("api.desktop_actions", desktop_actions_stub)
-sys.modules.setdefault("api.websocket", websocket_stub)
+from unittest.mock import MagicMock
 
 from api import hotkeys
 

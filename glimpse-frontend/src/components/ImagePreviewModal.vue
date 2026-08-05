@@ -1,89 +1,294 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { nextTick, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PhotoIcon,
+  XMarkIcon,
+} from '@heroicons/vue/24/outline'
+import { useImagePreviewStore } from '@/stores/imagePreview'
 import { t } from '@/utils/i18n'
 
-const props = withDefaults(defineProps<{
-  open: boolean
-  images: string[]
-  startIndex?: number
-}>(), {
-  startIndex: 0,
-})
+const FOCUSABLE_SELECTOR = [
+  'button:not([disabled])',
+  '[href]',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
 
-const emit = defineEmits<{
-  (e: 'close'): void
-  (e: 'update:startIndex', value: number): void
-}>()
+const previewStore = useImagePreviewStore()
+const {
+  isOpen,
+  images,
+  currentIndex,
+  currentImage,
+  hasMultiple,
+  originElement,
+} = storeToRefs(previewStore)
+
+const dialogPanel = ref<HTMLElement | null>(null)
+const closeButton = ref<HTMLButtonElement | null>(null)
+const failedImages = ref<Record<string, boolean>>({})
+let previousBodyOverflow = ''
+let previousHtmlOverflow = ''
+
+const lockDocumentScroll = () => {
+  previousBodyOverflow = document.body.style.overflow
+  previousHtmlOverflow = document.documentElement.style.overflow
+  document.body.style.overflow = 'hidden'
+  document.documentElement.style.overflow = 'hidden'
+}
+
+const restoreDocumentScroll = () => {
+  document.body.style.overflow = previousBodyOverflow
+  document.documentElement.style.overflow = previousHtmlOverflow
+}
+
+const restoreOriginFocus = async () => {
+  const target = originElement.value
+  await nextTick()
+  if (target?.isConnected) {
+    target.focus({ preventScroll: true })
+  }
+}
+
+const getFocusableElements = () => {
+  if (!dialogPanel.value) {
+    return []
+  }
+
+  return Array.from(
+    dialogPanel.value.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  ).filter((element) => !element.hasAttribute('disabled') && element.offsetParent !== null)
+}
+
+const trapFocus = (event: KeyboardEvent) => {
+  const focusable = getFocusableElements()
+  if (focusable.length === 0) {
+    event.preventDefault()
+    dialogPanel.value?.focus()
+    return
+  }
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement
+
+  if (event.shiftKey && (active === first || !dialogPanel.value?.contains(active))) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+  if (!isOpen.value) {
+    return
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    previewStore.close()
+    return
+  }
+
+  if (event.key === 'ArrowLeft' && hasMultiple.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    previewStore.previous()
+    return
+  }
+
+  if (event.key === 'ArrowRight' && hasMultiple.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    previewStore.next()
+    return
+  }
+
+  if (event.key === 'Tab') {
+    trapFocus(event)
+  }
+}
+
+const markImageError = (url: string) => {
+  failedImages.value = {
+    ...failedImages.value,
+    [url]: true,
+  }
+}
+
+const markImageLoaded = (url: string) => {
+  if (!failedImages.value[url]) {
+    return
+  }
+
+  const nextFailedImages = { ...failedImages.value }
+  delete nextFailedImages[url]
+  failedImages.value = nextFailedImages
+}
+
+const preloadAdjacentImages = () => {
+  if (!isOpen.value || images.value.length < 2) {
+    return
+  }
+
+  const indexes = [
+    (currentIndex.value - 1 + images.value.length) % images.value.length,
+    (currentIndex.value + 1) % images.value.length,
+  ]
+
+  for (const index of indexes) {
+    const url = images.value[index]
+    if (url) {
+      const preload = new Image()
+      preload.src = url
+    }
+  }
+}
 
 watch(
-  () => props.startIndex,
-  (value) => {
-    if (value < 0 || value >= props.images.length) {
-      emit('update:startIndex', 0)
+  isOpen,
+  async (open) => {
+    if (open) {
+      lockDocumentScroll()
+      document.addEventListener('keydown', handleKeydown, true)
+      await nextTick()
+      closeButton.value?.focus({ preventScroll: true })
+      preloadAdjacentImages()
+      return
     }
+
+    document.removeEventListener('keydown', handleKeydown, true)
+    restoreDocumentScroll()
+    await restoreOriginFocus()
   },
 )
 
-const currentImage = computed(() => props.images[props.startIndex] || '')
-const hasMultiple = computed(() => props.images.length > 1)
+watch([images, currentIndex], () => {
+  preloadAdjacentImages()
+})
 
-const showPrevious = () => {
-  if (!props.images.length) {
-    return
-  }
-  emit('update:startIndex', (props.startIndex - 1 + props.images.length) % props.images.length)
-}
+watch(images, () => {
+  failedImages.value = {}
+})
 
-const showNext = () => {
-  if (!props.images.length) {
-    return
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown, true)
+  if (isOpen.value) {
+    restoreDocumentScroll()
   }
-  emit('update:startIndex', (props.startIndex + 1) % props.images.length)
-}
+})
 </script>
 
 <template>
-  <teleport to="body">
+  <Teleport to="body">
     <div
-      v-if="open"
-      class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/72 p-6 backdrop-blur-sm"
-      @click.self="emit('close')"
+      v-if="isOpen"
+      class="image-preview-backdrop"
+      @mousedown.self="previewStore.close"
     >
-      <button
-        class="absolute right-6 top-6 rounded-full bg-white/14 p-3 text-white transition hover:bg-white/22"
-        @click="emit('close')"
+      <section
+        ref="dialogPanel"
+        class="image-preview-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="image-preview-title"
+        tabindex="-1"
       >
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+        <header class="image-preview-dialog__header">
+          <div class="image-preview-dialog__heading">
+            <h2 id="image-preview-title">{{ t('preview.title') }}</h2>
+            <span aria-live="polite">
+              {{ currentIndex + 1 }} / {{ images.length }}
+            </span>
+          </div>
+          <button
+            ref="closeButton"
+            type="button"
+            class="modal-icon-button"
+            :title="t('action.close')"
+            :aria-label="t('action.close')"
+            @click="previewStore.close"
+          >
+            <XMarkIcon class="h-6 w-6" aria-hidden="true" />
+          </button>
+        </header>
 
-      <button
-        v-if="hasMultiple"
-        class="absolute left-6 top-1/2 -translate-y-1/2 rounded-full bg-white/14 p-3 text-white transition hover:bg-white/22"
-        @click.stop="showPrevious"
-      >
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
+        <div class="image-preview-stage">
+          <button
+            v-if="hasMultiple"
+            type="button"
+            class="image-preview-stage__arrow image-preview-stage__arrow--previous"
+            :title="t('preview.previous')"
+            :aria-label="t('preview.previous')"
+            @click="previewStore.previous"
+          >
+            <ChevronLeftIcon class="h-6 w-6" aria-hidden="true" />
+          </button>
 
-      <img
-        v-if="currentImage"
-        :src="currentImage"
-        class="max-h-[85vh] max-w-[88vw] rounded-3xl border border-white/12 bg-white/8 object-contain shadow-2xl"
-        :alt="t('memory.previewAlt')"
-      />
+          <div
+            v-if="failedImages[currentImage]"
+            class="image-preview-error"
+            role="status"
+          >
+            <PhotoIcon class="h-10 w-10" aria-hidden="true" />
+            <p>{{ t('memory.previewFailed') }}</p>
+          </div>
+          <img
+            v-else-if="currentImage"
+            :key="currentImage"
+            :src="currentImage"
+            class="image-preview-stage__image"
+            :alt="`${t('memory.previewAlt')} ${currentIndex + 1}`"
+            draggable="false"
+            @load="markImageLoaded(currentImage)"
+            @error="markImageError(currentImage)"
+          />
 
-      <button
-        v-if="hasMultiple"
-        class="absolute right-6 top-1/2 -translate-y-1/2 rounded-full bg-white/14 p-3 text-white transition hover:bg-white/22"
-        @click.stop="showNext"
-      >
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
+          <button
+            v-if="hasMultiple"
+            type="button"
+            class="image-preview-stage__arrow image-preview-stage__arrow--next"
+            :title="t('preview.next')"
+            :aria-label="t('preview.next')"
+            @click="previewStore.next"
+          >
+            <ChevronRightIcon class="h-6 w-6" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div v-if="hasMultiple" class="image-preview-thumbnails" role="list">
+          <button
+            v-for="(image, index) in images"
+            :key="`${image}-${index}`"
+            type="button"
+            class="image-preview-thumbnail"
+            :class="{ 'image-preview-thumbnail--active': index === currentIndex }"
+            role="listitem"
+            :aria-current="index === currentIndex ? 'true' : undefined"
+            :aria-label="t('preview.thumbnail', { index: index + 1 })"
+            @click="previewStore.goTo(index)"
+          >
+            <img
+              :src="image"
+              alt=""
+              draggable="false"
+              @error="markImageError(image)"
+            />
+          </button>
+        </div>
+
+        <p class="image-preview-dialog__hint">
+          {{ t('preview.hint') }}
+        </p>
+      </section>
     </div>
-  </teleport>
+  </Teleport>
 </template>

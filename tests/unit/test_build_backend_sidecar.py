@@ -28,6 +28,15 @@ def test_sidecar_uses_branded_name_and_cache_inputs():
     assert "glimpse-frontend/src-tauri/Cargo.toml" in sidecar.HASH_INPUTS
 
 
+def test_sidecar_collects_rapidocr_code_models_metadata_and_onnx_runtime():
+    assert "rapidocr" in sidecar.PYINSTALLER_DYNAMIC_PACKAGES
+    assert "rapidocr" in sidecar.PYINSTALLER_DATA_PACKAGES
+    assert "rapidocr" in sidecar.PYINSTALLER_METADATA_PACKAGES
+    assert "onnxruntime" in sidecar.PYINSTALLER_DYNAMIC_PACKAGES
+    assert "onnxruntime" in sidecar.PYINSTALLER_DATA_PACKAGES
+    assert "onnxruntime" in sidecar.PYINSTALLER_METADATA_PACKAGES
+
+
 def test_read_package_version_reads_canonical_cargo_version(tmp_path: Path):
     manifest = tmp_path / "Cargo.toml"
     _write_manifest(manifest, "3.4.5")
@@ -93,7 +102,8 @@ def test_build_pyinstaller_args_include_windows_metadata(
 
     assert "--name=GlimpseRuntime" in args
     assert "--onedir" in args
-    assert "--noconsole" in args
+    assert "--console" in args
+    assert "--noconsole" not in args
     assert f"--icon={icon}" in args
     assert f"--version-file={version_file}" in args
     assert "--hidden-import=hidden.module" in args
@@ -132,6 +142,8 @@ def test_desktop_bundle_uses_runtime_name_and_cleans_legacy_sidecars():
     assert '"binaries/GlimpseRuntime/"' in tauri_config
     assert 'const BACKEND_BUNDLE_NAME: &str = "GlimpseRuntime";' in rust_main
     assert 'const BACKEND_PROCESS_NAME: &str = "GlimpseRuntime.exe";' in rust_main
+    assert "const CREATE_NO_WINDOW: u32 = 0x08000000;" in rust_main
+    assert "command.creation_flags(CREATE_NO_WINDOW);" in rust_main
     assert '("glimpse-backend", "glimpse-backend.exe")' in rust_main
     assert '("python-backend", "python-backend.exe")' in rust_main
     assert "GlimpseRuntime.exe" in installer_hooks

@@ -1,9 +1,29 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useSettingsStore } from '@/stores/settings'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import {
+  ArrowPathIcon,
+  CameraIcon,
+  CheckCircleIcon,
+  CircleStackIcon,
+  CpuChipIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  CommandLineIcon,
+  LockClosedIcon,
+  PaintBrushIcon,
+  ServerStackIcon,
+  SparklesIcon,
+} from '@heroicons/vue/24/outline'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import {
+  indexApi,
+  ocrApi,
+  type IndexRepairStatus,
+  type OcrBackfillStatus,
+} from '@/api/client'
 import { useNotificationStore } from '@/stores/notification'
-import { useRouter } from 'vue-router'
-import { indexApi, type IndexRepairStatus } from '@/api/client'
+import { useSettingsStore } from '@/stores/settings'
+import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
 import {
   applyThemePreference,
   normalizeThemePreference,
@@ -16,29 +36,40 @@ import {
   type LanguagePreference,
 } from '@/utils/i18n'
 import { createLogger } from '@/utils/logger'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const logger = createLogger('views/Settings')
-
-const settingsStore = useSettingsStore()
-const notificationStore = useNotificationStore()
 const router = useRouter()
+const settingsStore = useSettingsStore()
+const notifications = useNotificationStore()
+const unsavedChanges = useUnsavedChangesStore()
 
 const sections = [
-  { id: 'hotkeys', labelKey: 'settings.hotkeys', icon: 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z' },
-  { id: 'screenshot', labelKey: 'settings.screenshot', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z' },
-  { id: 'ai', labelKey: 'settings.ai', icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z' },
-  { id: 'ui', labelKey: 'settings.ui', icon: 'M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25' },
-  { id: 'maintenance', labelKey: 'settings.maintenance', icon: 'M4 6c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3z M4 6v6c0 1.657 3.582 3 8 3s8-1.343 8-3V6 M4 12v6c0 1.657 3.582 3 8 3s8-1.343 8-3v-6' },
+  { id: 'hotkeys', labelKey: 'settings.hotkeys', descriptionKey: 'settings.hotkeysDescription', icon: CommandLineIcon },
+  { id: 'screenshot', labelKey: 'settings.screenshot', descriptionKey: 'settings.screenshotDescription', icon: CameraIcon },
+  { id: 'ai', labelKey: 'settings.ai', descriptionKey: 'settings.aiDescription', icon: SparklesIcon },
+  { id: 'ui', labelKey: 'settings.ui', descriptionKey: 'settings.uiDescription', icon: PaintBrushIcon },
+  { id: 'maintenance', labelKey: 'settings.maintenance', descriptionKey: 'settings.maintenanceDescription', icon: CircleStackIcon },
 ] as const
 
 type SectionId = typeof sections[number]['id']
-const activeSection = ref<SectionId>('hotkeys')
+type ConfirmAction = 'reset' | 'index' | 'ocr' | null
 
-// Form refs
+const activeSection = ref<SectionId>('hotkeys')
+const loading = ref(true)
+const saving = ref(false)
+const savedSnapshot = ref('')
+const showApiKey = ref(false)
+
 const screenshotHotkey = ref('')
+const recordingHotkey = ref(false)
 const captureLimitWindowSeconds = ref(5)
 const clusterThreshold = ref(2)
 const maxCaptures = ref(10)
+const clusterMode = ref(false)
+const clusterAutoSubmit = ref(true)
+const clusterMaxImages = ref(5)
+const clusterTimeout = ref(5)
 const aiApiKey = ref('')
 const aiBaseUrl = ref('https://api.openai.com/v1')
 const aiModel = ref('gpt-4o-mini')
@@ -46,18 +77,42 @@ const aiTimeout = ref(60)
 const themePreference = ref<ThemePreference>('light')
 const language = ref<LanguagePreference>('zh-CN')
 const closeAction = ref<'ask' | 'minimize' | 'exit'>('ask')
-const clusterMode = ref(false)
-const clusterAutoSubmit = ref(true)
-const clusterMaxImages = ref(5)
-const clusterTimeout = ref(5)
 
-// Test connection state
-const isTestingAi = ref(false)
+const testingAi = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
-const recordingHotkey = ref<'screenshot' | null>(null)
-const isRepairingIndex = ref(false)
-const indexRepairStatus = ref<IndexRepairStatus | null>(null)
-let indexRepairPollTimer: ReturnType<typeof setTimeout> | null = null
+const indexStatus = ref<IndexRepairStatus | null>(null)
+const ocrStatus = ref<OcrBackfillStatus | null>(null)
+const confirmAction = ref<ConfirmAction>(null)
+const confirmBusy = ref(false)
+const discardDialogOpen = ref(false)
+let discardResolver: ((confirmed: boolean) => void) | null = null
+let pendingDiscardPromise: Promise<boolean> | null = null
+let unregisterGuard: (() => boolean) | null = null
+let maintenanceTimer: ReturnType<typeof window.setTimeout> | null = null
+
+const currentSection = computed(() => sections.find((section) => section.id === activeSection.value) ?? sections[0])
+const maintenanceRunning = computed(() => Boolean(indexStatus.value?.running || ocrStatus.value?.running))
+const formSnapshot = computed(() => JSON.stringify({
+  screenshotHotkey: screenshotHotkey.value,
+  captureLimitWindowSeconds: captureLimitWindowSeconds.value,
+  clusterThreshold: clusterThreshold.value,
+  maxCaptures: maxCaptures.value,
+  clusterMode: clusterMode.value,
+  clusterAutoSubmit: clusterAutoSubmit.value,
+  clusterMaxImages: clusterMaxImages.value,
+  clusterTimeout: clusterTimeout.value,
+  aiApiKey: aiApiKey.value,
+  aiBaseUrl: aiBaseUrl.value,
+  aiModel: aiModel.value,
+  aiTimeout: aiTimeout.value,
+  themePreference: themePreference.value,
+  language: language.value,
+  closeAction: closeAction.value,
+}))
+const dirty = computed(() => Boolean(savedSnapshot.value && formSnapshot.value !== savedSnapshot.value))
+const ocrSucceeded = computed(() =>
+  ocrStatus.value?.result?.succeeded ?? ocrStatus.value?.result?.updated ?? 0,
+)
 
 const hotkeyLabels: Record<string, string> = {
   ctrl: 'Ctrl',
@@ -80,8 +135,7 @@ const hotkeyLabels: Record<string, string> = {
   left: 'Left',
   right: 'Right',
 }
-
-const specialKeyMap: Record<string, string> = {
+const specialKeys: Record<string, string> = {
   Escape: 'escape',
   Enter: 'enter',
   Tab: 'tab',
@@ -99,474 +153,694 @@ const specialKeyMap: Record<string, string> = {
   ArrowLeft: 'left',
   ArrowRight: 'right',
 }
-
 const modifierKeys = new Set(['Control', 'Shift', 'Alt', 'Meta'])
 
-const normalizeMainKey = (event: KeyboardEvent) => {
-  if (modifierKeys.has(event.key)) return ''
-  if (specialKeyMap[event.key]) return specialKeyMap[event.key]
-  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(event.key)) return event.key.toLowerCase()
-  if (event.key.length === 1 && event.key !== '+') return event.key.toLowerCase()
-  return ''
+const formatHotkey = (hotkey: string) => {
+  if (!hotkey) return t('settings.emptyHotkey')
+  return hotkey.split('+').map((part) => {
+    const normalized = part.trim().replace(/^<|>$/g, '').toLowerCase()
+    return hotkeyLabels[normalized] ?? (normalized.length === 1 ? normalized.toUpperCase() : normalized)
+  }).join(' + ')
 }
 
-const formatHotkeyForPynput = (event: KeyboardEvent) => {
-  const mainKey = normalizeMainKey(event)
-  if (!mainKey) return ''
+const recordHotkey = (event: KeyboardEvent) => {
+  event.preventDefault()
+  event.stopPropagation()
+  if (event.key === 'Escape') {
+    recordingHotkey.value = false
+    return
+  }
+  const noModifier = !event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey
+  if (noModifier && (event.key === 'Backspace' || event.key === 'Delete')) {
+    screenshotHotkey.value = ''
+    recordingHotkey.value = false
+    return
+  }
+
+  if (modifierKeys.has(event.key)) return
+  const mainKey = specialKeys[event.key]
+    ?? (/^F([1-9]|1[0-9]|2[0-4])$/.test(event.key) ? event.key.toLowerCase() : event.key.length === 1 ? event.key.toLowerCase() : '')
+  if (!mainKey || mainKey === '+') return
 
   const parts: string[] = []
   if (event.ctrlKey) parts.push('<ctrl>')
   if (event.shiftKey) parts.push('<shift>')
   if (event.altKey) parts.push('<alt>')
   if (event.metaKey) parts.push('<cmd>')
-
-  const wrappedKey = mainKey.length === 1 ? mainKey : `<${mainKey}>`
-  return [...parts, wrappedKey].join('+')
+  parts.push(mainKey.length === 1 ? mainKey : `<${mainKey}>`)
+  screenshotHotkey.value = parts.join('+')
+  recordingHotkey.value = false
 }
 
-const formatHotkeyForDisplay = (hotkey: string) => {
-  if (!hotkey) return t('settings.emptyHotkey')
-  return hotkey
-    .split('+')
-    .map((part) => {
-      const normalized = part.trim().replace(/^<|>$/g, '').toLowerCase()
-      if (hotkeyLabels[normalized]) return hotkeyLabels[normalized]
-      if (/^f([1-9]|1[0-9]|2[0-4])$/.test(normalized)) return normalized.toUpperCase()
-      return normalized.length === 1 ? normalized.toUpperCase() : normalized
-    })
-    .join(' + ')
-}
-
-const startHotkeyRecording = () => {
-  recordingHotkey.value = 'screenshot'
-}
-
-const clearHotkey = () => {
-  screenshotHotkey.value = ''
-}
-
-const handleHotkeyKeydown = (event: KeyboardEvent) => {
-  event.preventDefault()
-  event.stopPropagation()
-
-  if (event.key === 'Escape') {
-    recordingHotkey.value = null
-    return
-  }
-
-  const noModifier = !event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey
-  if ((event.key === 'Backspace' || event.key === 'Delete') && noModifier) {
-    clearHotkey()
-    recordingHotkey.value = null
-    return
-  }
-
-  const hotkey = formatHotkeyForPynput(event)
-  if (!hotkey) return
-
-  screenshotHotkey.value = hotkey
-  recordingHotkey.value = null
+const populateForm = () => {
+  const settings = settingsStore.settings
+  if (!settings) return
+  screenshotHotkey.value = settings.hotkeys?.screenshot ?? ''
+  captureLimitWindowSeconds.value = settings.screenshot?.capture_limit_window_seconds
+    ?? settings.screenshot?.debounce_interval
+    ?? 5
+  clusterThreshold.value = settings.screenshot?.cluster_threshold ?? 2
+  maxCaptures.value = settings.screenshot?.max_captures_per_window ?? 10
+  clusterMode.value = Boolean(settings.cluster?.cluster_mode)
+  clusterAutoSubmit.value = settings.cluster?.cluster_auto_submit ?? true
+  clusterMaxImages.value = settings.cluster?.cluster_max_images ?? 5
+  clusterTimeout.value = settings.cluster?.cluster_timeout ?? 5
+  aiApiKey.value = settings.ai?.api_key ?? ''
+  aiBaseUrl.value = settings.ai?.base_url ?? 'https://api.openai.com/v1'
+  aiModel.value = settings.ai?.model ?? 'gpt-4o-mini'
+  aiTimeout.value = settings.ai?.timeout ?? 60
+  themePreference.value = normalizeThemePreference(settings.ui?.theme)
+  language.value = normalizeLanguagePreference(settings.ui?.language)
+  closeAction.value = settings.ui?.close_action ?? 'ask'
+  savedSnapshot.value = formSnapshot.value
 }
 
 const loadSettings = async () => {
+  loading.value = true
   await settingsStore.load()
-  if (settingsStore.settings) {
-    const s = settingsStore.settings
-    screenshotHotkey.value = s.hotkeys?.screenshot || ''
-    captureLimitWindowSeconds.value =
-      s.screenshot?.capture_limit_window_seconds ?? s.screenshot?.debounce_interval ?? 5
-    clusterThreshold.value = s.screenshot?.cluster_threshold || 2
-    maxCaptures.value = s.screenshot?.max_captures_per_window || 10
-    aiApiKey.value = s.ai?.api_key || ''
-    aiBaseUrl.value = s.ai?.base_url || 'https://api.openai.com/v1'
-    aiModel.value = s.ai?.model || 'gpt-4o-mini'
-    aiTimeout.value = s.ai?.timeout || 60
-    themePreference.value = normalizeThemePreference(s.ui?.theme)
-    language.value = normalizeLanguagePreference(s.ui?.language)
-    setLanguagePreference(language.value)
-    closeAction.value = s.ui?.close_action || 'ask'
-    clusterMode.value = s.cluster?.cluster_mode || false
-    clusterAutoSubmit.value = s.cluster?.cluster_auto_submit ?? true
-    clusterMaxImages.value = s.cluster?.cluster_max_images || 5
-    clusterTimeout.value = s.cluster?.cluster_timeout || 5
-  }
+  populateForm()
+  loading.value = false
 }
 
-const clearIndexRepairPoll = () => {
-  if (indexRepairPollTimer) {
-    clearTimeout(indexRepairPollTimer)
-    indexRepairPollTimer = null
-  }
+const refreshMaintenance = async () => {
+  const [nextIndex, nextOcr] = await Promise.allSettled([indexApi.status(), ocrApi.status()])
+  if (nextIndex.status === 'fulfilled') indexStatus.value = nextIndex.value
+  if (nextOcr.status === 'fulfilled') ocrStatus.value = nextOcr.value
 }
 
-const indexRepairFailed = (status: IndexRepairStatus) => {
-  return Boolean(
-    status.error ||
-    status.status === 'failed' ||
-    status.result?.status === 'failed' ||
-    status.result?.status === 'unavailable'
-  )
-}
-
-const handleIndexRepairFinished = (status: IndexRepairStatus) => {
-  isRepairingIndex.value = false
-
-  if (indexRepairFailed(status)) {
-    notificationStore.show(t('message.indexRepairFailed'), 'error')
-    return
-  }
-
-  const failed = status.result?.failed ?? 0
-  notificationStore.show(
-    failed > 0 ? t('message.indexRepairPartial') : t('message.indexRepairDone'),
-    failed > 0 ? 'warning' : 'success',
-  )
-}
-
-const refreshIndexRepairStatus = async () => {
-  const status = await indexApi.status()
-  indexRepairStatus.value = status
-  isRepairingIndex.value = status.running
-  return status
-}
-
-const pollIndexRepairStatus = () => {
-  clearIndexRepairPoll()
-  indexRepairPollTimer = setTimeout(async () => {
-    try {
-      const status = await refreshIndexRepairStatus()
-      if (status.running) {
-        pollIndexRepairStatus()
-      } else {
-        handleIndexRepairFinished(status)
-      }
-    } catch (error) {
-      isRepairingIndex.value = false
-      notificationStore.show(t('message.indexRepairFailed'), 'error')
-    }
+const scheduleMaintenancePoll = () => {
+  if (maintenanceTimer) window.clearTimeout(maintenanceTimer)
+  if (!maintenanceRunning.value) return
+  maintenanceTimer = window.setTimeout(async () => {
+    await refreshMaintenance()
+    scheduleMaintenancePoll()
   }, 1500)
 }
 
-const handleRepairIndex = async () => {
-  if (isRepairingIndex.value) return
-  if (!confirm(t('settings.indexRepairConfirm'))) return
-
-  try {
-    isRepairingIndex.value = true
-    indexRepairStatus.value = await indexApi.repair()
-    notificationStore.show(t('message.indexRepairStarted'), 'info')
-
-    if (indexRepairStatus.value.running) {
-      pollIndexRepairStatus()
-    } else {
-      handleIndexRepairFinished(indexRepairStatus.value)
-    }
-  } catch (error) {
-    isRepairingIndex.value = false
-    notificationStore.show(t('message.indexRepairFailed'), 'error')
-  }
-}
-
-const indexRepairStatusText = () => {
-  if (isRepairingIndex.value || indexRepairStatus.value?.running) {
-    return t('settings.indexRepairRunning')
-  }
-
-  const result = indexRepairStatus.value?.result
-  if (result) {
-    return t('settings.indexRepairLastResult', {
-      processed: result.processed,
-      indexed: result.indexed,
-      failed: result.failed,
-    })
-  }
-
-  return t('settings.indexRepairIdle', {
-    sqlite: indexRepairStatus.value?.sqlite_count ?? 0,
-    chroma: indexRepairStatus.value?.chroma_count ?? 0,
-  })
-}
-
-onMounted(async () => {
-  await loadSettings()
-  try {
-    const status = await refreshIndexRepairStatus()
-    if (status.running) {
-      pollIndexRepairStatus()
-    }
-  } catch (error) {
-    // Settings remain usable even if maintenance status is temporarily unavailable.
-  }
-})
-
-onUnmounted(() => {
-  clearIndexRepairPoll()
-})
-
 const handleSave = async () => {
+  const current = settingsStore.settings
+  if (!current || saving.value) return
+  saving.value = true
   try {
-    const aiSettings: Record<string, string | number> = {
-      base_url: aiBaseUrl.value,
-      model: aiModel.value,
+    const ai = {
+      ...current.ai,
+      api_key: aiApiKey.value.trim(),
+      base_url: aiBaseUrl.value.trim(),
+      model: aiModel.value.trim(),
       timeout: aiTimeout.value,
     }
-    if (aiApiKey.value.trim()) {
-      aiSettings.api_key = aiApiKey.value
-    }
-
     await settingsStore.update({
-      hotkeys: {
-        screenshot: screenshotHotkey.value,
-      },
+      hotkeys: { ...current.hotkeys, screenshot: screenshotHotkey.value },
       screenshot: {
+        ...current.screenshot,
         capture_limit_window_seconds: captureLimitWindowSeconds.value,
         cluster_threshold: clusterThreshold.value,
         max_captures_per_window: maxCaptures.value,
       },
-      ai: aiSettings,
+      ai,
       ui: {
+        ...current.ui,
         theme: themePreference.value,
         language: language.value,
         close_action: closeAction.value,
       },
       cluster: {
+        ...current.cluster,
         cluster_mode: clusterMode.value,
         cluster_auto_submit: clusterAutoSubmit.value,
         cluster_max_images: clusterMaxImages.value,
         cluster_timeout: clusterTimeout.value,
       },
     })
+    populateForm()
     applyThemePreference(themePreference.value)
     setLanguagePreference(language.value)
-    router.push('/')
+    notifications.show(t('settings.saved'), 'success', 1800)
   } catch (error) {
     logger.error('Failed to save settings: %s', error)
+    notifications.show(t('settings.saveFailed'), 'error', 2800)
+  } finally {
+    saving.value = false
   }
 }
 
-const handleTestAi = async () => {
-  isTestingAi.value = true
+const testAi = async () => {
+  testingAi.value = true
   aiTestResult.value = null
   try {
     aiTestResult.value = await settingsStore.testAi(
       aiApiKey.value,
       aiBaseUrl.value,
-      aiModel.value
+      aiModel.value,
     )
-  } catch (error) {
+  } catch {
     aiTestResult.value = { success: false, message: t('settings.testFailed') }
   } finally {
-    isTestingAi.value = false
+    testingAi.value = false
   }
 }
 
-const handleReset = async () => {
-  if (confirm(t('settings.resetConfirm'))) {
-    await settingsStore.reset()
-    await loadSettings()
-    applyThemePreference(themePreference.value)
-    setLanguagePreference(language.value)
+const openConfirmation = (action: Exclude<ConfirmAction, null>) => {
+  confirmAction.value = action
+}
+
+const confirmationCopy = computed(() => {
+  if (confirmAction.value === 'reset') {
+    return {
+      title: t('settings.resetTitle'),
+      description: t('settings.resetConfirm'),
+      confirm: t('action.reset'),
+      destructive: true,
+    }
+  }
+  if (confirmAction.value === 'index') {
+    return {
+      title: t('settings.repairIndex'),
+      description: t('settings.indexRepairConfirm'),
+      confirm: t('settings.startRepair'),
+      destructive: false,
+    }
+  }
+  return {
+    title: t('settings.ocrBackfill'),
+    description: t('settings.ocrBackfillConfirm'),
+    confirm: t('settings.startBackfill'),
+    destructive: false,
+  }
+})
+
+const runConfirmedAction = async () => {
+  const action = confirmAction.value
+  if (!action) return
+  confirmBusy.value = true
+  try {
+    if (action === 'reset') {
+      await settingsStore.reset()
+      populateForm()
+      applyThemePreference(themePreference.value)
+      setLanguagePreference(language.value)
+      notifications.show(t('settings.resetDone'), 'success', 1800)
+    } else if (action === 'index') {
+      indexStatus.value = await indexApi.repair()
+      notifications.show(t('message.indexRepairStarted'), 'success', 1800)
+      scheduleMaintenancePoll()
+    } else {
+      ocrStatus.value = await ocrApi.backfill()
+      notifications.show(t('message.ocrBackfillStarted'), 'success', 1800)
+      scheduleMaintenancePoll()
+    }
+    confirmAction.value = null
+  } catch (error) {
+    logger.error('Maintenance action failed: %s', error)
+    notifications.show(
+      maintenanceRunning.value ? t('message.maintenanceConflict') : t('message.maintenanceFailed'),
+      'error',
+      3000,
+    )
+  } finally {
+    confirmBusy.value = false
   }
 }
 
-const handleCancel = () => {
-  router.push('/')
+const resolveDiscard = (confirmed: boolean) => {
+  discardDialogOpen.value = false
+  if (confirmed) populateForm()
+  discardResolver?.(confirmed)
+  discardResolver = null
+  pendingDiscardPromise = null
 }
+
+const canLeave = async () => {
+  if (!dirty.value) return true
+  if (pendingDiscardPromise) return pendingDiscardPromise
+  discardDialogOpen.value = true
+  pendingDiscardPromise = new Promise<boolean>((resolve) => {
+    discardResolver = resolve
+  })
+  return pendingDiscardPromise
+}
+
+onBeforeRouteLeave(async () => canLeave())
+
+onMounted(async () => {
+  unregisterGuard = unsavedChanges.register(canLeave)
+  await Promise.all([loadSettings(), refreshMaintenance()])
+  scheduleMaintenancePoll()
+})
+
+onUnmounted(() => {
+  if (maintenanceTimer) window.clearTimeout(maintenanceTimer)
+  unregisterGuard?.()
+  discardResolver?.(false)
+})
 </script>
 
 <template>
-  <div class="h-screen p-4 sm:p-6" style="background: radial-gradient(circle at top left, rgba(217, 107, 49, 0.12), transparent 28%), radial-gradient(circle at top right, rgba(35, 93, 103, 0.10), transparent 22%), linear-gradient(135deg, var(--shell-bg-a), var(--shell-bg-b) 50%, var(--shell-bg-c))">
-    <div class="flex h-full min-h-0 gap-4">
-      <!-- Left Sidebar -->
-      <aside class="card flex w-56 flex-shrink-0 flex-col overflow-hidden p-4">
-        <div data-tauri-drag-region class="mb-5">
-          <h1 class="text-lg font-bold text-gray-900">{{ t('settings.title') }}</h1>
-        </div>
-        <nav class="flex-1 space-y-1">
+  <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-5 sm:p-6">
+    <div class="mx-auto flex h-full min-h-0 max-w-[1420px] flex-col">
+      <header class="mb-5 flex-none">
+        <h1 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('settings.title') }}</h1>
+      </header>
+
+      <div v-if="loading" class="flex min-h-[65vh] items-center justify-center">
+        <ArrowPathIcon class="h-8 w-8 animate-spin text-[var(--color-primary)]" :aria-label="t('settings.loading')" />
+      </div>
+
+      <div v-else class="settings-layout min-h-0 flex-1">
+        <nav class="settings-nav min-h-0 overflow-y-auto" :aria-label="t('settings.sectionNavigation')">
           <button
             v-for="section in sections"
             :key="section.id"
+            type="button"
+            class="flex min-h-12 w-full items-center gap-3 rounded-lg px-3.5 text-left text-sm font-medium transition"
+            :class="activeSection === section.id
+              ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
+              : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
+            :aria-current="activeSection === section.id ? 'page' : undefined"
             @click="activeSection = section.id"
-            :class="[
-              'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-              activeSection === section.id
-                ? 'bg-violet-50 text-violet-700'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
-            ]"
           >
-            <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" :d="section.icon" />
-            </svg>
+            <component :is="section.icon" class="h-5 w-5 flex-none" aria-hidden="true" />
             {{ t(section.labelKey) }}
           </button>
         </nav>
-        <button @click="handleCancel" class="btn-secondary mt-4 w-full text-center">
-          {{ t('action.back') }}
-        </button>
-      </aside>
 
-      <!-- Right Content -->
-      <div class="flex min-h-0 flex-1 flex-col gap-4">
-        <main class="card flex-1 overflow-y-auto p-6">
-          <div class="max-w-xl">
-            <!-- Hotkeys -->
-            <div v-if="activeSection === 'hotkeys'">
-              <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('settings.hotkeys') }}</h2>
-              <div class="space-y-4">
+        <section class="settings-content min-h-0">
+          <header class="flex-none border-b border-[var(--shell-line)] px-6 py-5 sm:px-7">
+            <h2 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t(currentSection.labelKey) }}</h2>
+            <p class="mt-1.5 text-sm leading-6 text-[var(--shell-muted)]">{{ t(currentSection.descriptionKey) }}</p>
+          </header>
+
+          <div class="settings-content__body min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5 sm:px-7">
+            <template v-if="activeSection === 'hotkeys'">
+              <div class="setting-row">
                 <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.screenshotHotkey') }}</label>
+                  <label class="setting-label">{{ t('settings.screenshotHotkey') }}</label>
+                  <p class="setting-help">{{ t('settings.recordHelp') }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="setting-input flex min-h-11 items-center justify-between text-left"
+                  :class="{ 'border-[var(--color-primary)] ring-2 ring-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]': recordingHotkey }"
+                  @click="recordingHotkey = true"
+                  @keydown="recordHotkey"
+                >
+                  <span>{{ recordingHotkey ? t('settings.recording') : formatHotkey(screenshotHotkey) }}</span>
+                  <CommandLineIcon class="h-5 w-5 flex-none text-[var(--shell-muted)]" aria-hidden="true" />
+                </button>
+              </div>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">{{ t('settings.searchHotkey') }}</span>
+                  <p class="setting-help">{{ t('settings.searchHotkeyFixed') }}</p>
+                </div>
+                <div class="setting-readonly">Ctrl + F</div>
+              </div>
+            </template>
+
+            <template v-else-if="activeSection === 'screenshot'">
+              <label class="setting-row">
+                <span class="setting-label">{{ t('settings.captureLimitWindow') }}</span>
+                <input v-model.number="captureLimitWindowSeconds" class="setting-input" type="number" min="1" max="120" />
+              </label>
+              <label class="setting-row">
+                <span class="setting-label">{{ t('settings.maxCaptures') }}</span>
+                <input v-model.number="maxCaptures" class="setting-input" type="number" min="1" max="100" />
+              </label>
+              <label class="setting-row">
+                <span class="setting-label">{{ t('settings.clusterThreshold') }}</span>
+                <input v-model.number="clusterThreshold" class="setting-input" type="number" min="1" max="20" />
+              </label>
+
+              <div class="rounded-lg border border-[var(--shell-line)] p-4">
+                <label class="flex cursor-pointer items-center justify-between gap-4">
+                  <span>
+                    <span class="setting-label">{{ t('settings.enableCluster') }}</span>
+                    <span class="setting-help">{{ t('settings.clusterScreenshotHint') }}</span>
+                  </span>
+                  <input v-model="clusterMode" type="checkbox" class="h-5 w-5 accent-[var(--color-primary)]" />
+                </label>
+                <div class="mt-4 grid gap-3.5 sm:grid-cols-3" :class="{ 'opacity-50': !clusterMode }">
+                  <label>
+                    <span class="setting-label">{{ t('settings.maxImages') }}</span>
+                    <input v-model.number="clusterMaxImages" class="setting-input mt-2" type="number" min="2" max="20" :disabled="!clusterMode" />
+                  </label>
+                  <label>
+                    <span class="setting-label">{{ t('settings.timeoutSeconds') }}</span>
+                    <input v-model.number="clusterTimeout" class="setting-input mt-2" type="number" min="1" max="120" :disabled="!clusterMode" />
+                  </label>
+                  <label class="flex items-center gap-3 pt-8">
+                    <input v-model="clusterAutoSubmit" type="checkbox" class="h-5 w-5 accent-[var(--color-primary)]" :disabled="!clusterMode" />
+                    <span class="setting-label">{{ t('settings.autoSubmit') }}</span>
+                  </label>
+                </div>
+              </div>
+            </template>
+
+            <template v-else-if="activeSection === 'ai'">
+              <div class="setting-row">
+                <div>
+                  <label for="ai-api-key" class="setting-label">API Key</label>
+                  <p class="setting-help">{{ t('settings.localOnly') }}</p>
+                </div>
+                <div class="relative">
+                  <input
+                    id="ai-api-key"
+                    v-model="aiApiKey"
+                    class="setting-input pr-12"
+                    :type="showApiKey ? 'text' : 'password'"
+                    autocomplete="off"
+                  />
                   <button
                     type="button"
-                    :class="[
-                      'w-full min-h-11 px-4 py-2 rounded-lg border text-left outline-none transition-colors',
-                      recordingHotkey === 'screenshot'
-                        ? 'border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
-                        : 'border-gray-200 bg-white text-gray-800 hover:border-violet-300 focus:border-violet-400',
-                    ]"
-                    @click="startHotkeyRecording"
-                    @keydown="handleHotkeyKeydown"
-                    @blur="recordingHotkey = null"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[var(--shell-muted)] hover:bg-[var(--shell-control-hover)]"
+                    :aria-label="showApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')"
+                    @click="showApiKey = !showApiKey"
                   >
-                    <span class="font-medium">
-                      {{ recordingHotkey === 'screenshot' ? t('settings.recording') : formatHotkeyForDisplay(screenshotHotkey) }}
-                    </span>
-                    <span class="ml-2 text-xs text-gray-400">
-                      {{ recordingHotkey === 'screenshot' ? t('settings.recordHelp') : t('settings.recordHint') }}
-                    </span>
+                    <EyeSlashIcon v-if="showApiKey" class="h-5 w-5" aria-hidden="true" />
+                    <EyeIcon v-else class="h-5 w-5" aria-hidden="true" />
                   </button>
                 </div>
               </div>
-            </div>
-
-            <!-- Screenshot -->
-            <div v-if="activeSection === 'screenshot'">
-              <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('settings.screenshot') }}</h2>
-              <div class="space-y-4">
+              <label class="setting-row">
+                <span class="setting-label">Base URL</span>
+                <input v-model="aiBaseUrl" class="setting-input" type="url" />
+              </label>
+              <label class="setting-row">
+                <span class="setting-label">{{ t('settings.visualModel') }}</span>
+                <input v-model="aiModel" class="setting-input" type="text" />
+              </label>
+              <div class="setting-row">
                 <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.captureLimitWindow') }}</label>
-                  <input v-model.number="captureLimitWindowSeconds" type="number" step="0.5" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                  <span class="setting-label">{{ t('settings.vectorModel') }}</span>
+                  <p class="setting-help">{{ t('settings.fixedBuiltin') }}</p>
                 </div>
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.maxCaptures') }}</label>
-                  <input v-model.number="maxCaptures" type="number" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+                <div class="setting-readonly flex items-center gap-2">
+                  <LockClosedIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+                  BAAI/bge-small-zh-v1.5
                 </div>
               </div>
+              <label class="setting-row">
+                <span class="setting-label">{{ t('settings.requestTimeout') }}</span>
+                <input v-model.number="aiTimeout" class="setting-input" type="number" min="1" max="600" />
+              </label>
 
-              <h3 class="text-lg font-semibold text-gray-900 mt-6 mb-4">{{ t('settings.clusterScreenshot') }}</h3>
-              <div class="space-y-4">
-                <label class="flex items-center gap-3">
-                  <input v-model="clusterMode" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
-                  <span class="text-gray-700">{{ t('settings.enableCluster') }}</span>
-                </label>
-                <label class="flex items-center gap-3">
-                  <input v-model="clusterAutoSubmit" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
-                  <span class="text-gray-700">{{ t('settings.autoSubmit') }}</span>
-                </label>
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.maxImages') }}</label>
-                  <input v-model.number="clusterMaxImages" type="number" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
-                </div>
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.timeoutSeconds') }}</label>
-                  <input v-model.number="clusterTimeout" type="number" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
-                </div>
+              <div class="flex flex-wrap items-center gap-3">
+                <button type="button" class="btn-secondary min-h-10" :disabled="testingAi" @click="testAi">
+                  <ArrowPathIcon v-if="testingAi" class="h-5 w-5 flex-none animate-spin" aria-hidden="true" />
+                  <ServerStackIcon v-else class="h-5 w-5 flex-none" aria-hidden="true" />
+                  {{ testingAi ? t('settings.testing') : t('settings.test') }}
+                </button>
+                <p
+                  v-if="aiTestResult"
+                  class="flex items-center gap-2 text-sm"
+                  :class="aiTestResult.success ? 'text-emerald-600' : 'text-red-600'"
+                >
+                  <CheckCircleIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+                  {{ aiTestResult.message }}
+                </p>
               </div>
-            </div>
 
-            <!-- AI -->
-            <div v-if="activeSection === 'ai'">
-              <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('settings.ai') }}</h2>
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">API Key</label>
-                  <input v-model="aiApiKey" type="password" placeholder="sk-..." class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
+              <div class="rounded-lg border border-[color-mix(in_srgb,var(--color-primary)_20%,transparent)] bg-[var(--color-primary-soft)] p-4">
+                <div class="flex items-center gap-2 text-sm font-semibold text-[var(--color-primary-hover)]">
+                  <CpuChipIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+                  {{ t('settings.localOcr') }}
                 </div>
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">Base URL</label>
-                  <input v-model="aiBaseUrl" placeholder="https://api.openai.com/v1" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
-                </div>
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.model') }}</label>
-                  <input v-model="aiModel" placeholder="gpt-4o-mini" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
-                </div>
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.timeoutSeconds') }}</label>
-                  <input v-model.number="aiTimeout" type="number" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" />
-                </div>
-                <div class="flex items-center gap-4">
-                  <button @click="handleTestAi" :disabled="isTestingAi" class="btn-secondary">
-                    {{ isTestingAi ? t('settings.testing') : t('settings.test') }}
-                  </button>
-                  <span v-if="aiTestResult" :class="['text-sm', aiTestResult.success ? 'text-green-600' : 'text-red-600']">
-                    {{ aiTestResult.message }}
-                  </span>
-                </div>
+                <dl class="mt-3 grid gap-2.5 text-sm sm:grid-cols-2">
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrModel') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">PP-OCRv6-small</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrFramework') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">RapidOCR 3.9.2</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrRuntime') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">ONNX Runtime CPU</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.dataPrivacy') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">{{ t('settings.localNoUpload') }}</dd></div>
+                </dl>
               </div>
-            </div>
+            </template>
 
-            <!-- UI -->
-            <div v-if="activeSection === 'ui'">
-              <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('settings.ui') }}</h2>
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.theme') }}</label>
-                  <select v-model="themePreference" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none">
-                    <option value="light">{{ t('settings.themeLight') }}</option>
-                    <option value="dark">{{ t('settings.themeDark') }}</option>
-                    <option value="system">{{ t('settings.themeSystem') }}</option>
-                  </select>
+            <template v-else-if="activeSection === 'ui'">
+              <fieldset>
+                <legend class="setting-label">{{ t('settings.theme') }}</legend>
+                <div class="mt-3 grid grid-cols-3 gap-3">
+                  <label
+                    v-for="option in [
+                      { value: 'light', label: t('settings.themeLight') },
+                      { value: 'dark', label: t('settings.themeDark') },
+                      { value: 'system', label: t('settings.themeSystem') },
+                    ]"
+                    :key="option.value"
+                    class="cursor-pointer rounded-lg border p-3.5 text-center text-sm font-medium transition"
+                    :class="themePreference === option.value ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]' : 'border-[var(--shell-line)]'"
+                  >
+                    <input v-model="themePreference" class="sr-only" type="radio" :value="option.value" />
+                    {{ option.label }}
+                  </label>
                 </div>
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.language') }}</label>
-                  <select v-model="language" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none" @change="setLanguagePreference(language)">
-                    <option value="zh-CN">{{ t('settings.languageZh') }}</option>
-                    <option value="en-US">{{ t('settings.languageEn') }}</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-sm text-gray-600 mb-2">{{ t('settings.closeAction') }}</label>
-                  <select v-model="closeAction" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-violet-400 outline-none">
-                    <option value="ask">{{ t('settings.closeAsk') }}</option>
-                    <option value="minimize">{{ t('settings.closeMinimize') }}</option>
-                    <option value="exit">{{ t('settings.closeExit') }}</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+              </fieldset>
+              <label class="setting-row">
+                <span class="setting-label">{{ t('settings.language') }}</span>
+                <select v-model="language" class="setting-input">
+                  <option value="zh-CN">{{ t('settings.languageZh') }}</option>
+                  <option value="en-US">{{ t('settings.languageEn') }}</option>
+                </select>
+              </label>
+              <label class="setting-row">
+                <span class="setting-label">{{ t('settings.closeAction') }}</span>
+                <select v-model="closeAction" class="setting-input">
+                  <option value="ask">{{ t('settings.closeAsk') }}</option>
+                  <option value="minimize">{{ t('settings.closeMinimize') }}</option>
+                  <option value="exit">{{ t('settings.closeExit') }}</option>
+                </select>
+              </label>
+            </template>
 
-            <!-- Maintenance -->
-            <div v-if="activeSection === 'maintenance'">
-              <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('settings.maintenance') }}</h2>
-              <div class="space-y-4">
-                <div class="flex items-center justify-between gap-4 border-b border-gray-100 py-3">
-                  <div class="min-w-0">
-                    <div class="text-sm font-medium text-gray-900">{{ t('settings.repairIndex') }}</div>
-                    <div class="mt-1 text-xs text-gray-500">{{ indexRepairStatusText() }}</div>
+            <template v-else>
+              <div class="maintenance-card">
+                <div class="flex items-start gap-4">
+                  <CircleStackIcon class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
+                  <div class="min-w-0 flex-1">
+                    <h3 class="setting-label">{{ t('settings.semanticIndex') }}</h3>
+                    <p class="setting-help">{{ t('settings.semanticIndexHint') }}</p>
+                    <p v-if="indexStatus?.running" class="mt-3 text-sm text-[var(--color-primary)]">{{ t('settings.indexRepairRunning') }}</p>
+                    <p v-else-if="indexStatus?.result" class="mt-3 text-sm text-[var(--shell-muted)]">
+                      {{ t('settings.indexRepairLastResult', {
+                        processed: indexStatus.result.processed,
+                        indexed: indexStatus.result.indexed,
+                        failed: indexStatus.result.failed,
+                      }) }}
+                    </p>
+                    <p v-else-if="indexStatus" class="mt-3 text-sm text-[var(--shell-muted)]">
+                      {{ t('settings.indexRepairIdle', {
+                        sqlite: indexStatus.sqlite_count ?? 0,
+                        chroma: indexStatus.chroma_count ?? 0,
+                      }) }}
+                    </p>
                   </div>
                   <button
-                    @click="handleRepairIndex"
-                    :disabled="isRepairingIndex"
-                    class="btn-secondary whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
+                    type="button"
+                    class="btn-secondary min-h-10"
+                    :disabled="maintenanceRunning"
+                    @click="openConfirmation('index')"
                   >
-                    {{ isRepairingIndex ? t('settings.repairingIndex') : t('settings.repairIndex') }}
+                    <ArrowPathIcon class="h-5 w-5 flex-none" :class="{ 'animate-spin': indexStatus?.running }" aria-hidden="true" />
+                    {{ indexStatus?.running ? t('settings.repairingIndex') : t('settings.repairIndex') }}
                   </button>
                 </div>
               </div>
-            </div>
-          </div>
-        </main>
 
-        <!-- Footer -->
-        <footer class="card flex items-center justify-between p-4">
-          <button @click="handleReset" class="px-4 py-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-            {{ t('action.reset') }}
-          </button>
-          <div class="flex gap-3">
-            <button @click="handleCancel" class="btn-secondary">{{ t('action.cancel') }}</button>
-            <button @click="handleSave" class="btn-primary">{{ t('action.save') }}</button>
+              <div class="maintenance-card">
+                <div class="flex items-start gap-4">
+                  <CpuChipIcon class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
+                  <div class="min-w-0 flex-1">
+                    <h3 class="setting-label">{{ t('settings.ocrBackfill') }}</h3>
+                    <p class="setting-help">{{ t('settings.ocrBackfillHint') }}</p>
+                    <p v-if="ocrStatus?.running" class="mt-3 text-sm text-[var(--color-primary)]">
+                      {{ t('settings.ocrBackfillRunning', {
+                        processed: ocrStatus.result?.processed ?? 0,
+                        total: ocrStatus.result?.total ?? 0,
+                      }) }}
+                    </p>
+                    <p v-else-if="ocrStatus?.result" class="mt-3 text-sm text-[var(--shell-muted)]">
+                      {{ t('settings.ocrBackfillResult', {
+                        processed: ocrStatus.result.processed,
+                        succeeded: ocrSucceeded,
+                        skipped: ocrStatus.result.skipped,
+                        failed: ocrStatus.result.failed,
+                      }) }}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-secondary min-h-10"
+                    :disabled="maintenanceRunning"
+                    @click="openConfirmation('ocr')"
+                  >
+                    <ArrowPathIcon class="h-5 w-5 flex-none" :class="{ 'animate-spin': ocrStatus?.running }" aria-hidden="true" />
+                    {{ ocrStatus?.running ? t('settings.backfillingOcr') : t('settings.startBackfill') }}
+                  </button>
+                </div>
+              </div>
+            </template>
           </div>
-        </footer>
+
+          <footer class="flex flex-none flex-wrap items-center justify-between gap-3 border-t border-[var(--shell-line)] px-6 py-4 sm:px-7">
+            <button type="button" class="min-h-10 rounded-md px-3 text-sm font-medium text-red-600 hover:bg-red-50" @click="openConfirmation('reset')">
+              {{ t('action.reset') }}
+            </button>
+            <div class="flex gap-2.5">
+              <button type="button" class="btn-secondary min-h-10 px-4" @click="router.push('/')">{{ t('action.cancel') }}</button>
+              <button type="button" class="btn-primary min-h-10 px-4" :disabled="saving || !dirty" @click="handleSave">
+                <ArrowPathIcon v-if="saving" class="h-5 w-5 flex-none animate-spin" aria-hidden="true" />
+                {{ saving ? t('settings.saving') : t('settings.saveChanges') }}
+              </button>
+            </div>
+          </footer>
+        </section>
       </div>
     </div>
-  </div>
+
+    <ConfirmDialog
+      id="settings-confirm"
+      :open="Boolean(confirmAction)"
+      :title="confirmationCopy.title"
+      :description="confirmationCopy.description"
+      :confirm-label="confirmationCopy.confirm"
+      :cancel-label="t('action.cancel')"
+      :destructive="confirmationCopy.destructive"
+      :busy="confirmBusy"
+      @confirm="runConfirmedAction"
+      @cancel="confirmAction = null"
+    />
+    <ConfirmDialog
+      id="settings-discard"
+      :open="discardDialogOpen"
+      :title="t('settings.discardTitle')"
+      :description="t('settings.discardDescription')"
+      :confirm-label="t('settings.discard')"
+      :cancel-label="t('settings.keepEditing')"
+      destructive
+      @confirm="resolveDiscard(true)"
+      @cancel="resolveDiscard(false)"
+    />
+  </main>
 </template>
+
+<style scoped>
+.settings-layout {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+.settings-page {
+  overflow-y: auto;
+}
+
+.settings-nav,
+.settings-content {
+  border: 1px solid var(--shell-line);
+  background: var(--shell-card);
+  box-shadow: var(--shell-card-shadow);
+}
+
+.settings-nav {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: .375rem;
+  border-radius: var(--radius-xl);
+  padding: .75rem;
+}
+
+.settings-content {
+  display: flex;
+  min-height: 500px;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(260px, 1fr);
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.setting-label {
+  display: block;
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--shell-ink);
+}
+
+.setting-help {
+  display: block;
+  margin-top: .375rem;
+  font-size: .75rem;
+  line-height: 1.25rem;
+  color: var(--shell-muted);
+}
+
+.setting-input,
+.setting-readonly {
+  width: 100%;
+  min-height: 2.625rem;
+  border: 1px solid var(--shell-line);
+  border-radius: var(--radius-md);
+  background: var(--shell-control-bg);
+  padding: .55rem .85rem;
+  color: var(--shell-ink);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.setting-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
+}
+
+.setting-readonly {
+  color: var(--shell-muted);
+  cursor: default;
+}
+
+.maintenance-card {
+  border: 1px solid var(--shell-line);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+}
+
+@media (max-width: 900px) {
+  .settings-page {
+    overflow-y: auto;
+  }
+
+  .settings-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .settings-nav {
+    display: grid;
+    align-self: auto;
+    grid-template-columns: repeat(5, minmax(115px, 1fr));
+    overflow-x: auto;
+  }
+
+  .settings-content {
+    overflow: visible;
+  }
+
+  .settings-content__body {
+    flex: none;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 720px) {
+  .setting-row {
+    grid-template-columns: 1fr;
+    gap: .75rem;
+  }
+}
+</style>

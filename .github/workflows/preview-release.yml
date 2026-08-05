@@ -81,6 +81,54 @@ jobs:
         shell: cmd
         run: build_release.bat
 
+      - name: Smoke test bundled backend sidecar
+        shell: pwsh
+        run: |
+          $sidecar = "glimpse-frontend/src-tauri/binaries/GlimpseRuntime/GlimpseRuntime.exe"
+          if (-not (Test-Path -LiteralPath $sidecar)) {
+            throw "Bundled backend sidecar missing: $sidecar"
+          }
+          $port = 58123
+          $token = "preview-smoke-token"
+          $stdoutPath = Join-Path $env:RUNNER_TEMP "sidecar-smoke-$port.out"
+          $stderrPath = Join-Path $env:RUNNER_TEMP "sidecar-smoke-$port.err"
+          $process = Start-Process -FilePath $sidecar `
+            -ArgumentList "--host","127.0.0.1","--port","$port","--auth-token",$token `
+            -PassThru -WindowStyle Hidden -WorkingDirectory (Split-Path $sidecar) `
+            -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+          try {
+            $deadline = (Get-Date).AddSeconds(45)
+            $response = $null
+            while ((Get-Date) -lt $deadline) {
+              Start-Sleep -Seconds 2
+              try {
+                $response = Invoke-WebRequest -UseBasicParsing `
+                  -Uri "http://127.0.0.1:$port/api/health" `
+                  -Headers @{ "X-Glimpse-Auth" = $token } `
+                  -TimeoutSec 3
+                break
+              } catch {
+                if ($process.HasExited) {
+                  $stderrTail = Get-Content -Path $stderrPath -Tail 40 -ErrorAction SilentlyContinue
+                  throw "Backend sidecar exited early (code $($process.ExitCode)): $($_.Exception.Message)`n$($stderrTail -join "`n")"
+                }
+              }
+            }
+            if (-not $response) {
+              throw "Backend sidecar health check timed out"
+            }
+            if ($response.StatusCode -ne 200 -or $response.Content -notmatch "healthy") {
+              throw "Backend health check failed: $($response.StatusCode) $($response.Content)"
+            }
+            Write-Host "Backend sidecar smoke test passed: $($response.Content)"
+          } finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+              $process.WaitForExit()
+            }
+            Remove-Item $stdoutPath,$stderrPath -ErrorAction SilentlyContinue
+          }
+
       - name: Create checksums and publish private draft GitHub Release
         shell: pwsh
         env:

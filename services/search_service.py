@@ -177,7 +177,7 @@ class SearchService:
                 continue
 
             memory = self._sqlite_manager.get_memory_by_id(mem_id)
-            if memory:
+            if memory and memory.sync_status == "SYNCED":
                 self._set_search_metadata(
                     memory,
                     ["语义"],
@@ -233,12 +233,22 @@ class SearchService:
         vector_distance: Dict[str, float] = {}
         for rank, result in enumerate(vector_results):
             result_id = result["id"]
+            memory = self._sqlite_manager.get_memory_by_id(result_id)
+            if memory is None or memory.sync_status != "SYNCED":
+                continue
             vector_rank[result_id] = 1.0 / (rrf_k + rank + 1)
             vector_position[result_id] = rank + 1
             if "distance" in result:
                 vector_distance[result_id] = result["distance"]
 
-        all_ids = set(text_rank.keys()) | set(vector_rank.keys())
+        accepted_vector_ids = {
+            memory_id
+            for memory_id, distance in vector_distance.items()
+            if distance is not None and distance <= semantic_threshold
+        }
+        # Above-threshold vector candidates may still contribute an RRF boost to
+        # an exact match, but they must never create a result with no match source.
+        all_ids = set(text_rank.keys()) | accepted_vector_ids
         rrf_scores: Dict[str, float] = {}
         for mem_id in all_ids:
             rrf_scores[mem_id] = text_rank.get(mem_id, 0.0) + vector_rank.get(mem_id, 0.0)

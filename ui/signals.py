@@ -16,6 +16,7 @@ class UISignals:
         self.screenshot_requested = EventSignal("screenshot_requested")
         self.screenshot_completed = EventSignal("screenshot_completed")
         self.memory_saved = EventSignal("memory_saved")
+        self.memory_updated = EventSignal("memory_updated")
         self.memory_deleted = EventSignal("memory_deleted")
         self.search_requested = EventSignal("search_requested")
         self.search_completed = EventSignal("search_completed")

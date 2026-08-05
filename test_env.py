@@ -2,6 +2,7 @@
 环境验证脚本
 验证 Glimpse 项目的 Python 版本和依赖安装
 """
+import os
 import sys
 
 
@@ -34,7 +35,8 @@ def test_dependencies():
         'mss': 'mss',
         'Pillow': 'PIL',
         'pynput': 'pynput',
-        'rapidocr-onnxruntime': 'rapidocr_onnxruntime',
+        'rapidocr': 'rapidocr',
+        'onnxruntime': 'onnxruntime',
         'openai': 'openai',
         'requests': 'requests',
         'python-dotenv': 'dotenv',
@@ -106,5 +108,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import os
     sys.exit(main())

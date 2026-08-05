@@ -1,22 +1,106 @@
-"""
-Unit tests for services/memory_service.py
-"""
+"""Unit tests for services.memory_service."""
+
+import copy
+import json
+import time
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, call
+
+from db.sqlite_manager import MemoryRecord
+from services.memory_service import MemoryService
 
 
 @pytest.fixture
 def mock_services():
+    records = {}
     sqlite_mgr = MagicMock()
-    sqlite_mgr.insert_memory.return_value = True
-    sqlite_mgr.delete_memory.return_value = True
+
+    def insert_memory(record):
+        if record.id in records:
+            return False
+        records[record.id] = copy.deepcopy(record)
+        return True
+
+    def get_memory(memory_id):
+        record = records.get(memory_id)
+        return copy.deepcopy(record) if record else None
+
+    def update_summary(memory_id, summary, sync_status="PENDING"):
+        record = records.get(memory_id)
+        if record is None:
+            return False
+        record.ai_summary = summary
+        record.sync_status = sync_status
+        return True
+
+    def update_text(memory_id, text_content, sync_status="PENDING"):
+        record = records.get(memory_id)
+        if record is None:
+            return False
+        record.text_content = text_content
+        record.sync_status = sync_status
+        return True
+
+    def update_status(memory_id, sync_status):
+        record = records.get(memory_id)
+        if record is None:
+            return False
+        record.sync_status = sync_status
+        return True
+
+    def compare_status(
+        memory_id,
+        *,
+        expected_ai_summary,
+        expected_text_content,
+        sync_status,
+    ):
+        record = records.get(memory_id)
+        if record is None:
+            return False
+        if (
+            record.ai_summary != expected_ai_summary
+            or record.text_content != expected_text_content
+        ):
+            return False
+        record.sync_status = sync_status
+        return True
+
+    def get_all(limit=100, offset=0):
+        values = sorted(records.values(), key=lambda item: item.created_at, reverse=True)
+        return copy.deepcopy(values[offset : offset + limit])
+
+    sqlite_mgr.insert_memory.side_effect = insert_memory
+    sqlite_mgr.get_memory_by_id.side_effect = get_memory
+    sqlite_mgr.update_memory_summary.side_effect = update_summary
+    sqlite_mgr.update_memory_text_content.side_effect = update_text
+    sqlite_mgr.update_memory_sync_status.side_effect = update_status
+    sqlite_mgr.compare_and_set_memory_sync_status.side_effect = compare_status
+    sqlite_mgr.get_all_memories.side_effect = get_all
+    sqlite_mgr.get_memories_count.side_effect = lambda: len(records)
+    sqlite_mgr.get_unsynced_memories_count.side_effect = lambda: sum(
+        record.sync_status != "SYNCED" for record in records.values()
+    )
+    sqlite_mgr.get_memories_without_text.side_effect = lambda: [
+        copy.deepcopy(record)
+        for record in records.values()
+        if not (record.text_content or "").strip()
+    ]
+    sqlite_mgr.delete_memory.side_effect = lambda memory_id: records.pop(
+        memory_id, None
+    ) is not None
+    sqlite_mgr._records = records
 
     chroma_mgr = MagicMock()
-    chroma_mgr.add_memory.return_value = True
     chroma_mgr.upsert_memory.return_value = True
     chroma_mgr.reset_collection.return_value = True
     chroma_mgr.delete_memory.return_value = True
     chroma_mgr.available = True
+    chroma_mgr.get_all_memory_ids.return_value = []
+    chroma_mgr.get_memory_count.return_value = 0
 
     ocr_engine = MagicMock()
     ocr_engine.extract_text.return_value = "extracted text"
@@ -24,11 +108,13 @@ def mock_services():
     ai_client = MagicMock()
     ai_client.is_configured.return_value = True
     ai_client.analyze_image.return_value = "AI summary"
+    ai_client.analyze_images.return_value = "Cluster summary"
 
     embedding_client = MagicMock()
     embedding_client.get_embedding.return_value = [0.1] * 384
 
     task_queue = MagicMock()
+    task_queue.submit.return_value = object()
     return {
         "sqlite_manager": sqlite_mgr,
         "chroma_manager": chroma_mgr,
@@ -39,294 +125,410 @@ def mock_services():
     }
 
 
-class TestMemoryServiceInit:
-    def test_init_stores_dependencies(self, mock_services):
-        from services.memory_service import MemoryService
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        assert ms._sqlite_manager is mock_services["sqlite_manager"]
-        assert ms._ai_client is mock_services["ai_client"]
-
-    def test_init_with_task_queue(self, mock_services):
-        from services.memory_service import MemoryService
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-            task_queue=mock_services["task_queue"],
-        )
-        assert ms._task_queue is mock_services["task_queue"]
-
-    def test_progress_callback(self, mock_services):
-        from services.memory_service import MemoryService
-        ms = MemoryService(**{k: v for k, v in mock_services.items() if k != "task_queue"})
-        cb = MagicMock()
-        ms.set_progress_callback(cb)
-        ms._report_progress("test")
-        cb.assert_called_once_with("test")
+def make_service(mock_services, *, with_queue=False):
+    values = dict(mock_services)
+    if not with_queue:
+        values.pop("task_queue")
+    return MemoryService(**values)
 
 
-class TestMemoryServiceCreateMemory:
-    def test_create_memory_success(self, mock_services):
-        from services.memory_service import MemoryService
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        memory_id = ms.create_memory("/fake/path.png", app_name="chrome")
-        assert memory_id is not None
-        mock_services["sqlite_manager"].insert_memory.assert_called_once()
-        mock_services["chroma_manager"].add_memory.assert_called_once()
+def add_record(mock_services, **overrides):
+    values = {
+        "id": "memory-1",
+        "created_at": "2026-01-01 12:00:00",
+        "image_path": "primary.png",
+        "ai_summary": "summary",
+        "app_name": "unknown",
+        "text_content": "",
+        "sync_status": "PENDING",
+    }
+    values.update(overrides)
+    record = MemoryRecord(**values)
+    assert mock_services["sqlite_manager"].insert_memory(record)
+    return record
 
-    def test_create_memory_ai_not_configured(self, mock_services):
-        from services.memory_service import MemoryService
-        mock_services["ai_client"].is_configured.return_value = False
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        memory_id = ms.create_memory("/fake/path.png")
-        assert memory_id is not None
-        mock_services["sqlite_manager"].insert_memory.assert_called_once()
 
-    def test_create_memory_chroma_fail_rolls_back(self, mock_services):
-        from services.memory_service import MemoryService
-        mock_services["chroma_manager"].add_memory.return_value = False
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        with pytest.raises(RuntimeError, match="ChromaDB"):
-            ms.create_memory("/fake/path.png")
-        # Rollback should delete from SQLite
-        mock_services["sqlite_manager"].delete_memory.assert_called_once()
+class TestMemoryServiceCreate:
+    def test_single_capture_runs_ocr_before_persisting(self, mock_services):
+        service = make_service(mock_services)
 
-    def test_create_memory_does_not_extract_ocr_text(self, mock_services):
-        from services.memory_service import MemoryService
-        mock_services["ocr_engine"].extract_text.return_value = "Hello World"
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        ms.create_memory("/fake/path.png")
-        mock_services["ocr_engine"].extract_text.assert_not_called()
-        record = mock_services["sqlite_manager"].insert_memory.call_args[0][0]
+        memory_id = service.create_memory("capture.png")
+
+        record = mock_services["sqlite_manager"]._records[memory_id]
+        assert record.text_content == "extracted text"
+        assert record.sync_status == "SYNCED"
+        mock_services["ocr_engine"].extract_text.assert_called_once_with("capture.png")
+        kwargs = mock_services["chroma_manager"].upsert_memory.call_args.kwargs
+        assert kwargs["text"] == "AI summary\n\nextracted text"
+
+    def test_ocr_exception_does_not_block_creation(self, mock_services):
+        mock_services["ocr_engine"].extract_text.side_effect = RuntimeError("OCR failed")
+        service = make_service(mock_services)
+
+        memory_id = service.create_memory("capture.png")
+
+        record = mock_services["sqlite_manager"]._records[memory_id]
         assert record.text_content == ""
+        assert record.ai_summary == "AI summary"
+
+    def test_no_ai_uses_first_200_ocr_characters(self, mock_services):
+        mock_services["ai_client"].is_configured.return_value = False
+        mock_services["ocr_engine"].extract_text.return_value = "字" * 250
+        service = make_service(mock_services)
+
+        memory_id = service.create_memory("capture.png")
+
+        record = mock_services["sqlite_manager"]._records[memory_id]
+        assert record.ai_summary == "字" * 200
+
+    def test_index_failure_keeps_sqlite_memory_as_failed(self, mock_services):
+        mock_services["chroma_manager"].upsert_memory.return_value = False
+        service = make_service(mock_services)
+
+        memory_id = service.create_memory("capture.png")
+
+        assert memory_id in mock_services["sqlite_manager"]._records
+        assert (
+            mock_services["sqlite_manager"]._records[memory_id].sync_status
+            == "FAILED"
+        )
+
+    def test_cluster_ocr_preserves_image_order(self, mock_services):
+        mock_services["ocr_engine"].extract_text.side_effect = ["first", None, "third"]
+        service = make_service(mock_services)
+
+        memory_id = service.create_cluster_memory(["1.png", "2.png", "3.png"])
+
+        record = mock_services["sqlite_manager"]._records[memory_id]
+        assert record.text_content == "first\n\nthird"
+        assert json.loads(record.extra_images) == ["2.png", "3.png"]
+        mock_services["ai_client"].analyze_images.assert_called_once()
+
+    def test_empty_cluster_is_rejected(self, mock_services):
+        service = make_service(mock_services)
+        with pytest.raises(ValueError, match="at least one image"):
+            service.create_cluster_memory([])
 
 
 class TestMemoryServiceAsync:
-    def test_create_memory_async_no_queue_raises(self, mock_services):
-        from services.memory_service import MemoryService
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
+    def test_create_memory_async_requires_queue(self, mock_services):
         with pytest.raises(RuntimeError, match="not configured"):
-            ms.create_memory_async("/fake/path.png")
+            make_service(mock_services).create_memory_async("capture.png")
 
-    def test_create_memory_async_submits_task(self, mock_services):
-        from services.memory_service import MemoryService
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-            task_queue=mock_services["task_queue"],
-        )
-        ms.create_memory_async("/fake/path.png")
-        mock_services["task_queue"].submit.assert_called_once()
-        args, kwargs = mock_services["task_queue"].submit.call_args
-        assert len(args) == 2
-        assert isinstance(args[0], str)
+    def test_create_memory_async_submits_unique_task(self, mock_services):
+        service = make_service(mock_services, with_queue=True)
+        service.create_memory_async("capture.png")
+
+        args = mock_services["task_queue"].submit.call_args.args
         assert args[0].startswith("memory_creation_")
         assert callable(args[1])
 
 
-class TestMemoryServiceVectorRepair:
-    def test_repair_vector_index_indexes_missing_memories(self, mock_services):
-        from db.sqlite_manager import MemoryRecord
-        from services.memory_service import MemoryService
+class TestMemorySummaryUpdate:
+    def test_update_trims_summary_and_queues_reindex(self, mock_services):
+        add_record(mock_services, sync_status="SYNCED")
+        service = make_service(mock_services, with_queue=True)
 
-        existing = MemoryRecord(
-            id="existing",
-            created_at="now",
-            image_path="path",
+        updated = service.update_memory_summary("memory-1", "  new summary  ")
+
+        assert updated.ai_summary == "new summary"
+        assert updated.sync_status == "PENDING"
+        mock_services["task_queue"].submit.assert_called_once()
+        assert mock_services["task_queue"].submit.call_args.args[0].startswith(
+            "memory_reindex_memory-1_"
+        )
+
+    @pytest.mark.parametrize("summary", ["", "   ", "x" * 4001])
+    def test_update_rejects_invalid_summary(self, mock_services, summary):
+        add_record(mock_services)
+        service = make_service(mock_services, with_queue=True)
+        with pytest.raises(ValueError):
+            service.update_memory_summary("memory-1", summary)
+
+    def test_identical_update_is_idempotent(self, mock_services):
+        add_record(mock_services, ai_summary="same", sync_status="SYNCED")
+        service = make_service(mock_services, with_queue=True)
+
+        updated = service.update_memory_summary("memory-1", "same")
+
+        assert updated.sync_status == "SYNCED"
+        mock_services["sqlite_manager"].update_memory_summary.assert_not_called()
+        mock_services["task_queue"].submit.assert_not_called()
+
+    def test_missing_memory_returns_none(self, mock_services):
+        service = make_service(mock_services, with_queue=True)
+        assert service.update_memory_summary("missing", "new") is None
+
+    def test_reindex_requests_for_same_memory_are_coalesced(self, mock_services):
+        add_record(mock_services)
+        service = make_service(mock_services, with_queue=True)
+
+        assert service.schedule_memory_reindex("memory-1")
+        assert service.schedule_memory_reindex("memory-1")
+
+        mock_services["task_queue"].submit.assert_called_once()
+
+    def test_pending_event_precedes_terminal_reindex_event(self, mock_services):
+        class InlineTaskQueue:
+            @staticmethod
+            def submit(_task_id, func, *args):
+                func(*args)
+                return object()
+
+        add_record(mock_services, ai_summary="old", sync_status="SYNCED")
+        values = dict(mock_services)
+        values["task_queue"] = InlineTaskQueue()
+        service = MemoryService(**values)
+        statuses = []
+
+        with patch.object(
+            service,
+            "_emit_memory_updated",
+            side_effect=lambda memory: statuses.append(memory.sync_status),
+        ):
+            updated = service.update_memory_summary("memory-1", "new")
+
+        assert updated.sync_status == "PENDING"
+        assert statuses == ["PENDING", "SYNCED"]
+
+    def test_reindex_and_summary_update_are_serial_for_one_memory(
+        self,
+        mock_services,
+    ):
+        add_record(
+            mock_services,
             ai_summary="old summary",
-            app_name="app",
+            text_content="",
+            sync_status="PENDING",
         )
-        missing = MemoryRecord(
-            id="missing",
-            created_at="later",
-            image_path="path",
-            ai_summary="new summary",
-            app_name="app",
-        )
-        mock_services["sqlite_manager"].get_memories_count.return_value = 2
-        mock_services["sqlite_manager"].get_all_memories.return_value = [existing, missing]
-        mock_services["chroma_manager"].get_all_memory_ids.return_value = ["existing"]
+        old_embedding_started = Event()
+        release_old_embedding = Event()
 
-        ms = MemoryService(**mock_services)
-        result = ms.repair_vector_index()
+        def get_embedding(text):
+            if text == "old summary":
+                old_embedding_started.set()
+                assert release_old_embedding.wait(timeout=2)
+            return [0.1] * 384
+
+        mock_services["embedding_client"].get_embedding.side_effect = get_embedding
+        service = make_service(mock_services)
+
+        with (
+            patch.object(service, "_emit_memory_updated"),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            old_reindex = executor.submit(service._reindex_memory, "memory-1")
+            assert old_embedding_started.wait(timeout=2)
+            summary_update = executor.submit(
+                service.update_memory_summary,
+                "memory-1",
+                "new summary",
+            )
+            time.sleep(0.05)
+            assert not summary_update.done()
+            release_old_embedding.set()
+
+            assert old_reindex.result(timeout=2) is True
+            updated = summary_update.result(timeout=2)
+
+        assert updated.ai_summary == "new summary"
+        indexed_texts = [
+            call.kwargs["text"]
+            for call in mock_services["chroma_manager"].upsert_memory.call_args_list
+        ]
+        assert indexed_texts == ["old summary", "new summary"]
+
+
+class TestMemoryServiceVectorRepair:
+    def test_repair_skips_synced_existing_and_rebuilds_failed_existing(
+        self,
+        mock_services,
+    ):
+        add_record(
+            mock_services,
+            id="synced",
+            ai_summary="current",
+            sync_status="SYNCED",
+        )
+        add_record(
+            mock_services,
+            id="failed",
+            ai_summary="needs repair",
+            sync_status="FAILED",
+        )
+        mock_services["chroma_manager"].get_all_memory_ids.return_value = [
+            "synced",
+            "failed",
+        ]
+        service = make_service(mock_services)
+
+        result = service.repair_vector_index()
 
         assert result["indexed"] == 1
         assert result["skipped"] == 1
-        mock_services["chroma_manager"].upsert_memory.assert_called_once()
-        kwargs = mock_services["chroma_manager"].upsert_memory.call_args.kwargs
-        assert kwargs["memory_id"] == "missing"
-        assert kwargs["text"] == "new summary"
-
-    def test_repair_vector_index_force_rebuild_indexes_all_memories(self, mock_services):
-        from db.sqlite_manager import MemoryRecord
-        from services.memory_service import MemoryService
-
-        memory = MemoryRecord(
-            id="mem-1",
-            created_at="now",
-            image_path="path",
-            ai_summary="summary",
-            app_name="app",
+        assert result["failed"] == 0
+        assert (
+            mock_services["sqlite_manager"]._records["failed"].sync_status
+            == "SYNCED"
         )
-        mock_services["sqlite_manager"].get_memories_count.return_value = 1
-        mock_services["sqlite_manager"].get_all_memories.return_value = [memory]
-        mock_services["chroma_manager"].get_all_memory_ids.return_value = ["mem-1"]
 
-        ms = MemoryService(**mock_services)
-        result = ms.repair_vector_index(force_rebuild=True)
+    def test_force_repair_rebuilds_all(self, mock_services):
+        add_record(mock_services, sync_status="SYNCED")
+        service = make_service(mock_services)
+
+        result = service.repair_vector_index(force_rebuild=True)
 
         assert result["rebuilt"] is True
         assert result["indexed"] == 1
-        assert result["skipped"] == 0
         mock_services["chroma_manager"].reset_collection.assert_called_once()
-        mock_services["chroma_manager"].upsert_memory.assert_called_once()
 
-    def test_repair_vector_index_async_skips_when_counts_match(self, mock_services):
-        from services.memory_service import MemoryService
+    def test_conditional_repair_skips_when_counts_and_status_match(self, mock_services):
+        add_record(mock_services, sync_status="SYNCED")
+        mock_services["chroma_manager"].get_memory_count.return_value = 1
+        service = make_service(mock_services, with_queue=True)
 
-        mock_services["sqlite_manager"].get_memories_count.return_value = 3
-        mock_services["chroma_manager"].get_memory_count.return_value = 3
-
-        ms = MemoryService(**mock_services)
-        assert ms.repair_vector_index_async() is False
+        assert service.maybe_schedule_vector_index_repair() is False
         mock_services["task_queue"].submit.assert_not_called()
 
-    def test_repair_vector_index_async_schedules_when_chroma_is_behind(self, mock_services):
-        from services.memory_service import MemoryService
-
-        mock_services["sqlite_manager"].get_memories_count.return_value = 3
+    def test_conditional_repair_queues_failed_row_without_running_inline(
+        self,
+        mock_services,
+    ):
+        add_record(mock_services, sync_status="FAILED")
         mock_services["chroma_manager"].get_memory_count.return_value = 1
+        service = make_service(mock_services, with_queue=True)
 
-        ms = MemoryService(**mock_services)
-        assert ms.repair_vector_index_async() is True
+        assert service.maybe_schedule_vector_index_repair() is True
         mock_services["task_queue"].submit.assert_called_once_with(
             "vector_index_repair",
-            ms.repair_vector_index,
+            service.repair_vector_index,
         )
 
+    def test_legacy_async_repair_name_delegates_to_conditional_scheduler(
+        self,
+        mock_services,
+    ):
+        service = make_service(mock_services, with_queue=True)
+        with patch.object(
+            service,
+            "maybe_schedule_vector_index_repair",
+            return_value=True,
+        ) as scheduler:
+            assert service.repair_vector_index_async() is True
+        scheduler.assert_called_once_with()
 
-class TestMemoryServiceDelete:
+    def test_conditional_repair_scheduler_failure_is_non_fatal(
+        self,
+        mock_services,
+    ):
+        add_record(mock_services, sync_status="PENDING")
+        mock_services["task_queue"].submit.side_effect = RuntimeError("closed")
+        service = make_service(mock_services, with_queue=True)
+
+        assert service.maybe_schedule_vector_index_repair() is False
+
+
+class TestOCRBackfill:
+    def test_backfill_updates_empty_text_and_reindexes(self, mock_services):
+        add_record(
+            mock_services,
+            extra_images=json.dumps(["second.png"]),
+            sync_status="SYNCED",
+        )
+        mock_services["ocr_engine"].extract_text.side_effect = ["first", "second"]
+        service = make_service(mock_services)
+
+        result = service.backfill_ocr()
+
+        assert result == {
+            "status": "completed",
+            "total": 1,
+            "processed": 1,
+            "succeeded": 1,
+            "updated": 1,
+            "skipped": 0,
+            "failed": 0,
+            "index_failed": 0,
+        }
+        record = mock_services["sqlite_manager"]._records["memory-1"]
+        assert record.text_content == "first\n\nsecond"
+        assert record.sync_status == "SYNCED"
+
+    def test_backfill_empty_result_is_skipped(self, mock_services):
+        add_record(mock_services)
+        mock_services["ocr_engine"].extract_text.return_value = None
+        service = make_service(mock_services)
+
+        result = service.backfill_ocr()
+
+        assert result["processed"] == 1
+        assert result["skipped"] == 1
+        assert result["updated"] == 0
+
+    def test_backfill_exception_counts_failure_and_continues(self, mock_services):
+        add_record(mock_services, id="bad", image_path="bad.png")
+        add_record(mock_services, id="good", image_path="good.png")
+        mock_services["ocr_engine"].extract_text.side_effect = [
+            RuntimeError("bad image"),
+            "recognized",
+        ]
+        service = make_service(mock_services)
+
+        result = service.backfill_ocr()
+
+        assert result["processed"] == 2
+        assert result["failed"] == 1
+        assert result["updated"] == 1
+
+
+class TestMemoryServiceQueryAndDelete:
     def test_delete_memory_success(self, mock_services):
-        from services.memory_service import MemoryService
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        result = ms.delete_memory("test-id")
-        assert result is True
-        mock_services["sqlite_manager"].delete_memory.assert_called_with("test-id")
-        mock_services["chroma_manager"].delete_memory.assert_called_with("test-id")
+        add_record(mock_services)
+        service = make_service(mock_services)
+        assert service.delete_memory("memory-1") is True
+        assert "memory-1" not in mock_services["sqlite_manager"]._records
 
-    def test_delete_memory_chroma_fail_returns_false(self, mock_services):
-        from services.memory_service import MemoryService
+    def test_delete_succeeds_when_chroma_cleanup_fails(self, mock_services):
+        add_record(mock_services)
         mock_services["chroma_manager"].delete_memory.return_value = False
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        result = ms.delete_memory("test-id")
-        assert result is False
-        mock_services["sqlite_manager"].delete_memory.assert_not_called()
+        service = make_service(mock_services)
+        assert service.delete_memory("memory-1") is True
+        assert "memory-1" not in mock_services["sqlite_manager"]._records
 
-    def test_delete_memory_sqlite_fail_after_chroma_delete_returns_false(self, mock_services):
-        from services.memory_service import MemoryService
-        mock_services["sqlite_manager"].delete_memory.return_value = False
-        mock_services["chroma_manager"].delete_memory.return_value = True
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        result = ms.delete_memory("test-id")
-        assert result is False
+    def test_delete_waits_for_inflight_reindex_before_vector_cleanup(
+        self,
+        mock_services,
+    ):
+        add_record(mock_services, sync_status="PENDING")
+        embedding_started = Event()
+        release_embedding = Event()
 
+        def get_embedding(_text):
+            embedding_started.set()
+            assert release_embedding.wait(timeout=2)
+            return [0.1] * 384
 
-class TestMemoryServiceQuery:
-    def test_get_memory(self, mock_services):
-        from services.memory_service import MemoryService
-        from db.sqlite_manager import MemoryRecord
-        mock_record = MagicMock(spec=MemoryRecord)
-        mock_services["sqlite_manager"].get_memory_by_id.return_value = mock_record
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        result = ms.get_memory("test-id")
-        assert result is mock_record
+        mock_services["embedding_client"].get_embedding.side_effect = get_embedding
+        service = make_service(mock_services)
 
-    def test_get_recent_memories(self, mock_services):
-        from services.memory_service import MemoryService
-        mock_services["sqlite_manager"].get_all_memories.return_value = []
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        result = ms.get_recent_memories(limit=50)
-        assert result == []
-        mock_services["sqlite_manager"].get_all_memories.assert_called_with(limit=50, offset=0)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            reindex = executor.submit(service._reindex_memory, "memory-1")
+            assert embedding_started.wait(timeout=2)
+            deletion = executor.submit(service.delete_memory, "memory-1")
+            time.sleep(0.05)
+            assert not deletion.done()
 
-    def test_get_active_count_initial(self, mock_services):
-        from services.memory_service import MemoryService
-        ms = MemoryService(
-            sqlite_manager=mock_services["sqlite_manager"],
-            chroma_manager=mock_services["chroma_manager"],
-            ocr_engine=mock_services["ocr_engine"],
-            ai_client=mock_services["ai_client"],
-            embedding_client=mock_services["embedding_client"],
-        )
-        assert ms.get_active_count() == 0
+            release_embedding.set()
+            assert reindex.result(timeout=2) is True
+            assert deletion.result(timeout=2) is True
+
+        method_names = [call[0] for call in mock_services["chroma_manager"].method_calls]
+        assert method_names.index("upsert_memory") < method_names.index("delete_memory")
+        assert "memory-1" not in mock_services["sqlite_manager"]._records
+
+    def test_get_memory_and_recent(self, mock_services):
+        add_record(mock_services)
+        service = make_service(mock_services)
+        assert service.get_memory("memory-1").id == "memory-1"
+        assert service.get_recent_memories(limit=50)[0].id == "memory-1"
+        assert service.get_active_count() == 0

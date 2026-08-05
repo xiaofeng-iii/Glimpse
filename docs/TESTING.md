@@ -19,12 +19,20 @@ conda run -n glimpse python -m pytest tests/test_api.py -q
 conda run -n glimpse python -m pytest -q
 ```
 
-前端类型检查与生产构建：
+前端单元/组件测试、类型检查与生产构建：
 
 ```powershell
 cd glimpse-frontend
 npm install
+npm run test:run
 npm run build
+```
+
+开发时持续监听受影响的前端测试：
+
+```powershell
+cd glimpse-frontend
+npm test
 ```
 
 完整 Windows 安装包验证：
@@ -47,6 +55,7 @@ npm run build
 | `tests/unit/ui/` | 旧 Qt 回退界面的关键行为 |
 | `tests/integration/` | AI 管道、双库、搜索和完整记忆生命周期 |
 | `tests/test_api.py` | FastAPI 与 WebSocket 边界 |
+| `glimpse-frontend/tests/` | Vue 组件、Pinia store、交互与渲染契约（Vitest + Vue Test Utils + jsdom） |
 
 单元测试应隔离网络、屏幕和持久数据库。集成测试可以组合真实业务组件，但仍
 应使用临时数据目录和可控的 AI/Embedding 替身。
@@ -60,7 +69,7 @@ npm run build
 | `core/capture.py` | capture 单测 + capture-to-storage |
 | `db/` | 对应 DB 单测 + database sync |
 | `api/` | `tests/test_api.py` + 对应 API 单测 |
-| Vue 组件或 stores | `npm run build` + 手动检查受影响流程 |
+| Vue 组件或 stores | `npm run test:run` + `npm run build` + 手动检查受影响流程 |
 | Tauri/Rust 或 sidecar | 前端构建 + `build_release.bat` |
 | 设置或快捷键 | settings、hotkey、keyboard 单测 |
 
@@ -90,6 +99,7 @@ Embedding 模型首次加载可能较慢；测试应优先使用 fixture 或 moc
 - 运行与改动范围相匹配的测试。
 - 新行为有对应的单元或集成验证。
 - 前端改动至少通过 `npm run build`。
+- 前端新行为需要对应 Vitest 组件或 store 测试，并通过 `npm run test:run`。
 - 不依赖测试执行顺序。
 - 不在测试中写入真实 `GlimpseData/`。
 - 失败时报告实际命令、通过数和失败原因，不以“环境问题”笼统代替。

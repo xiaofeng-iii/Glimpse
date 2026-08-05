@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { PhotoIcon } from '@heroicons/vue/24/outline'
 import { t } from '@/utils/i18n'
 
 const props = defineProps<{
@@ -17,10 +18,8 @@ const shortcutParts = computed(() => {
 
 <template>
   <div class="flex flex-col items-center justify-center py-16 text-center">
-    <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-100 to-pink-100 flex items-center justify-center mb-6">
-      <svg class="w-10 h-10 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
+    <div class="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-violet-100">
+      <PhotoIcon class="h-10 w-10 text-violet-500" aria-hidden="true" />
     </div>
 
     <h3 class="text-lg font-medium text-gray-900 mb-2">{{ t('memory.emptyTitle') }}</h3>

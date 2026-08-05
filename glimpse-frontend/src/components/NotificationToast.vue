@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import {
+  CheckIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  XMarkIcon,
+} from '@heroicons/vue/24/outline'
 import { useNotificationStore } from '@/stores/notification'
 
 const notificationStore = useNotificationStore()
@@ -15,20 +21,20 @@ const getTypeClass = (type: string) => {
     case 'warning':
       return 'bg-yellow-500'
     default:
-      return 'bg-violet-500'
+      return 'bg-[var(--color-primary)]'
   }
 }
 
 const getIcon = (type: string) => {
   switch (type) {
     case 'success':
-      return 'M5 13l4 4L19 7'
+      return CheckIcon
     case 'error':
-      return 'M6 18L18 6M6 6l12 12'
+      return XMarkIcon
     case 'warning':
-      return 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
+      return ExclamationTriangleIcon
     default:
-      return 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+      return InformationCircleIcon
   }
 }
 </script>
@@ -39,13 +45,11 @@ const getIcon = (type: string) => {
       <div
         v-for="notification in notifications"
         :key="notification.id"
-        class="glass flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg min-w-[280px] animate-slide-up"
+        class="glass flex min-w-[280px] items-center gap-2.5 rounded-md px-3.5 py-2.5 shadow-lg animate-slide-up"
       >
         <!-- Icon -->
-        <div :class="['w-6 h-6 rounded-full flex items-center justify-center', getTypeClass(notification.type)]">
-          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="getIcon(notification.type)" />
-          </svg>
+        <div :class="['flex h-6 w-6 flex-none items-center justify-center rounded-full', getTypeClass(notification.type)]">
+          <component :is="getIcon(notification.type)" class="h-4 w-4 text-white" aria-hidden="true" />
         </div>
 
         <!-- Message -->
@@ -54,11 +58,9 @@ const getIcon = (type: string) => {
         <!-- Close Button -->
         <button
           @click="notificationStore.dismiss(notification.id)"
-          class="p-1 hover:bg-gray-100 rounded transition-colors"
+          class="inline-flex flex-none items-center justify-center rounded p-1 transition-colors hover:bg-gray-100"
         >
-          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <XMarkIcon class="h-4 w-4 text-gray-400" aria-hidden="true" />
         </button>
       </div>
     </TransitionGroup>

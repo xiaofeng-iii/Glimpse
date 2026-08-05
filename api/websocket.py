@@ -130,6 +130,7 @@ def setup_signal_forwarding(loop: Optional[asyncio.AbstractEventLoop] = None):
     # Connect signals
     signals.screenshot_completed.connect(make_sync_handler("screenshot_completed"))
     signals.memory_saved.connect(make_sync_handler("memory_saved"))
+    signals.memory_updated.connect(make_sync_handler("memory_updated"))
     signals.memory_deleted.connect(make_sync_handler("memory_deleted"))
     signals.search_completed.connect(make_sync_handler("search_completed"))
     signals.error_occurred.connect(make_sync_handler("error_occurred"))

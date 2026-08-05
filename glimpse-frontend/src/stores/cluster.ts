@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { createLogger } from '@/utils/logger'
 
 const logger = createLogger('stores/cluster')
@@ -11,7 +11,7 @@ export const useClusterStore = defineStore('cluster', () => {
   const images = ref<string[]>([])
   const remainingSeconds = ref(0)
 
-  const isCollecting = () => state.value === 'COLLECTING'
+  const isCollecting = computed(() => state.value === 'COLLECTING')
 
   const setState = (data: { state: string; count: number; max_count: number; images?: string[] }) => {
     state.value = data.state as 'IDLE' | 'COLLECTING'

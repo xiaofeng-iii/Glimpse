@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import { useMemoriesStore } from '@/stores/memories'
 import type { SearchOptions } from '@/api/client'
 import { t } from '@/utils/i18n'
@@ -58,6 +59,7 @@ const currentSearchOptions = (): SearchOptions => {
 }
 
 const scheduleSearch = () => {
+  memoriesStore.invalidatePendingRequests()
   if (debounceTimeout) {
     clearTimeout(debounceTimeout)
   }
@@ -103,9 +105,7 @@ defineExpose({ focus })
     <!-- Search Input -->
     <div class="search-bar relative flex items-center p-1">
       <!-- Search Icon -->
-      <svg class="w-5 h-5 text-gray-400 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
+      <MagnifyingGlassIcon class="ml-4 h-5 w-5 text-gray-400" aria-hidden="true" />
 
       <!-- Input -->
       <input
@@ -141,7 +141,6 @@ defineExpose({ focus })
 
     <details
       v-if="isDev"
-      open
       class="mt-3 rounded-xl border border-amber-200/80 bg-amber-50/70 px-4 py-3 text-left"
     >
       <summary class="cursor-pointer select-none text-xs font-semibold text-amber-800">

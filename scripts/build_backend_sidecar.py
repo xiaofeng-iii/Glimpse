@@ -65,6 +65,49 @@ EXCLUDED_FILE_PATTERNS = {
     "*.pyo",
 }
 
+PYINSTALLER_DYNAMIC_PACKAGES = (
+    "uvicorn",
+    "fastapi",
+    "starlette",
+    "pydantic",
+    "websockets",
+    "openai",
+    "pynput",
+    "mss",
+    "PIL",
+    "chromadb",
+    "onnxruntime",
+    "rapidocr",
+    "sentence_transformers",
+    "transformers",
+    "tokenizers",
+    "huggingface_hub",
+)
+
+PYINSTALLER_DATA_PACKAGES = (
+    "certifi",
+    "chromadb",
+    "onnxruntime",
+    "rapidocr",
+    "sentence_transformers",
+    "transformers",
+    "tokenizers",
+    "huggingface_hub",
+)
+
+PYINSTALLER_METADATA_PACKAGES = (
+    "chromadb",
+    "sentence-transformers",
+    "transformers",
+    "tokenizers",
+    "huggingface-hub",
+    "openai",
+    "fastapi",
+    "uvicorn",
+    "rapidocr",
+    "onnxruntime",
+)
+
 
 def target_triple() -> str:
     system = platform.system().lower()
@@ -334,53 +377,10 @@ def collect_pyinstaller_resources() -> tuple[list[str], list[tuple[str, str]], l
         "runtime_env",
     ]
 
-    dynamic_packages = [
-        "uvicorn",
-        "fastapi",
-        "starlette",
-        "pydantic",
-        "websockets",
-        "openai",
-        "pynput",
-        "mss",
-        "PIL",
-        "chromadb",
-        "onnxruntime",
-        "rapidocr_onnxruntime",
-        "sentence_transformers",
-        "transformers",
-        "tokenizers",
-        "huggingface_hub",
-    ]
-
-    data_packages = [
-        "certifi",
-        "chromadb",
-        "onnxruntime",
-        "rapidocr_onnxruntime",
-        "sentence_transformers",
-        "transformers",
-        "tokenizers",
-        "huggingface_hub",
-    ]
-
-    metadata_packages = [
-        "chromadb",
-        "sentence-transformers",
-        "transformers",
-        "tokenizers",
-        "huggingface-hub",
-        "openai",
-        "fastapi",
-        "uvicorn",
-        "rapidocr-onnxruntime",
-        "onnxruntime",
-    ]
-
     datas: list[tuple[str, str]] = []
     binaries: list[tuple[str, str]] = []
 
-    for package in dynamic_packages:
+    for package in PYINSTALLER_DYNAMIC_PACKAGES:
         try:
             hiddenimports.extend(collect_submodules(package))
         except Exception as exc:
@@ -412,7 +412,7 @@ def collect_pyinstaller_resources() -> tuple[list[str], list[tuple[str, str]], l
     except Exception as exc:
         print(f"[warn] Unable to walk chromadb filesystem packages: {exc}")
 
-    for package in data_packages:
+    for package in PYINSTALLER_DATA_PACKAGES:
         try:
             datas.extend(collect_data_files(package))
         except Exception as exc:
@@ -422,7 +422,7 @@ def collect_pyinstaller_resources() -> tuple[list[str], list[tuple[str, str]], l
         except Exception as exc:
             print(f"[warn] Unable to collect dynamic libs for {package}: {exc}")
 
-    for package in metadata_packages:
+    for package in PYINSTALLER_METADATA_PACKAGES:
         try:
             datas.extend(copy_metadata(package))
         except Exception as exc:
@@ -479,7 +479,10 @@ def build_pyinstaller_args(
         "--noconfirm",
         "--clean",
         "--onedir",
-        "--noconsole",
+        # Use PyInstaller's console bootloader for reliable startup. The Tauri
+        # host launches the sidecar with CREATE_NO_WINDOW on Windows, so users
+        # still never see a console window in the packaged desktop app.
+        "--console",
         f"--name={build_name}",
         f"--distpath={BINARIES_DIR}",
         f"--workpath={PYINSTALLER_BUILD_DIR}",

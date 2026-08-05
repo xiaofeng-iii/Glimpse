@@ -99,7 +99,14 @@ class TestSearchServiceSearch:
         from db.sqlite_manager import MemoryRecord
         ss = SearchService(**mock_services)
         
-        mock_memory = MemoryRecord(id="1", created_at="now", image_path="path", ai_summary="sum", app_name="app")
+        mock_memory = MemoryRecord(
+            id="1",
+            created_at="now",
+            image_path="path",
+            ai_summary="sum",
+            app_name="app",
+            sync_status="SYNCED",
+        )
         mock_services["sqlite_manager"].get_all_memories.return_value = [mock_memory]
         
         results = ss.search("")
@@ -170,7 +177,14 @@ class TestSearchServiceSearch:
         from db.sqlite_manager import MemoryRecord
         ss = SearchService(**mock_services)
         
-        mock_memory = MemoryRecord(id="1", created_at="now", image_path="path", ai_summary="sum", app_name="app")
+        mock_memory = MemoryRecord(
+            id="1",
+            created_at="now",
+            image_path="path",
+            ai_summary="sum",
+            app_name="app",
+            sync_status="SYNCED",
+        )
         mock_services["embedding_client"].get_embedding.return_value = [0.1, 0.2]
         mock_services["chroma_manager"].search_similar.return_value = [{"id": "1", "distance": 0.5}]
         mock_services["sqlite_manager"].get_memory_by_id.return_value = mock_memory
@@ -180,13 +194,80 @@ class TestSearchServiceSearch:
         assert "语义" in results[0].match_sources
         assert "精确" not in results[0].match_sources
 
+    @pytest.mark.parametrize("sync_status", ["PENDING", "FAILED"])
+    def test_semantic_search_ignores_unsynced_vectors(
+        self,
+        mock_services,
+        sync_status,
+    ):
+        from services.search_service import SearchService
+        from db.sqlite_manager import MemoryRecord
+
+        memory = MemoryRecord(
+            id="stale",
+            created_at="now",
+            image_path="path",
+            ai_summary="stale summary",
+            app_name="app",
+            sync_status=sync_status,
+        )
+        mock_services["chroma_manager"].search_similar.return_value = [
+            {"id": "stale", "distance": 0.1}
+        ]
+        mock_services["sqlite_manager"].get_memory_by_id.return_value = memory
+
+        assert (
+            SearchService(**mock_services).search(
+                "test",
+                source_filter="semantic",
+            )
+            == []
+        )
+
+    def test_semantic_candidate_pool_can_fill_limit_after_unsynced_rows(
+        self,
+        mock_services,
+    ):
+        from db.sqlite_manager import MemoryRecord
+        from services.search_service import SearchService
+
+        records = {
+            f"candidate-{index}": MemoryRecord(
+                id=f"candidate-{index}",
+                created_at="now",
+                image_path="path",
+                ai_summary=f"summary-{index}",
+                app_name="app",
+                sync_status="PENDING" if index < 4 else "SYNCED",
+            )
+            for index in range(6)
+        }
+        mock_services["chroma_manager"].search_similar.return_value = [
+            {"id": f"candidate-{index}", "distance": 0.1}
+            for index in range(6)
+        ]
+        mock_services["sqlite_manager"].get_memory_by_id.side_effect = records.get
+
+        results = SearchService(**mock_services).search(
+            "test",
+            limit=2,
+            source_filter="semantic",
+            candidate_multiplier=3,
+        )
+
+        mock_services["chroma_manager"].search_similar.assert_called_once_with(
+            mock_services["embedding_client"].get_embedding.return_value,
+            n_results=6,
+        )
+        assert [memory.id for memory in results] == ["candidate-4", "candidate-5"]
+
     def test_search_source_filter_all(self, mock_services):
         from services.search_service import SearchService
         from db.sqlite_manager import MemoryRecord
         ss = SearchService(**mock_services)
         
-        mock_memory1 = MemoryRecord(id="1", created_at="now", image_path="path", ai_summary="sum", app_name="app")
-        mock_memory2 = MemoryRecord(id="2", created_at="now", image_path="path", ai_summary="sum", app_name="app")
+        mock_memory1 = MemoryRecord(id="1", created_at="now", image_path="path", ai_summary="sum", app_name="app", sync_status="SYNCED")
+        mock_memory2 = MemoryRecord(id="2", created_at="now", image_path="path", ai_summary="sum", app_name="app", sync_status="SYNCED")
         
         mock_services["sqlite_manager"].search_memories.return_value = [mock_memory1]
         mock_services["embedding_client"].get_embedding.return_value = [0.1, 0.2]
@@ -226,6 +307,7 @@ class TestSearchServiceSearch:
             image_path="path",
             ai_summary="sum",
             app_name="app",
+            sync_status="SYNCED",
         )
         mock_services["chroma_manager"].search_similar.return_value = [
             {"id": "1", "distance": 1.2}
@@ -276,6 +358,7 @@ class TestSearchServiceSearch:
             image_path="path",
             ai_summary="sum",
             app_name="app",
+            sync_status="SYNCED",
         )
         mock_services["sqlite_manager"].search_memories.return_value = [mock_memory]
         mock_services["chroma_manager"].search_similar.return_value = [
@@ -303,6 +386,36 @@ class TestSearchServiceSearch:
         )
 
         assert tuned_results[0].match_sources == ["精确", "语义"]
+
+    @pytest.mark.parametrize("distance", [1.2, None])
+    def test_hybrid_excludes_unaccepted_vector_only_candidate(
+        self,
+        mock_services,
+        distance,
+    ):
+        from services.search_service import SearchService
+        from db.sqlite_manager import MemoryRecord
+
+        memory = MemoryRecord(
+            id="semantic-only",
+            created_at="now",
+            image_path="path",
+            ai_summary="sum",
+            app_name="app",
+            sync_status="SYNCED",
+        )
+        mock_services["sqlite_manager"].search_memories.return_value = []
+        mock_services["chroma_manager"].search_similar.return_value = [
+            {"id": memory.id, "distance": distance}
+        ]
+        mock_services["sqlite_manager"].get_memory_by_id.return_value = memory
+
+        results = SearchService(**mock_services).search(
+            "test",
+            source_filter="all",
+        )
+
+        assert results == []
 
 
 class TestSearchServiceQuery:

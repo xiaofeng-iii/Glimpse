@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "vitest",
+    "test:run": "vitest run",
     "build": "vue-tsc --noEmit && vite build",
     "build:backend": "python ../scripts/build_backend_sidecar.py --if-needed",
     "preview": "vite preview",
@@ -12,22 +14,25 @@
     "tauri:build": "npm run build:backend && tauri build"
   },
   "dependencies": {
-    "vue": "^3.4.0",
-    "vue-router": "^4.2.5",
-    "pinia": "^2.1.7",
-    "axios": "^1.6.5",
-    "@vueuse/core": "^10.7.2",
+    "@heroicons/vue": "^2.2.0",
     "@tauri-apps/api": "^2.0.0",
-    "@tauri-apps/plugin-shell": "^2.0.0"
+    "@vueuse/core": "^10.7.2",
+    "axios": "^1.19.0",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.5"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.3",
-    "typescript": "^5.3.3",
-    "vite": "^5.0.11",
-    "vue-tsc": "^2.0.29",
-    "tailwindcss": "^3.4.1",
-    "postcss": "^8.4.33",
+    "@tauri-apps/cli": "^2.0.0",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.17",
-    "@tauri-apps/cli": "^2.0.0"
+    "jsdom": "^26.1.0",
+    "postcss": "^8.5.25",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^6.4.3",
+    "vitest": "^3.2.6",
+    "vue-tsc": "^2.0.29"
   }
 }

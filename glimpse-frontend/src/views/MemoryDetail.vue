@@ -1,236 +1,187 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { memoriesApi, type Memory } from '@/api/client'
-import { getImageUrl } from '@/config/runtime'
-import { openExternalTarget } from '@/platform/desktop'
+import { computed, ref, watch } from 'vue'
+import {
+  ArrowPathIcon,
+  ClipboardDocumentIcon,
+  TrashIcon,
+} from '@heroicons/vue/24/outline'
+import {
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  useRoute,
+  useRouter,
+} from 'vue-router'
+import { memoriesApi } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
-import { getMemoryImageUrls } from '@/utils/memory-images'
-import { t } from '@/utils/i18n'
 import { createLogger } from '@/utils/logger'
-import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
+import { t } from '@/utils/i18n'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import MediaGallery from '@/components/MediaGallery.vue'
+import OcrText from '@/components/OcrText.vue'
+import SummaryEditor from '@/components/SummaryEditor.vue'
 
-const logger = createLogger('views/MemoryDetail')
+type SummaryEditorExpose = {
+  canLeave: () => Promise<boolean>
+}
 
 const route = useRoute()
 const router = useRouter()
 const memoriesStore = useMemoriesStore()
-const notificationStore = useNotificationStore()
+const notifications = useNotificationStore()
+const logger = createLogger('views/MemoryDetail')
 
-const memory = ref<Memory | null>(null)
-const isLoading = ref(true)
-const isDeleting = ref(false)
-const previewOpen = ref(false)
-const previewIndex = ref(0)
-const failedImages = ref<Record<string, boolean>>({})
+const summaryEditor = ref<SummaryEditorExpose | null>(null)
+const loading = ref(false)
+const loadFailed = ref(false)
+const deleteDialogOpen = ref(false)
+const deleting = ref(false)
+const memoryId = computed(() => String(route.params.id ?? ''))
+const memory = computed(() => memoriesStore.entities[memoryId.value] ?? null)
 
-onMounted(async () => {
-  const id = route.params.id as string
+const formatDate = (value: string) =>
+  new Date(value).toLocaleString([], {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+const loadMemory = async () => {
+  if (!memoryId.value) return
+  loading.value = true
+  loadFailed.value = false
   try {
-    memory.value = await memoriesApi.get(id)
+    memoriesStore.upsert(await memoriesApi.get(memoryId.value))
   } catch (error) {
     logger.error('Failed to load memory: %s', error)
+    loadFailed.value = true
   } finally {
-    isLoading.value = false
+    loading.value = false
   }
-})
-
-const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleString('zh-CN')
 }
 
-const handleDelete = async () => {
-  if (!memory.value || isDeleting.value) {
-    return
-  }
+watch(memoryId, () => void loadMemory(), { immediate: true })
 
-  if (!confirm(t('message.deleteConfirm'))) {
-    return
-  }
+const canLeave = () => summaryEditor.value?.canLeave() ?? Promise.resolve(true)
+onBeforeRouteLeave(async () => canLeave())
+onBeforeRouteUpdate(async () => canLeave())
 
-  isDeleting.value = true
+const copySummary = async () => {
+  if (!memory.value) return
+  try {
+    await navigator.clipboard.writeText(memory.value.ai_summary)
+    notifications.show(t('message.copied'), 'success', 1800)
+  } catch {
+    notifications.show(t('message.copyFailed'), 'error', 2800)
+  }
+}
+
+const confirmDelete = async () => {
+  if (!memory.value || deleting.value) return
+  deleting.value = true
   try {
     await memoriesStore.remove(memory.value.id)
-    notificationStore.show(t('message.deleted'), 'success', 2200)
+    notifications.show(t('message.deleted'), 'success', 1800)
+    deleteDialogOpen.value = false
     await router.push('/')
   } catch (error) {
     logger.error('Delete memory failed: %s', error)
-    notificationStore.show(t('message.deleteFailed'), 'error', 3200)
+    notifications.show(t('message.deleteFailed'), 'error', 2800)
   } finally {
-    isDeleting.value = false
-  }
-}
-
-const handleCopy = async () => {
-  if (!memory.value) {
-    return
-  }
-
-  try {
-    await navigator.clipboard.writeText(memory.value.ai_summary)
-    notificationStore.show(t('message.copied'), 'success', 2200)
-  } catch (error) {
-    notificationStore.show(t('message.copyFailed'), 'error', 3000)
-  }
-}
-
-const handleOpenImage = () => {
-  if (!memory.value) {
-    return
-  }
-  void openExternalTarget(getImageUrl(memory.value.image_path))
-}
-
-const imageUrls = computed(() => {
-  if (!memory.value) {
-    return []
-  }
-
-  return getMemoryImageUrls(memory.value)
-})
-
-const openPreview = (index = 0) => {
-  previewIndex.value = index
-  previewOpen.value = true
-}
-
-const markImageError = (url: string) => {
-  failedImages.value = {
-    ...failedImages.value,
-    [url]: true,
+    deleting.value = false
   }
 }
 </script>
 
 <template>
-  <div class="h-screen overflow-y-auto overflow-x-hidden p-4 sm:p-6">
-    <div class="max-w-3xl mx-auto pb-10">
-      <!-- Loading -->
-      <div v-if="isLoading" class="flex justify-center py-20">
-        <div class="spinner"></div>
+  <main class="h-full min-h-0 overflow-y-auto bg-[var(--shell-window-bg)] px-5 py-4 sm:px-6">
+    <div class="mx-auto max-w-[1440px]">
+      <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <h1 class="text-lg font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('memory.detail') }}</h1>
+          <time v-if="memory" class="text-sm text-[var(--shell-muted)]" :datetime="memory.created_at">
+            {{ formatDate(memory.created_at) }}
+          </time>
+        </div>
+
+        <button
+          v-if="memory"
+          type="button"
+          class="inline-flex min-h-10 items-center gap-2 rounded-md border border-red-200 px-3.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+          @click="deleteDialogOpen = true"
+        >
+          <TrashIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+          {{ t('action.delete') }}
+        </button>
+      </header>
+
+      <div v-if="loading" class="flex min-h-[65vh] items-center justify-center">
+        <ArrowPathIcon class="h-8 w-8 animate-spin text-[var(--color-primary)]" :aria-label="t('memory.loading')" />
       </div>
 
-      <!-- Memory Detail -->
-      <div v-else-if="memory">
-        <!-- Header -->
-        <div class="mb-6 flex items-center justify-between gap-3">
-          <button @click="router.back()" class="btn-secondary memory-detail-action">
-            <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            {{ t('action.back') }}
+      <div
+        v-else-if="loadFailed || !memory"
+        class="flex min-h-[65vh] flex-col items-center justify-center text-center"
+      >
+        <h2 class="text-lg font-semibold text-[var(--shell-ink)]">{{ t('memory.missing') }}</h2>
+        <p class="mt-2 text-sm text-[var(--shell-muted)]">{{ t('memory.loadFailedHint') }}</p>
+        <button type="button" class="btn-primary mt-4 min-h-10" @click="loadMemory">
+          <ArrowPathIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+          {{ t('action.retry') }}
+        </button>
+      </div>
+
+      <div v-else class="detail-layout">
+        <section class="min-w-0">
+          <MediaGallery :memory="memory" />
+        </section>
+
+        <section class="min-w-0 space-y-5">
+          <SummaryEditor ref="summaryEditor" :memory="memory" />
+
+          <button type="button" class="btn-secondary min-h-10" @click="copySummary">
+            <ClipboardDocumentIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+            {{ t('action.copySummary') }}
           </button>
-          <div class="flex items-center gap-2">
-            <button @click="handleCopy" class="btn-secondary memory-detail-action">{{ t('action.copySummary') }}</button>
-            <button @click="handleOpenImage" class="btn-secondary memory-detail-action">{{ t('action.viewImage') }}</button>
-            <button
-              @click="handleDelete"
-              :disabled="isDeleting"
-              class="memory-detail-action text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {{ isDeleting ? t('action.deleting') : t('action.delete') }}
-            </button>
-          </div>
-        </div>
 
-        <!-- Content Card -->
-        <div class="card p-8">
-          <!-- Image Preview -->
-          <div v-if="imageUrls.length" class="mb-8 space-y-3">
-            <button
-              class="block w-full overflow-hidden rounded-3xl border border-slate-200 bg-slate-100"
-              @click="openPreview(0)"
-            >
-              <img
-                v-if="!failedImages[imageUrls[0]]"
-                :src="imageUrls[0]"
-                :alt="memory.ai_summary"
-                class="h-[420px] w-full object-contain"
-                @error="markImageError(imageUrls[0])"
-              />
-              <div v-else class="flex h-[420px] items-center justify-center text-sm text-slate-500">
-                {{ t('memory.previewFailed') }}
-              </div>
-            </button>
-
-            <div v-if="imageUrls.length > 1" class="grid grid-cols-4 gap-3">
-              <button
-                v-for="(imageUrl, index) in imageUrls.slice(1)"
-                :key="imageUrl"
-                class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
-                @click="openPreview(index + 1)"
-              >
-                <img
-                  v-if="!failedImages[imageUrl]"
-                  :src="imageUrl"
-                  :alt="`${memory.ai_summary}-${index + 2}`"
-                  class="h-24 w-full object-cover"
-                  @error="markImageError(imageUrl)"
-                />
-                <div v-else class="flex h-24 items-center justify-center text-[11px] text-slate-400">
-                  {{ t('memory.loadFailed') }}
-                </div>
-              </button>
-            </div>
+          <div class="border-t border-[var(--shell-line)] pt-5">
+            <OcrText :text="memory.text_content" />
           </div>
 
-          <!-- Time -->
-          <p class="text-sm text-gray-500 mb-4">{{ formatDate(memory.created_at) }}</p>
-
-          <!-- App Badge -->
-          <div v-if="memory.app_name && memory.app_name !== 'unknown'" class="inline-flex px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-600 text-sm font-medium mb-6">
-            {{ memory.app_name }}
-          </div>
-
-          <!-- AI Summary -->
-          <h2 class="text-lg font-semibold text-gray-900 mb-3">{{ t('memory.summary') }}</h2>
-          <p class="text-gray-900 leading-relaxed mb-8">{{ memory.ai_summary }}</p>
-
-          <!-- Extracted Text -->
-          <div v-if="memory.text_content">
-            <h2 class="text-lg font-semibold text-gray-900 mb-3">{{ t('memory.text') }}</h2>
-            <p class="text-gray-600 leading-relaxed bg-gray-50 p-4 rounded-xl">{{ memory.text_content }}</p>
-          </div>
-
-          <!-- Image Path -->
-          <div class="mt-8 pt-6 border-t border-gray-100">
-            <p class="text-xs text-gray-400">
-              <span class="font-medium">{{ t('memory.imagePath') }}:</span> {{ memory.image_path }}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Not Found -->
-      <div v-else class="text-center py-20 text-gray-500">
-        {{ t('memory.missing') }}
+          <p class="text-xs text-[var(--shell-muted)]">
+            {{ t('memory.createdAt', { date: formatDate(memory.created_at) }) }}
+          </p>
+        </section>
       </div>
     </div>
 
-    <ImagePreviewModal
-      v-if="memory"
-      :open="previewOpen"
-      :images="imageUrls"
-      :start-index="previewIndex"
-      @close="previewOpen = false"
-      @update:start-index="previewIndex = $event"
+    <ConfirmDialog
+      id="detail-delete-memory"
+      :open="deleteDialogOpen"
+      :title="t('delete.title')"
+      :description="t('message.deleteConfirmIrreversible')"
+      :confirm-label="t('action.delete')"
+      :cancel-label="t('action.cancel')"
+      :busy="deleting"
+      destructive
+      @confirm="confirmDelete"
+      @cancel="deleteDialogOpen = false"
     />
-  </div>
+  </main>
 </template>
 
 <style scoped>
-.memory-detail-action {
-  display: inline-flex;
-  height: 2.75rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0 1rem;
-  border-radius: 14px;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 960px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

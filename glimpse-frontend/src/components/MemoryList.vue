@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { PhotoIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
+import { getMatchSourceKinds } from '@/utils/match-sources'
 import { t } from '@/utils/i18n'
 import EmptyState from './EmptyState.vue'
 import LoadingSpinner from './LoadingSpinner.vue'
@@ -85,14 +87,13 @@ const markImageError = (memoryId: string) => {
             :class="[
               'group relative cursor-pointer rounded-2xl border p-4 transition-all duration-300',
               selectedId === memory.id
-                ? 'border-violet-200 bg-gradient-to-r from-violet-50 to-pink-50 shadow-sm'
+                ? 'border-blue-300 bg-blue-50 shadow-sm'
                 : 'border-gray-100 bg-white hover:border-violet-200 hover:bg-gray-50',
             ]"
           >
             <div class="flex items-start gap-4">
               <!-- Thumbnail -->
               <div class="relative flex-shrink-0">
-                <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-violet-400 to-pink-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style="transform: scale(1.05);"></div>
                 <div class="relative z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-gray-100">
                   <img
                     v-if="getPrimaryImageUrl(memory) && !failedImages[memory.id]"
@@ -102,9 +103,7 @@ const markImageError = (memoryId: string) => {
                     loading="lazy"
                     @error="markImageError(memory.id)"
                   />
-                  <svg v-else class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+                  <PhotoIcon v-else class="h-6 w-6 text-gray-400" aria-hidden="true" />
                 </div>
               </div>
 
@@ -117,16 +116,12 @@ const markImageError = (memoryId: string) => {
                 <!-- Badges -->
                 <div class="mt-2 flex items-center gap-2">
                   <span
-                    v-if="memory.match_sources?.includes('精确')"
-                    class="badge badge-exact"
+                    v-for="kind in getMatchSourceKinds(memory.match_sources)"
+                    :key="kind"
+                    class="badge"
+                    :class="kind === 'exact' ? 'badge-exact' : 'badge-semantic'"
                   >
-                    {{ t('match.exact') }}
-                  </span>
-                  <span
-                    v-if="memory.match_sources?.includes('语义')"
-                    class="badge badge-semantic"
-                  >
-                    {{ t('match.semantic') }}
+                    {{ t(kind === 'exact' ? 'match.exact' : 'match.semantic') }}
                   </span>
                   <span class="text-xs text-gray-400">
                     {{ formatTime(memory.created_at) }}
@@ -155,13 +150,7 @@ const markImageError = (memoryId: string) => {
                 </div>
 
                 <div class="mt-3 flex items-center justify-between gap-3">
-                  <div
-                    v-if="memory.app_name && memory.app_name !== 'unknown'"
-                    class="rounded-lg bg-gradient-to-r from-indigo-50 to-violet-50 px-3 py-1 text-xs font-medium text-indigo-600"
-                  >
-                    {{ memory.app_name }}
-                  </div>
-                  <div v-else class="text-xs text-gray-400">
+                  <div class="text-xs text-gray-400">
                     {{ t('memory.openHint') }}
                   </div>
 

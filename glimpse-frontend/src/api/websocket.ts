@@ -94,6 +94,19 @@ export function useWebSocket() {
         }
         break
 
+      case 'memory_updated': {
+        const memory = (event.data.memory ?? event.data) as unknown
+        if (
+          memory
+          && typeof memory === 'object'
+          && 'id' in memory
+          && 'ai_summary' in memory
+        ) {
+          memoriesStore.upsert(memory as import('@/api/client').Memory)
+        }
+        break
+      }
+
       case 'memory_deleted':
         memoriesStore.refresh()
         break
