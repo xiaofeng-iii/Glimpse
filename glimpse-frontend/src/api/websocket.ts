@@ -89,9 +89,6 @@ export function useWebSocket() {
           }
         })
         notificationStore.show(t('message.saved'), 'success')
-        if (event.data.source === 'global_hotkey') {
-          void focusDesktopWindow()
-        }
         break
 
       case 'memory_updated': {

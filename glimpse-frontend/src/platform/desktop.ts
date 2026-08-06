@@ -69,6 +69,14 @@ export const minimizeDesktopWindow = async () => {
   await currentWindow.minimize()
 }
 
+export const getDesktopWindowMinimized = async () => {
+  const currentWindow = await getWindowApi()
+  if (!currentWindow) {
+    return false
+  }
+  return await currentWindow.isMinimized()
+}
+
 export const startDesktopWindowDrag = async () => {
   if (await invokeDesktopCommand('start_drag_window')) {
     return

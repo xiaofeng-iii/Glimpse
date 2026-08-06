@@ -5,7 +5,7 @@ import type { Memory } from '@/api/client'
 import { clusterApi, screenshotApi, searchApi, settingsApi } from '@/api/client'
 import { whenBackendRuntimeReady } from '@/config/runtime'
 import {
-  focusDesktopWindow,
+  getDesktopWindowMinimized,
   isDesktopShell,
   minimizeDesktopWindow,
 } from '@/platform/desktop'
@@ -133,7 +133,21 @@ const handleScreenshot = async (initiatedByHotkey = false) => {
   }
 
   await loadUiSettings()
+
+  if (isDesktop) {
+    const wasMinimized = await getDesktopWindowMinimized()
+    if (!wasMinimized) {
+      await minimizeDesktopWindow()
+      await wait(300)
+    }
+  }
+
+  if (isCapturing.value) {
+    if (initiatedByHotkey) notifications.show(t('message.busyCapture'), 'warning', 2800)
+    return
+  }
   isCapturing.value = true
+  // 锁只保护发送截图请求本身；最小化与等待不在锁内，连按可快速进入下一次截图。
   if (!clusterModeEnabled.value) {
     notifications.show(
       initiatedByHotkey ? t('message.captureStartedHotkey') : t('message.captureStarted'),
@@ -143,10 +157,6 @@ const handleScreenshot = async (initiatedByHotkey = false) => {
   }
 
   try {
-    if (isDesktop) {
-      await minimizeDesktopWindow()
-      await wait(300)
-    }
     const result = await screenshotApi.triggerAndAnalyze()
     if (!result.success) {
       notifications.show(result.message || t('message.captureFailed'), 'error', 4200)
@@ -157,7 +167,6 @@ const handleScreenshot = async (initiatedByHotkey = false) => {
     logger.error('Screenshot failed: %s', error)
     notifications.show(t('message.checkBackendLogs'), 'error', 4200)
   } finally {
-    if (isDesktop) await focusDesktopWindow()
     isCapturing.value = false
   }
 }
