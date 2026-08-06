@@ -83,11 +83,26 @@ def _write_version_fixture(
 
 @pytest.mark.parametrize(
     "version",
-    ["v0.1.5", "0.1", "0.1.5-beta.1", "01.2.3", "1.2.3.4"],
+    ["v0.1.5", "0.1", "0.1.5-", "0.1.5-preview..1", "01.2.3", "1.2.3.4"],
 )
 def test_validate_version_rejects_non_stable_semver(version: str):
     with pytest.raises(VersionSyncError):
         validate_version(version)
+
+
+@pytest.mark.parametrize(
+    "version",
+    [
+        "0.2.0",
+        "0.2.0-preview.20260806",
+        "0.2.0-dev",
+        "0.2.0-rc.1",
+        "0.2.0+build.5",
+        "0.2.0-preview.20260806+build.7",
+    ],
+)
+def test_validate_version_accepts_prerelease_and_build(version: str):
+    assert validate_version(version) == version
 
 
 def test_sync_versions_updates_sources_and_cargo_lock(tmp_path: Path):
@@ -111,6 +126,18 @@ def test_sync_versions_dry_run_does_not_write_files(tmp_path: Path):
     assert changed
     assert (tmp_path / CARGO_MANIFEST).read_bytes() == before
     assert check_versions(tmp_path, expected="0.1.4") == "0.1.4"
+
+
+def test_sync_versions_accepts_prerelease_version(tmp_path: Path):
+    _write_version_fixture(tmp_path)
+
+    changed = sync_versions("0.2.0-preview.20260806", tmp_path)
+
+    assert set(changed) == {CARGO_MANIFEST, PYPROJECT, CARGO_LOCK}
+    assert (
+        check_versions(tmp_path, expected="0.2.0-preview.20260806")
+        == "0.2.0-preview.20260806"
+    )
 
 
 def test_check_versions_reports_metadata_drift(tmp_path: Path):

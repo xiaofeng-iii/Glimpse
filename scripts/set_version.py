@@ -11,7 +11,11 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-SEMVER_PATTERN = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+SEMVER_PATTERN = re.compile(
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+)
 
 CARGO_MANIFEST = Path("glimpse-frontend/src-tauri/Cargo.toml")
 CARGO_LOCK = Path("glimpse-frontend/src-tauri/Cargo.lock")
@@ -26,8 +30,9 @@ def validate_version(version: str) -> str:
     version = version.strip()
     if not SEMVER_PATTERN.fullmatch(version):
         raise VersionSyncError(
-            f"Invalid version {version!r}; expected stable SemVer MAJOR.MINOR.PATCH "
-            "(for example 0.1.5)."
+            f"Invalid version {version!r}; expected SemVer MAJOR.MINOR.PATCH with "
+            "optional -prerelease and +build metadata "
+            "(for example 0.2.0 or 0.2.0-preview.20260806)."
         )
     return version
 
@@ -241,7 +246,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Synchronize Glimpse version metadata from one version argument."
     )
-    parser.add_argument("version", nargs="?", help="Target stable SemVer, such as 0.1.5")
+    parser.add_argument(
+        "version",
+        nargs="?",
+        help="Target SemVer (MAJOR.MINOR.PATCH with optional -prerelease/+build), "
+        "such as 0.2.0 or 0.2.0-preview.20260806",
+    )
     parser.add_argument(
         "--check",
         action="store_true",
@@ -254,7 +264,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--expected",
-        help="With --check, require this exact stable SemVer.",
+        help="With --check, require this exact SemVer (prerelease/build allowed).",
     )
     parser.add_argument(
         "--dry-run",

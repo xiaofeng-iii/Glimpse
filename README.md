@@ -226,20 +226,33 @@ cd D:\path\to\Glimpse
 同步版本号并检查重复版本字段：
 
 ```powershell
-python scripts/set_version.py 0.1.5
+python scripts/set_version.py 0.2.0
 python scripts/set_version.py --check
 ```
 
 一键提交当前改动、创建版本标签并推送到 GitHub：
 
 ```powershell
-.\scripts\release.ps1 -Version 0.1.5
+.\scripts\release.ps1 -Version 0.2.0
 ```
 
-脚本会显示待提交文件，并要求输入 `v0.1.5` 确认。推送成功后，
+脚本会显示待提交文件，并要求输入 `v0.2.0` 确认。推送成功后，
 `.github/workflows/release.yml` 会在 GitHub 的 Windows 服务器上运行完整测试、
 构建 NSIS 安装包、生成 SHA-256 校验文件并创建 GitHub Release。
 可先使用 `-DryRun` 预览，或在无人值守环境中明确传入 `-Yes`。
+
+### 版本命名规范
+
+项目统一采用 SemVer，正式版与私密预览版共用同一套版本号，不再混用日历版本：
+
+- 正式版：纯 SemVer，如 `0.2.0`、`0.3.0`、`1.0.0`
+- 私密预览：`<正式版本>-preview.YYYYMMDD`，如 `0.2.0-preview.20260806`
+- 开发版（可选）：`<正式版本>-dev`，如 `0.2.0-dev`
+
+私密预览构建前把仓库版本同步为 `0.2.0-preview.20260806`（不修改主版本号），
+构建完成后恢复为正式版 `0.2.0`，避免在历史中反复污染版本号。
+`scripts/set_version.py` 接受标准 SemVer 预发布后缀（`-preview.20260806`、
+`-dev`、`-rc.1`）和构建元数据（`+build.5`）。
 
 安装包输出目录：
 
