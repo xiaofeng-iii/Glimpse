@@ -1,27 +1,27 @@
-name: Build preview release
+name: Build dev release
 
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+-preview.[0-9]{8}"
+      - "v[0-9]+.[0-9]+.[0-9]+-dev.[0-9]{8}"
   workflow_dispatch:
     inputs:
       version:
-        description: "Full preview version, e.g. 0.3.0-preview.20260806"
+        description: "Full dev version, e.g. 0.3.0-dev.20260806"
         required: true
-        default: "0.3.0-preview.20260806"
+        default: "0.3.0-dev.20260806"
         type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: preview-${{ github.ref }}
+  group: dev-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  windows-preview:
-    name: Windows preview installer
+  windows-dev:
+    name: Windows dev installer
     runs-on: windows-latest
     timeout-minutes: 90
 
@@ -45,19 +45,19 @@ jobs:
           cache: npm
           cache-dependency-path: glimpse-frontend/package-lock.json
 
-      - name: Verify preview tag and synchronized version
+      - name: Verify dev tag and synchronized version
         shell: pwsh
         run: |
           $version = if ($env:GITHUB_EVENT_NAME -eq "push") {
-            if ($env:GITHUB_REF_NAME -notmatch '^v(?<ver>[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]{8})$') {
-              throw "Preview tag must be vMAJOR.MINOR.PATCH-preview.YYYYMMDD, got: $env:GITHUB_REF_NAME"
+            if ($env:GITHUB_REF_NAME -notmatch '^v(?<ver>[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]{8})$') {
+              throw "Dev tag must be vMAJOR.MINOR.PATCH-dev.YYYYMMDD, got: $env:GITHUB_REF_NAME"
             }
             $Matches['ver']
           } else {
             "${{ github.event.inputs.version }}"
           }
-          if ($version -notmatch '^(?<base>[0-9]+\.[0-9]+\.[0-9]+)-preview\.(?<date>[0-9]{8})$') {
-            throw "Preview version must be <base>-preview.YYYYMMDD, got: $version"
+          if ($version -notmatch '^(?<base>[0-9]+\.[0-9]+\.[0-9]+)-dev\.(?<date>[0-9]{8})$') {
+            throw "Dev version must be <base>-dev.YYYYMMDD, got: $version"
           }
           $current = python scripts/set_version.py --current
           if ($LASTEXITCODE -ne 0) {
@@ -91,8 +91,8 @@ jobs:
           if (-not (Test-Path -LiteralPath $sidecar)) {
             throw "Bundled backend sidecar missing: $sidecar"
           }
-          $port = 58123
-          $token = "preview-smoke-token"
+          $port = 58124
+          $token = "dev-smoke-token"
           $stdoutPath = Join-Path $env:RUNNER_TEMP "sidecar-smoke-$port.out"
           $stderrPath = Join-Path $env:RUNNER_TEMP "sidecar-smoke-$port.err"
           $process = Start-Process -FilePath $sidecar `
@@ -132,7 +132,7 @@ jobs:
             Remove-Item $stdoutPath,$stderrPath -ErrorAction SilentlyContinue
           }
 
-      - name: Create checksums and publish preview GitHub Release
+      - name: Create checksums and publish dev draft GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -162,8 +162,8 @@ jobs:
             gh release upload $releaseTag @assets --clobber
           } else {
             gh release create $releaseTag @assets `
-              --prerelease `
+              --draft `
               --target "$env:GITHUB_SHA" `
               --generate-notes `
-              --title "Glimpse $releaseTag (preview)"
+              --title "Glimpse $releaseTag (dev build)"
           }

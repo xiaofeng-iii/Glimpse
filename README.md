@@ -243,16 +243,20 @@ python scripts/set_version.py --check
 
 ### 版本命名规范
 
-项目统一采用 SemVer，正式版与私密预览版共用同一套版本号，不再混用日历版本：
+项目统一采用 SemVer + 预发布后缀，三个发布通道，不再混用日历版本：
 
-- 正式版：纯 SemVer，如 `0.2.0`、`0.3.0`、`1.0.0`
-- 私密预览：`<正式版本>-preview.YYYYMMDD`，如 `0.2.0-preview.20260806`
-- 开发版（可选）：`<正式版本>-dev`，如 `0.2.0-dev`
+| 通道 | 版本号 | Git 标签 | GitHub Release 形态 | 可见性 |
+|---|---|---|---|---|
+| 正式版 | `0.2.0`、`0.3.0`、`1.0.0` | `v0.2.0` | Release | 所有人可见 |
+| 公开预览 | `0.2.0-preview.20260806` | `v0.2.0-preview.20260806` | Pre-release | 所有人可见（带 prerelease 标记） |
+| 私密开发版 | `0.2.0-dev.20260806` | `v0.2.0-dev.20260806` | Draft | 仅仓库协作者可见 |
 
-私密预览构建前把仓库版本同步为 `0.2.0-preview.20260806`（不修改主版本号），
-构建完成后恢复为正式版 `0.2.0`，避免在历史中反复污染版本号。
-`scripts/set_version.py` 接受标准 SemVer 预发布后缀（`-preview.20260806`、
-`-dev`、`-rc.1`）和构建元数据（`+build.5`）。
+- **正式版**：功能稳定后发布，触发 `.github/workflows/release.yml`
+- **公开预览（preview）**：功能完成、准备收集外部反馈时发布，触发 `.github/workflows/preview-release.yml`
+- **私密开发版（dev）**：开发中途自测用，不对外暴露半成品，触发 `.github/workflows/dev-release.yml`
+
+三个通道都会校验 `scripts/set_version.py --check`（仓库版本必须与标签/输入完全一致）。
+`scripts/set_version.py` 接受标准 SemVer 预发布后缀（`-preview.20260806`、`-dev.20260806`、`-rc.1`）和构建元数据（`+build.5`）。
 
 安装包输出目录：
 
