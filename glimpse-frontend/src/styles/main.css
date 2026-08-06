@@ -1085,15 +1085,6 @@ kbd {
   object-fit: cover;
 }
 
-.image-preview-dialog__hint {
-  min-height: 2.35rem;
-  margin: 0;
-  padding: 0.35rem 1.25rem 0.75rem;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-  text-align: center;
-}
-
 .confirmation-dialog {
   width: min(440px, calc(100vw - 2rem));
   padding: 1.25rem;

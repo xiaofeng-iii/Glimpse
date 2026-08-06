@@ -285,9 +285,6 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <p class="image-preview-dialog__hint">
-          {{ t('preview.hint') }}
-        </p>
       </section>
     </div>
   </Teleport>
