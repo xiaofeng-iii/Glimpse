@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "glimpse"
-version = "2026.8.6"
+version = "0.2.0"
 description = "AI 驱动的桌面记忆检索系统 - 截图、OCR、AI 摘要、精确与语义检索"
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
