@@ -203,8 +203,8 @@ const populateForm = () => {
   maxCaptures.value = settings.screenshot?.max_captures_per_window ?? 10
   clusterMode.value = Boolean(settings.cluster?.cluster_mode)
   clusterAutoSubmit.value = settings.cluster?.cluster_auto_submit ?? true
-  clusterMaxImages.value = settings.cluster?.cluster_max_images ?? 5
-  clusterTimeout.value = settings.cluster?.cluster_timeout ?? 5
+  clusterMaxImages.value = settings.cluster?.cluster_max_images ?? 10
+  clusterTimeout.value = settings.cluster?.cluster_timeout ?? 10
   aiApiKey.value = settings.ai?.api_key ?? ''
   aiBaseUrl.value = settings.ai?.base_url ?? 'https://api.openai.com/v1'
   aiModel.value = settings.ai?.model ?? 'gpt-4o-mini'

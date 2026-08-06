@@ -101,8 +101,8 @@ class SettingsResponse(BaseModel):
     cluster: Dict[str, Any] = Field(default_factory=lambda: {
         "cluster_mode": False,
         "cluster_auto_submit": True,
-        "cluster_max_images": 5,
-        "cluster_timeout": 5,
+        "cluster_max_images": 10,
+        "cluster_timeout": 10,
     })
 
 

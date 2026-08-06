@@ -98,8 +98,8 @@ class SettingsDialog(QDialog):
             "cluster": {
                 "cluster_mode": False,
                 "cluster_auto_submit": True,
-                "cluster_max_images": 5,
-                "cluster_timeout": 5,
+                "cluster_max_images": 10,
+                "cluster_timeout": 10,
             },
             "ai": {"api_key": "", "model": "gpt-4o-mini", "timeout": 30},
             "ocr": {"engine": "rapidocr", "language": "ch"},
@@ -332,8 +332,8 @@ class SettingsDialog(QDialog):
         cluster = merged.get("cluster", {})
         self._cluster_mode.setChecked(cluster.get("cluster_mode", False))
         self._cluster_auto_submit.setChecked(cluster.get("cluster_auto_submit", True))
-        self._cluster_max_images.setValue(cluster.get("cluster_max_images", 5))
-        self._cluster_timeout.setValue(cluster.get("cluster_timeout", 5))
+        self._cluster_max_images.setValue(cluster.get("cluster_max_images", 10))
+        self._cluster_timeout.setValue(cluster.get("cluster_timeout", 10))
 
         ai = merged.get("ai", {})
         self._ai_api_key.setText(ai.get("api_key", ""))
@@ -523,10 +523,10 @@ class SettingsDialog(QDialog):
             return False
 
         cluster = settings.get("cluster", {})
-        if not (1 <= cluster.get("cluster_max_images", 5) <= 10):
+        if not (1 <= cluster.get("cluster_max_images", 10) <= 10):
             QMessageBox.warning(self, t("settings.validation_input_error"), t("settings.validation_cluster_max_images"))
             return False
-        if not (1 <= cluster.get("cluster_timeout", 5) <= 10):
+        if not (1 <= cluster.get("cluster_timeout", 10) <= 10):
             QMessageBox.warning(self, t("settings.validation_input_error"), t("settings.validation_cluster_timeout"))
             return False
 

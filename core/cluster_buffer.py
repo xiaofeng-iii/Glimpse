@@ -155,7 +155,7 @@ class ClusterBuffer:
         return self._get_max_images()
 
     def _get_max_images(self) -> int:
-        return int(self._settings_manager.get("cluster.cluster_max_images", 5))
+        return int(self._settings_manager.get("cluster.cluster_max_images", 10))
 
     def _get_timeout_seconds(self) -> int:
-        return max(int(self._settings_manager.get("cluster.cluster_timeout", 5)), 0)
+        return max(int(self._settings_manager.get("cluster.cluster_timeout", 10)), 0)

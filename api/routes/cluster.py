@@ -16,7 +16,7 @@ async def get_cluster_status():
         cluster_buffer = get_cluster_buffer()
         settings_manager = get_settings_manager()
 
-        max_count = settings_manager.get("cluster.cluster_max_images", 5)
+        max_count = settings_manager.get("cluster.cluster_max_images", 10)
 
         return ClusterStatus(
             state="COLLECTING" if cluster_buffer.is_collecting() else "IDLE",

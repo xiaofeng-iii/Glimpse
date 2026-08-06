@@ -320,8 +320,8 @@ class TestSettingsManagerCluster:
         sm = SettingsManager(mock_path_manager)
         assert sm.get("cluster.cluster_mode") is False
         assert sm.get("cluster.cluster_auto_submit") is True
-        assert sm.get("cluster.cluster_max_images") == 5
-        assert sm.get("cluster.cluster_timeout") == 5
+        assert sm.get("cluster.cluster_max_images") == 10
+        assert sm.get("cluster.cluster_timeout") == 10
 
     def test_update_valid_cluster_settings(self, mock_path_manager):
         from config.settings_manager import SettingsManager
