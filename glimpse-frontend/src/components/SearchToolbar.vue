@@ -144,7 +144,7 @@ defineExpose({ focus, clear })
           ref="searchInput"
           v-model="query"
           type="search"
-          class="h-11 w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)]"
+          class="h-11 w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[display:none]"
           :placeholder="t('search.placeholder')"
           @keydown.esc.stop.prevent="clear"
         />
@@ -152,11 +152,11 @@ defineExpose({ focus, clear })
           <button
             v-if="query"
             type="button"
-            class="rounded-md p-1 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+            class="flex h-[22px] min-h-0 w-[22px] flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
             :aria-label="t('search.clear')"
             @click="clear"
           >
-            <XMarkIcon class="h-4 w-4" aria-hidden="true" />
+            <XMarkIcon class="h-3 w-3" aria-hidden="true" />
           </button>
           <kbd class="rounded-md border border-[var(--shell-line)] px-1.5 py-0.5 text-xs text-[var(--shell-muted)]">
             {{ shortcutLabel }}
