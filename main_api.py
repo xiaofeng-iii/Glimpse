@@ -11,39 +11,6 @@ import os
 import sys
 from pathlib import Path
 
-from utils.logger import get_logger, setup_logging
-
-logger = get_logger(__name__)
-
-
-def _packaged_log_path() -> Path:
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    if local_app_data:
-        return Path(local_app_data).resolve() / "Glimpse" / "logs" / "glimpse-runtime.log"
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent / "glimpse-runtime.log"
-    return Path.cwd() / "glimpse-runtime.log"
-
-
-output_streams_redirected = False
-if sys.stdout is None:
-    log_path = _packaged_log_path()
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    sys.stdout = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
-    output_streams_redirected = True
-if sys.stderr is None:
-    if sys.stdout is not None and getattr(sys.stdout, "name", None) != os.devnull:
-        sys.stderr = sys.stdout
-    else:
-        log_path = _packaged_log_path()
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        sys.stderr = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
-    output_streams_redirected = True
-
-if output_streams_redirected:
-    setup_logging()
-
-import argparse
 from runtime_env import get_env_file, get_runtime_root
 
 # Ensure project root is in path
@@ -51,16 +18,29 @@ project_root = get_runtime_root(Path(__file__).parent)
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-# Load .env environment variables
+# Load .env before path and logging initialization so their overrides apply.
+loaded_env_path = None
 try:
     from dotenv import load_dotenv
     env_path = get_env_file(project_root)
     if env_path.exists():
         load_dotenv(env_path)
-        logger.info("Loaded .env from %s", env_path)
+        loaded_env_path = env_path
 except ImportError:
     pass
 
+from config.path_manager import path_manager
+from utils.logger import get_logger, setup_logging
+
+# Structured Python logs use the canonical data-root log file. The Tauri host
+# captures raw sidecar stdout/stderr in a separate sidecar output file.
+setup_logging(log_file=path_manager.log_file)
+logger = get_logger(__name__)
+
+if loaded_env_path is not None:
+    logger.info("Loaded .env from %s", loaded_env_path)
+
+import argparse
 import uvicorn
 
 

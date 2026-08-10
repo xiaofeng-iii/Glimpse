@@ -4,6 +4,7 @@
 use serde::Serialize;
 #[cfg(not(debug_assertions))]
 use std::fmt::Write as FmtWrite;
+use std::fs::OpenOptions;
 #[cfg(debug_assertions)]
 use std::io::{Read, Write};
 use std::net::SocketAddr;
@@ -11,10 +12,9 @@ use std::net::SocketAddr;
 use std::net::TcpListener;
 #[cfg(debug_assertions)]
 use std::net::TcpStream;
-#[cfg(not(debug_assertions))]
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
@@ -31,6 +31,8 @@ use std::os::windows::process::CommandExt;
 
 const DEV_API_ORIGIN: &str = "http://127.0.0.1:8000";
 const APP_VERSION_ENV: &str = "GLIMPSE_APP_VERSION";
+const DATA_ROOT_ENV: &str = "GLIMPSE_DATA_ROOT";
+const PROJECT_ROOT_ENV: &str = "GLIMPSE_PROJECT_ROOT";
 #[cfg(not(debug_assertions))]
 const LOOPBACK_HOST: &str = "127.0.0.1";
 #[cfg(debug_assertions)]
@@ -195,6 +197,69 @@ fn backend_autostart_disabled() -> bool {
     )
 }
 
+fn non_empty_env_path(name: &str) -> Option<PathBuf> {
+    std::env::var_os(name)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+fn backend_runtime_root(app: &AppHandle) -> Option<PathBuf> {
+    if let Some(root) = non_empty_env_path(PROJECT_ROOT_ENV) {
+        return Some(root);
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        let _ = app;
+        project_root()
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        bundled_backend_dir(app)
+    }
+}
+
+fn backend_data_root(app: &AppHandle) -> Option<PathBuf> {
+    if let Some(root) = non_empty_env_path(DATA_ROOT_ENV) {
+        return Some(root);
+    }
+
+    #[cfg(not(debug_assertions))]
+    if let Some(local_app_data) = non_empty_env_path("LOCALAPPDATA") {
+        return Some(local_app_data.join("Glimpse").join("GlimpseData"));
+    }
+
+    backend_runtime_root(app).map(|root| root.join("GlimpseData"))
+}
+
+fn redirect_command_stdio(command: &mut Command, log_path: &Path) -> std::io::Result<()> {
+    if let Some(log_dir) = log_path.parent() {
+        std::fs::create_dir_all(log_dir)?;
+    }
+
+    let stdout_log = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)?;
+    let stderr_log = stdout_log.try_clone()?;
+
+    command.stdout(Stdio::from(stdout_log));
+    command.stderr(Stdio::from(stderr_log));
+    Ok(())
+}
+
+fn redirect_backend_stdio(app: &AppHandle, command: &mut Command) -> std::io::Result<()> {
+    let data_root = backend_data_root(app).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "unable to resolve Glimpse data directory",
+        )
+    })?;
+    let log_path = data_root.join("logs").join("glimpse-sidecar.out.log");
+    redirect_command_stdio(command, &log_path)
+}
+
 fn build_backend_command(app: &AppHandle, runtime: &BackendRuntime) -> Option<Command> {
     #[cfg(debug_assertions)]
     {
@@ -270,6 +335,10 @@ fn spawn_backend_if_needed(app: &AppHandle, runtime: &BackendRuntime) -> Option<
     }
 
     let mut command = build_backend_command(app, runtime)?;
+
+    if let Err(error) = redirect_backend_stdio(app, &mut command) {
+        eprintln!("Failed to redirect backend output to the sidecar output log: {error}");
+    }
 
     #[cfg(target_os = "windows")]
     {
@@ -559,4 +628,68 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redirect_command_stdio;
+    use std::path::Path;
+    use std::process::Command;
+
+    fn output_command(label: &str) -> Command {
+        #[cfg(target_os = "windows")]
+        {
+            let mut command = Command::new("cmd.exe");
+            command.args([
+                "/C",
+                &format!("echo stdout-{label} & echo stderr-{label} 1>&2"),
+            ]);
+            command
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let mut command = Command::new("sh");
+            command.args([
+                "-c",
+                &format!("echo stdout-{label}; echo stderr-{label} >&2"),
+            ]);
+            command
+        }
+    }
+
+    fn run_redirected_probe(log_path: &Path, label: &str) {
+        let mut command = output_command(label);
+        redirect_command_stdio(&mut command, log_path).expect("redirect probe output");
+        let status = command.status().expect("run redirected probe");
+        assert!(status.success());
+    }
+
+    #[test]
+    fn sidecar_output_redirection_captures_both_streams_and_appends() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock after epoch")
+            .as_nanos();
+        let temp_dir = std::env::temp_dir().join(format!(
+            "glimpse-sidecar-log-test-{}-{unique}",
+            std::process::id()
+        ));
+        let log_path = temp_dir.join("logs").join("glimpse-sidecar.out.log");
+
+        run_redirected_probe(&log_path, "first");
+        run_redirected_probe(&log_path, "second");
+
+        let output = std::fs::read_to_string(&log_path).expect("read sidecar output log");
+        for expected in [
+            "stdout-first",
+            "stderr-first",
+            "stdout-second",
+            "stderr-second",
+        ] {
+            assert!(output.contains(expected), "missing {expected}: {output}");
+        }
+
+        std::fs::remove_dir_all(temp_dir).expect("remove sidecar log test directory");
+    }
 }

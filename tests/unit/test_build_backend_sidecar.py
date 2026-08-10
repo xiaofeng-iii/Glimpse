@@ -26,6 +26,7 @@ def test_sidecar_uses_branded_name_and_cache_inputs():
     assert sidecar.sidecar_exe_path().name == "GlimpseRuntime.exe"
     assert "assets/icons/glimpse.ico" in sidecar.HASH_INPUTS
     assert "glimpse-frontend/src-tauri/Cargo.toml" in sidecar.HASH_INPUTS
+    assert "utils" in sidecar.HASH_INPUTS
 
 
 def test_sidecar_collects_rapidocr_code_models_metadata_and_onnx_runtime():
@@ -144,6 +145,11 @@ def test_desktop_bundle_uses_runtime_name_and_cleans_legacy_sidecars():
     assert 'const BACKEND_PROCESS_NAME: &str = "GlimpseRuntime.exe";' in rust_main
     assert "const CREATE_NO_WINDOW: u32 = 0x08000000;" in rust_main
     assert "command.creation_flags(CREATE_NO_WINDOW);" in rust_main
+    assert 'command.stdout(Stdio::from(stdout_log));' in rust_main
+    assert 'command.stderr(Stdio::from(stderr_log));' in rust_main
+    assert '.join("GlimpseData")' in rust_main
+    assert '.join("logs")' in rust_main
+    assert '.join("glimpse-sidecar.out.log")' in rust_main
     assert '("glimpse-backend", "glimpse-backend.exe")' in rust_main
     assert '("python-backend", "python-backend.exe")' in rust_main
     assert "GlimpseRuntime.exe" in installer_hooks

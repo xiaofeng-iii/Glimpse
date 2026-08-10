@@ -56,20 +56,8 @@ def setup_logging(
     # Configure root logger
     root.setLevel(log_level)
 
-    # PyInstaller --noconsole starts with stdout/stderr set to None. Never bind
-    # a StreamHandler to an invalid stream; the packaged entry point will call
-    # setup_logging() again after redirecting both streams to its log file.
-    console_stream = sys.stdout if sys.stdout is not None else sys.stderr
-    if console_stream is not None:
-        console_handler = logging.StreamHandler(console_stream)
-        console_handler.setLevel(log_level)
-        console_formatter = logging.Formatter(log_format, date_format)
-        console_handler.setFormatter(console_formatter)
-        root.addHandler(console_handler)
-    else:
-        root.addHandler(logging.NullHandler())
-
-    # File handler (if specified)
+    # A configured file is the single sink for structured Python logs. Raw
+    # sidecar stdout/stderr is captured separately by the Tauri host.
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
@@ -77,6 +65,17 @@ def setup_logging(
         file_formatter = logging.Formatter(log_format, date_format)
         file_handler.setFormatter(file_formatter)
         root.addHandler(file_handler)
+    else:
+        console_stream = sys.stdout if sys.stdout is not None else sys.stderr
+        if console_stream is not None:
+            console_handler = logging.StreamHandler(console_stream)
+            console_handler.setLevel(log_level)
+            console_formatter = logging.Formatter(log_format, date_format)
+            console_handler.setFormatter(console_formatter)
+            root.addHandler(console_handler)
+
+    if not root.handlers:
+        root.addHandler(logging.NullHandler())
 
     # Reduce noise from third-party libraries
     logging.getLogger("uvicorn").setLevel(logging.WARNING)

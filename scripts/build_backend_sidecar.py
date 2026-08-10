@@ -43,6 +43,7 @@ HASH_INPUTS = [
     "core",
     "db",
     "services",
+    "utils",
     "async_runtime.py",
     "container.py",
     "event_bus.py",
