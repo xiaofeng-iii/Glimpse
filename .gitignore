@@ -113,6 +113,7 @@ claude-*.env
 anthropic*.json
 anthropic*.env
 *.prompt.md
+design-qa.md
 
 # Keep one shared guide for future vibe-coding sessions.
 !AGENTS.md

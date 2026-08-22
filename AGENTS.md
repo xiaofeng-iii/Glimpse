@@ -8,11 +8,14 @@ Glimpse is a desktop memory assistant: a user captures the screen, the app summa
 
 ## First Principles
 
-- Preserve the current local-memory pipeline: capture -> AI summary -> embedding -> SQLite + ChromaDB -> search/UI.
+- Preserve the current local-memory pipeline: capture -> local OCR -> AI summary
+  or OCR fallback -> SQLite (`PENDING`) -> embedding + ChromaDB -> final sync
+  status -> search/UI.
 - Keep user data local by default. Runtime data belongs under `GlimpseData/`, not in the repo.
 - Prefer dependency injection through `container.get(...)`. Avoid introducing new module-level global instances.
 - Treat UI, services, storage, and capture as separate layers. Cross layers through existing services/signals instead of shortcut imports.
-- Make behavior robust when AI credentials are missing. Search/browse should still work with saved data.
+- Make behavior robust when AI credentials are missing. OCR-only memory creation,
+  search, and browse should still work.
 - Do not commit AI session artifacts. Keep only this guide as the repo-level instruction file for future sessions.
 
 ## Environment
@@ -67,11 +70,17 @@ The project is developed on Windows with a Tauri/Vue desktop shell and a Python 
 
 1. Screenshot is captured by `core/capture.py`.
 2. Cluster mode, if enabled, buffers multiple screenshots in `core/cluster_buffer.py`.
-3. `services/memory_service.py` orchestrates AI summary, embeddings, and persistence.
-4. `db/sqlite_manager.py` stores memory metadata, summary text, optional recognized text, and FTS search data.
-5. `db/chroma_manager.py` stores vector-search data.
-6. `services/search_service.py` combines exact and semantic search results.
-7. UI renders list/detail state and hides placeholder app names such as empty strings or `unknown`.
+3. `services/memory_service.py` runs local OCR before optional AI summarization;
+   without AI credentials it falls back to the recognized text.
+4. `db/sqlite_manager.py` first stores the fact record with `PENDING` sync status,
+   including summary text, recognized text, metadata, and FTS data.
+5. `services/memory_service.py` embeds the summary plus recognized text,
+   `db/chroma_manager.py` writes the derived vector index, and SQLite records
+   `SYNCED` or `FAILED`.
+6. `services/search_service.py` combines text search (FTS with substring
+   fallback) and semantic results.
+7. UI renders list/detail state, reacts to WebSocket updates, and hides
+   placeholder app names such as empty strings or `unknown`.
 
 OCR is enabled before AI summarization through the injected `OCREngine`.
 `services/ocr_engine.py` uses RapidOCR 3.9.2 with the bundled

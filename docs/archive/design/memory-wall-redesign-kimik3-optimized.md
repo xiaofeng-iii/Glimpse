@@ -1,5 +1,9 @@
 # 前端 UI 沉稳化改造对比说明
 
+> 归档状态：2026-08-04 前端视觉改造记录，不是当前界面事实来源。
+> 当前产品与架构说明见 [`docs/README.md`](../../README.md)；现行界面以代码和
+> 自动化测试为准。
+
 分支：`feat/memory-wall-redesign-kimik3-optimized`
 基线：`feat/memory-wall-redesign`
 范围：仅 `glimpse-frontend/`，纯样式层调整，不改动任何组件 props、事件、状态管理与交互逻辑。

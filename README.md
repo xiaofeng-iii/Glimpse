@@ -1,6 +1,6 @@
 # Glimpse
 
-AI 驱动的桌面记忆检索系统。支持截图、AI 摘要、精确检索、语义检索，以及基于 `Vue 3 + Tauri` 的桌面弹窗界面。
+AI 驱动的桌面记忆检索系统。支持截图、本地 OCR、AI 摘要、精确检索、语义检索，以及基于 `Vue 3 + Tauri` 的桌面弹窗界面。
 
 当前仓库包含以下入口：
 
@@ -13,7 +13,7 @@ AI 驱动的桌面记忆检索系统。支持截图、AI 摘要、精确检索�
 
 基础要求：
 
-- Python `3.10+`
+- Python `3.10` 或 `3.11`（推荐 `3.10`）
 - Node.js `18+`
 
 如果要运行 Tauri 弹窗，还需要：
@@ -50,8 +50,8 @@ pip install -r requirements-packaging.txt
 
 ## 3. 配置 `.env`
 
-复制 `.env.example` 为 `.env`。应用可以在没有 AI 凭据的情况下启动；若要创建
-AI 记忆，需要填写：
+复制 `.env.example` 为 `.env`。应用可以在没有 AI 凭据的情况下启动，并使用
+本地 OCR 创建基础记忆；若要生成多模态 AI 摘要，需要填写：
 
 ```env
 OPENAI_API_KEY=your_api_key_here
@@ -129,10 +129,12 @@ cd D:\path\to\Glimpse
 - `start_tauri_visible.bat`
   - 会显示终端
   - 适合开发和排错
+  - Tauri 错误直接显示在终端；后端日志写入
+    `GlimpseData/logs/glimpse-sidecar.out.log`
 - `start_tauri.bat`
   - 会隐藏控制台
   - 适合日常调试
-  - 如果启动失败，请查看 `.logs/tauri-dev.log`
+  - 如果启动失败，请查看 `.logs/tauri-dev.log` 和 `.logs/backend-dev.log`
 
 注意：
 
@@ -198,16 +200,16 @@ cd D:\path\to\Glimpse
 .\start_tauri_visible.bat
 ```
 
-如果仍有问题，查看：
+如果仍有问题：
 
-- `.logs/tauri-dev.log`
-- `.logs/backend-dev.log`
+- 可见模式先查看当前终端和 `GlimpseData/logs/glimpse-sidecar.out.log`
+- 静默模式查看 `.logs/tauri-dev.log` 和 `.logs/backend-dev.log`
 
 ### 4. 快捷键、截图或图片预览没有反应
 
 先确认：
 
-- 后端状态是否为“已连接”
+- 顶栏状态是否为“服务正常”；若仍为“服务启动中”，等待冷启动完成
 - `http://127.0.0.1:8000/api/health` 是否返回 `healthy`
 - WebSocket 未被浏览器插件或代理拦截
 
@@ -237,8 +239,9 @@ python scripts/set_version.py --check
 ```
 
 脚本会显示待提交文件，并要求输入 `v0.2.0` 确认。推送成功后，
-`.github/workflows/release.yml` 会在 GitHub 的 Windows 服务器上运行完整测试、
-构建 NSIS 安装包、生成 SHA-256 校验文件并创建 GitHub Release。
+`.github/workflows/release.yml` 会在 GitHub 的 Windows 服务器上运行 Python
+单元测试、构建 NSIS 安装包、执行 sidecar 冒烟检查、生成 SHA-256 校验文件并
+创建 GitHub Release。
 可先使用 `-DryRun` 预览，或在无人值守环境中明确传入 `-Yes`。
 
 ### 正式版发布后的 Release 说明（必做）

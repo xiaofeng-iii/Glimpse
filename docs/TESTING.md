@@ -23,10 +23,13 @@ conda run -n glimpse python -m pytest -q
 
 ```powershell
 cd glimpse-frontend
-npm install
+npm ci
 npm run test:run
 npm run build
 ```
+
+日常开发已安装依赖时可直接运行测试和构建；全新检出、CI 或需要严格按锁文件
+复现依赖时使用 `npm ci`。
 
 开发时持续监听受影响的前端测试：
 
@@ -81,20 +84,7 @@ npm test
 Embedding 模型首次加载可能较慢；测试应优先使用 fixture 或 mock，专项搜索
 验证再加载真实模型。
 
-## 5. 当前已知测试问题
-
-完整测试套件存在一个测试隔离问题：
-
-- `tests/unit/api/test_hotkeys.py` 在模块级注册 `api.desktop_actions` stub。
-- 该 stub 只有 `capture_and_analyze`，没有 `capture_only`。
-- 当它先于 `tests/test_api.py` 导入时，11 个 API 测试在收集后的 setup 阶段
-  报错。
-- 单独运行 `tests/test_api.py` 时 11 项全部通过。
-
-修复标准是让测试替身在用例结束后恢复 `sys.modules`，或补齐路由导入所需
-接口；在修复前，不应把这组顺序错误解释为生产代码缺少 `capture_only`。
-
-## 6. 完成标准
+## 5. 完成标准
 
 - 运行与改动范围相匹配的测试。
 - 新行为有对应的单元或集成验证。
