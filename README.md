@@ -241,6 +241,66 @@ python scripts/set_version.py --check
 构建 NSIS 安装包、生成 SHA-256 校验文件并创建 GitHub Release。
 可先使用 `-DryRun` 预览，或在无人值守环境中明确传入 `-Yes`。
 
+### 正式版发布后的 Release 说明（必做）
+
+正式版标签触发的 Workflow 使用 `--generate-notes` 创建 Release；自动正文只是
+提交列表或 compare 链接，不能作为最终发布说明。Workflow 成功且安装包上传后，
+必须补写面向用户的中文说明，完成正文验收后才能宣布发布完成。
+
+1. 从上一正式版到本版的提交记录收集素材，只保留用户能感知的变化：
+
+   ```powershell
+   $PreviousTag = "v0.2.1"
+   $CurrentTag = "v0.2.2"
+   git log --oneline "$PreviousTag..$CurrentTag"
+   ```
+
+2. 在 `.tmp/` 中准备临时发布说明文件：
+
+   ```powershell
+   $NotesFile = ".tmp/release-notes-$CurrentTag.md"
+   ```
+
+   正文使用以下骨架：
+
+   ```markdown
+   ## Glimpse vX.Y.Z
+
+   **新特性**
+   - 用户可感知的新能力
+
+   **优化**
+   - 用户能感知的体验改善
+
+   **修复**
+   - 用户能感知的修复结果
+
+   **Full Changelog**: https://github.com/xiaofeng-iii/Glimpse/compare/v上一版...v本版
+   ```
+
+   编写时遵循以下规则：
+
+   - 每条只写一句话且不超过 30 个字，说明用户实际得到的结果。
+   - 删除锁、死代码、SemVer、通道名等实现或发布术语。
+   - 使用“默认”“不再”“支持”“移除”等准确的结果表述。
+   - 没有用户可感知变化的改动不写；某分类无内容时保留标题，不编造条目。
+   - `Full Changelog` 使用 `v上一版...v本版` 的 GitHub compare 链接。
+
+3. 用填写后的文件覆盖 Release 正文：
+
+   ```powershell
+   gh release edit $CurrentTag --notes-file $NotesFile
+   ```
+
+4. 重新读取 GitHub Release，确认正文、正式发布状态和链接都正确：
+
+   ```powershell
+   gh release view $CurrentTag --json name,tagName,isDraft,isPrerelease,body,url
+   ```
+
+   同时确认安装包和 `SHA256SUMS.txt` 已上传。验收完成后删除临时说明文件；
+   在此之前不得把发布报告为完成。`v0.2.1` 的发布说明是文案风格范本。
+
 ### 版本命名规范
 
 项目统一采用 SemVer + 预发布后缀，三个发布通道，不再混用日历版本：

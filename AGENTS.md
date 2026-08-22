@@ -120,6 +120,13 @@ When touching Qt UI, also run the app manually in the `glimpse` environment and 
 - Do not rewrite or discard user changes unless explicitly asked.
 - If removing tracked AI artifacts, use `git rm --cached` so local scratch files are not deleted.
 
+## Release Completion
+
+- A formal release is not complete when the tag, Workflow, or installer build merely succeeds.
+- After the GitHub Release exists, follow the post-release procedure in `README.md` and replace the generated notes via `gh release edit vX.Y.Z --notes-file ...`.
+- Build the notes from `git log vPrevious..vCurrent`. Keep only user-visible results, use the three Chinese sections, keep each item to one sentence of at most 30 Chinese characters, and include the compare link.
+- Read the Release back from GitHub and verify its body, release status, installer, and checksum before reporting the release complete.
+
 
 
 以暗猜接口为耻，以认真查阅为荣
