@@ -11,6 +11,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
+import { ONBOARDING_REQUEST_EVENT } from '@/utils/onboarding'
 
 const apiMocks = vi.hoisted(() => ({
   updateSummary: vi.fn(),
@@ -99,6 +100,29 @@ describe('memory components', () => {
     expect(buttons.map((button) => button.attributes('aria-pressed'))).toEqual(['true', 'false', 'false'])
     for (const button of buttons) {
       expect(button.classes()).toEqual(expect.arrayContaining(['h-9', 'min-h-0']))
+    }
+  })
+
+  it('closes the DEV panel before requesting the onboarding guide', async () => {
+    const wrapper = mount(SearchToolbar)
+    const panel = wrapper.get('details')
+    const requestHandler = vi.fn(() => {
+      expect((panel.element as HTMLDetailsElement).open).toBe(false)
+    })
+    window.addEventListener(ONBOARDING_REQUEST_EVENT, requestHandler)
+
+    try {
+      (panel.element as HTMLDetailsElement).open = true
+      await panel.trigger('toggle')
+      expect(wrapper.emitted('debug-panel-change')?.at(-1)).toEqual([true])
+
+      await wrapper.get('[data-testid="show-onboarding"]').trigger('click')
+
+      expect((panel.element as HTMLDetailsElement).open).toBe(false)
+      expect(wrapper.emitted('debug-panel-change')?.at(-1)).toEqual([false])
+      expect(requestHandler).toHaveBeenCalledTimes(1)
+    } finally {
+      window.removeEventListener(ONBOARDING_REQUEST_EVENT, requestHandler)
     }
   })
 

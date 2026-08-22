@@ -4,12 +4,14 @@ import {
   AdjustmentsHorizontalIcon,
   CameraIcon,
   MagnifyingGlassIcon,
+  QuestionMarkCircleIcon,
   ArrowPathIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import type { SearchOptions } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { t } from '@/utils/i18n'
+import { requestOnboarding } from '@/utils/onboarding'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
@@ -38,6 +40,7 @@ const memoriesStore = useMemoriesStore()
 const query = ref(props.modelValue)
 const source = ref(memoriesStore.searchSource || 'all')
 const searchInput = ref<HTMLInputElement | null>(null)
+const debugPanelElement = ref<HTMLDetailsElement | null>(null)
 const debugPanelOpen = ref(false)
 const isDev = import.meta.env.DEV
 const devOptions = ref({
@@ -88,8 +91,17 @@ const scheduleSearch = () => {
 }
 
 const handleDebugToggle = (event: Event) => {
-  debugPanelOpen.value = (event.currentTarget as HTMLDetailsElement).open
-  emit('debug-panel-change', debugPanelOpen.value)
+  const open = (event.currentTarget as HTMLDetailsElement).open
+  if (debugPanelOpen.value === open) return
+  debugPanelOpen.value = open
+  emit('debug-panel-change', open)
+}
+
+const handleShowOnboarding = () => {
+  debugPanelOpen.value = false
+  if (debugPanelElement.value) debugPanelElement.value.open = false
+  emit('debug-panel-change', false)
+  requestOnboarding()
 }
 
 watch(
@@ -196,8 +208,10 @@ defineExpose({ focus, clear })
         </button>
 
         <details
+          ref="debugPanelElement"
           v-if="isDev"
           class="relative"
+          :open="debugPanelOpen"
           @toggle="handleDebugToggle"
         >
           <summary
@@ -239,6 +253,15 @@ defineExpose({ focus, clear })
               <input v-model="devOptions.debug" type="checkbox" class="h-4 w-4 accent-amber-600" />
               {{ t('search.showScores') }}
             </label>
+            <button
+              data-testid="show-onboarding"
+              type="button"
+              class="mt-4 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-amber-300/80 bg-amber-50 px-3 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+              @click="handleShowOnboarding"
+            >
+              <QuestionMarkCircleIcon class="h-4 w-4" aria-hidden="true" />
+              {{ t('search.showOnboarding') }}
+            </button>
           </div>
         </details>
 

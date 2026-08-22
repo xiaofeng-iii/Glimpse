@@ -6,7 +6,11 @@ import { useSettingsStore } from '@/stores/settings'
 import { whenBackendRuntimeReady } from '@/config/runtime'
 import { applyThemePreference, watchSystemTheme } from '@/utils/theme'
 import { setLanguagePreference } from '@/utils/i18n'
-import { completeOnboarding, shouldShowOnboarding } from '@/utils/onboarding'
+import {
+  completeOnboarding,
+  ONBOARDING_REQUEST_EVENT,
+  shouldShowOnboarding,
+} from '@/utils/onboarding'
 import DesktopShell from '@/components/DesktopShell.vue'
 import FirstRunGuide from '@/components/FirstRunGuide.vue'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
@@ -22,6 +26,10 @@ const finishOnboarding = () => {
   firstRunGuideOpen.value = false
 }
 
+const showOnboarding = () => {
+  firstRunGuideOpen.value = true
+}
+
 const applySavedTheme = async () => {
   await settingsStore.load()
   applyThemePreference(settingsStore.settings?.ui?.theme)
@@ -30,6 +38,7 @@ const applySavedTheme = async () => {
 
 // Connect WebSocket on app mount
 onMounted(async () => {
+  window.addEventListener(ONBOARDING_REQUEST_EVENT, showOnboarding)
   await whenBackendRuntimeReady()
   await applySavedTheme()
   stopWatchingSystemTheme = watchSystemTheme(() => {
@@ -40,6 +49,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener(ONBOARDING_REQUEST_EVENT, showOnboarding)
   stopWatchingSystemTheme?.()
   stopWatchingSystemTheme = null
 })

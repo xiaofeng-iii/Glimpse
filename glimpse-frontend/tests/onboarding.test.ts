@@ -7,6 +7,7 @@ import {
   completeOnboarding,
   CURRENT_ONBOARDING_VERSION,
   ONBOARDING_VERSION_STORAGE_KEY,
+  requestOnboarding,
   shouldShowOnboarding,
 } from '@/utils/onboarding'
 
@@ -110,6 +111,19 @@ describe('first-run onboarding', () => {
     await flushPromises()
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+  })
+
+  it('reopens the guide when the development UI requests it', async () => {
+    completeOnboarding()
+    const wrapper = mountApp()
+    await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+
+    requestOnboarding()
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(window.localStorage.getItem(ONBOARDING_VERSION_STORAGE_KEY)).toBe('1')
   })
 
   it('focuses the primary action and supports Escape dismissal', async () => {

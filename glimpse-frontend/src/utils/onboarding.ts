@@ -1,5 +1,6 @@
 export const CURRENT_ONBOARDING_VERSION = 1
 export const ONBOARDING_VERSION_STORAGE_KEY = 'glimpse.onboardingVersion'
+export const ONBOARDING_REQUEST_EVENT = 'glimpse:show-onboarding'
 
 const readStoredOnboardingVersion = () => {
   if (typeof window === 'undefined') return CURRENT_ONBOARDING_VERSION
@@ -31,4 +32,9 @@ export const completeOnboarding = () => {
     // Storage can be unavailable in restricted webviews. The guide still closes
     // for the current session even when its completion cannot be persisted.
   }
+}
+
+export const requestOnboarding = () => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(ONBOARDING_REQUEST_EVENT))
 }
