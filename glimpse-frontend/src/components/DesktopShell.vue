@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeftIcon,
+  ArrowPathIcon,
   ArrowsPointingInIcon,
   ArrowsPointingOutIcon,
   CheckCircleIcon,
@@ -57,9 +58,11 @@ const sectionTitle = computed(() => {
 
   return ''
 })
-const serviceLabel = computed(() => (
-  backendStatus.isReady ? t('status.ready') : t('status.offline')
-))
+const serviceLabel = computed(() => {
+  if (backendStatus.isReady) return t('status.ready')
+  if (backendStatus.isStarting) return t('status.starting')
+  return t('status.offline')
+})
 
 const isWindowMaximized = ref(false)
 const closeAction = ref<CloseAction>('ask')
@@ -237,7 +240,8 @@ onUnmounted(() => {
           class="service-status"
           :class="{
             'service-status--ready': backendStatus.isReady,
-            'service-status--offline': !backendStatus.isReady,
+            'service-status--starting': backendStatus.isStarting,
+            'service-status--offline': backendStatus.isOffline,
           }"
           role="status"
           aria-live="polite"
@@ -245,6 +249,11 @@ onUnmounted(() => {
           <CheckCircleIcon
             v-if="backendStatus.isReady"
             class="service-status__icon"
+            aria-hidden="true"
+          />
+          <ArrowPathIcon
+            v-else-if="backendStatus.isStarting"
+            class="service-status__icon animate-spin"
             aria-hidden="true"
           />
           <ExclamationCircleIcon

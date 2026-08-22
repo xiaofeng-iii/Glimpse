@@ -124,9 +124,12 @@ const handleScreenshot = async (initiatedByHotkey = false) => {
   }
 
   if (!(await backendStatus.check())) {
+    const messageKey = backendStatus.isStarting
+      ? initiatedByHotkey ? 'message.backendStartingHotkey' : 'message.backendStarting'
+      : initiatedByHotkey ? 'message.backendOfflineHotkey' : 'message.backendOffline'
     notifications.show(
-      initiatedByHotkey ? t('message.backendOfflineHotkey') : t('message.backendOffline'),
-      'error',
+      t(messageKey),
+      backendStatus.isStarting ? 'info' : 'error',
       4200,
     )
     return
