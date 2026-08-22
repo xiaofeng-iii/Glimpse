@@ -202,10 +202,30 @@ class DIContainer:
             embedding_client=self.get("embedding_client"),
         ))
 
+        self.register_shutdown_handler(self._shutdown_sqlite_manager)
+        self.register_shutdown_handler(self._shutdown_chroma_manager)
         self.register_shutdown_handler(self._shutdown_keyboard_manager)
         self.register_shutdown_handler(self._shutdown_task_queue)
         self.register_shutdown_handler(self._shutdown_capture_manager)
         self.register_shutdown_handler(self._shutdown_cluster_buffer)
+
+    def _close_initialized_service(self, name: str) -> None:
+        with self._service_lock:
+            instance = self._services.get(name)
+
+        if instance is None:
+            return
+
+        try:
+            instance.close()
+        except Exception:
+            pass
+
+    def _shutdown_sqlite_manager(self) -> None:
+        self._close_initialized_service("sqlite_manager")
+
+    def _shutdown_chroma_manager(self) -> None:
+        self._close_initialized_service("chroma_manager")
 
     def _shutdown_keyboard_manager(self) -> None:
         if self.has("keyboard_manager"):
