@@ -1,15 +1,11 @@
 name: Build dev release
 
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+-dev.[0-9]{8}"
   workflow_dispatch:
     inputs:
       version:
         description: "Full dev version, e.g. 0.3.0-dev.20260806"
         required: true
-        default: "0.3.0-dev.20260806"
         type: string
 
 permissions:
@@ -26,7 +22,7 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - name: Check out tagged source
+      - name: Check out selected source
         uses: actions/checkout@v6
 
       - name: Set up Python
@@ -45,17 +41,10 @@ jobs:
           cache: npm
           cache-dependency-path: glimpse-frontend/package-lock.json
 
-      - name: Verify dev tag and synchronized version
+      - name: Verify dev version is synchronized
         shell: pwsh
         run: |
-          $version = if ($env:GITHUB_EVENT_NAME -eq "push") {
-            if ($env:GITHUB_REF_NAME -notmatch '^v(?<ver>[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]{8})$') {
-              throw "Dev tag must be vMAJOR.MINOR.PATCH-dev.YYYYMMDD, got: $env:GITHUB_REF_NAME"
-            }
-            $Matches['ver']
-          } else {
-            "${{ github.event.inputs.version }}"
-          }
+          $version = "${{ github.event.inputs.version }}"
           if ($version -notmatch '^(?<base>[0-9]+\.[0-9]+\.[0-9]+)-dev\.(?<date>[0-9]{8})$') {
             throw "Dev version must be <base>-dev.YYYYMMDD, got: $version"
           }
@@ -151,11 +140,7 @@ jobs:
           Set-Content -Path $checksumPath -Value $checksumLines -Encoding ascii
 
           $assets = @($installers.FullName) + @((Resolve-Path $checksumPath).Path)
-          $version = if ($env:GITHUB_EVENT_NAME -eq "push") {
-            $env:GITHUB_REF_NAME.Substring(1)
-          } else {
-            "${{ github.event.inputs.version }}"
-          }
+          $version = "${{ github.event.inputs.version }}"
           $releaseTag = "v$version"
           gh release view $releaseTag *> $null
           if ($LASTEXITCODE -eq 0) {

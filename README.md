@@ -311,9 +311,9 @@ python scripts/set_version.py --check
 | 公开预览 | `0.2.0-preview.20260806` | `v0.2.0-preview.20260806` | Pre-release | 所有人可见（带 prerelease 标记） |
 | 私密开发版 | `0.2.0-dev.20260806` | `v0.2.0-dev.20260806` | Draft | 仅仓库协作者可见 |
 
-- **正式版**：功能稳定后发布，触发 `.github/workflows/release.yml`
-- **公开预览（preview）**：功能完成、准备收集外部反馈时发布，触发 `.github/workflows/preview-release.yml`
-- **私密开发版（dev）**：开发中途自测用，不对外暴露半成品，触发 `.github/workflows/dev-release.yml`
+- **正式版**：功能稳定后发布，推送纯 SemVer 标签后触发 `.github/workflows/release.yml`
+- **公开预览（preview）**：功能完成、准备收集外部反馈时发布，推送 Preview 标签后触发 `.github/workflows/preview-release.yml`
+- **私密开发版（dev）**：开发中途自测用，不对外暴露半成品，通过 GitHub Actions 的 `workflow_dispatch` 手动触发 `.github/workflows/dev-release.yml`
 
 三个通道都会校验 `scripts/set_version.py --check`（仓库版本必须与标签/输入完全一致）。
 `scripts/set_version.py` 接受标准 SemVer 预发布后缀（`-preview.20260806`、`-dev.20260806`、`-rc.1`）和构建元数据（`+build.5`）。

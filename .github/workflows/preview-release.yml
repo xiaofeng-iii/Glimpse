@@ -3,14 +3,7 @@ name: Build preview release
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+-preview.[0-9]{8}"
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Full preview version, e.g. 0.3.0-preview.20260806"
-        required: true
-        default: "0.3.0-preview.20260806"
-        type: string
+      - "v[0-9]+.[0-9]+.[0-9]+-preview.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]"
 
 permissions:
   contents: write
@@ -48,14 +41,10 @@ jobs:
       - name: Verify preview tag and synchronized version
         shell: pwsh
         run: |
-          $version = if ($env:GITHUB_EVENT_NAME -eq "push") {
-            if ($env:GITHUB_REF_NAME -notmatch '^v(?<ver>[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]{8})$') {
-              throw "Preview tag must be vMAJOR.MINOR.PATCH-preview.YYYYMMDD, got: $env:GITHUB_REF_NAME"
-            }
-            $Matches['ver']
-          } else {
-            "${{ github.event.inputs.version }}"
+          if ($env:GITHUB_REF_NAME -notmatch '^v(?<ver>[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]{8})$') {
+            throw "Preview tag must be vMAJOR.MINOR.PATCH-preview.YYYYMMDD, got: $env:GITHUB_REF_NAME"
           }
+          $version = $Matches['ver']
           if ($version -notmatch '^(?<base>[0-9]+\.[0-9]+\.[0-9]+)-preview\.(?<date>[0-9]{8})$') {
             throw "Preview version must be <base>-preview.YYYYMMDD, got: $version"
           }
@@ -151,11 +140,7 @@ jobs:
           Set-Content -Path $checksumPath -Value $checksumLines -Encoding ascii
 
           $assets = @($installers.FullName) + @((Resolve-Path $checksumPath).Path)
-          $version = if ($env:GITHUB_EVENT_NAME -eq "push") {
-            $env:GITHUB_REF_NAME.Substring(1)
-          } else {
-            "${{ github.event.inputs.version }}"
-          }
+          $version = $env:GITHUB_REF_NAME.Substring(1)
           $releaseTag = "v$version"
           gh release view $releaseTag *> $null
           if ($LASTEXITCODE -eq 0) {
