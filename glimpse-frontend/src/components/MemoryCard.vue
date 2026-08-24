@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { CheckCircleIcon, PhotoIcon } from '@heroicons/vue/24/outline'
+import { PhotoIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
 import { getMatchSourceKinds } from '@/utils/match-sources'
+import { isTextMemory } from '@/utils/memory-types'
 import { t } from '@/utils/i18n'
 
 const props = defineProps<{
@@ -21,6 +22,7 @@ const emit = defineEmits<{
 const imageFailed = ref(false)
 const isDev = import.meta.env.DEV
 const imageUrl = computed(() => getMemoryImageUrls(props.memory)[0] ?? '')
+const textMemory = computed(() => isTextMemory(props.memory))
 const matchSourceKinds = computed(() => getMatchSourceKinds(props.memory.match_sources))
 
 const formatTime = (value: string) =>
@@ -39,17 +41,30 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 <template>
   <article
-    class="memory-card group cursor-pointer overflow-hidden rounded-lg border bg-[var(--shell-card)] outline-none transition duration-200"
-    :class="selected
-      ? 'border-[var(--color-primary)] shadow-[0_4px_14px_rgba(59,86,201,.10)] ring-1 ring-[var(--color-primary)]'
-      : 'border-[var(--shell-line)] hover:border-[var(--color-border-strong)] hover:shadow-md'"
+    class="memory-card group flex cursor-pointer flex-col overflow-hidden rounded-lg border bg-[var(--shell-card)] transition duration-200"
+    :class="[
+      textMemory ? 'memory-card--text' : '',
+      selected
+        ? 'border-[var(--color-primary)] shadow-[0_4px_14px_rgba(59,86,201,.10)] ring-1 ring-[var(--color-primary)]'
+        : 'border-[var(--shell-line)] hover:border-[var(--color-border-strong)] hover:shadow-md',
+    ]"
+    role="button"
     tabindex="0"
-    :aria-selected="selected"
+    :aria-pressed="selected"
     @click="emit('select', memory)"
     @dblclick.stop="emit('open', memory)"
     @keydown="handleKeydown"
   >
-    <div class="relative flex aspect-[1.28/1] items-center justify-center overflow-hidden bg-slate-100/70">
+    <div
+      v-if="textMemory"
+      class="memory-card__text-body relative bg-[var(--color-primary-soft)] p-4"
+    >
+      <p class="memory-card__text-content line-clamp-6 whitespace-pre-wrap text-sm leading-6 text-[var(--shell-ink)]">
+        {{ memory.ai_summary || t('memory.noContent') }}
+      </p>
+    </div>
+
+    <div v-else class="relative flex aspect-[1.28/1] items-center justify-center overflow-hidden bg-slate-100/70">
       <img
         v-if="imageUrl && !imageFailed"
         :src="imageUrl"
@@ -59,31 +74,34 @@ const handleKeydown = (event: KeyboardEvent) => {
         @error="imageFailed = true"
       />
       <PhotoIcon v-else class="h-9 w-9 text-[var(--shell-muted)]" aria-hidden="true" />
-      <CheckCircleIcon
-        v-if="selected"
-        class="absolute left-2.5 top-2.5 h-5 w-5 rounded-full bg-white text-[var(--color-primary)]"
-        aria-hidden="true"
-      />
     </div>
 
-    <div class="p-3.5">
-      <p class="line-clamp-2 min-h-10 text-[13px] leading-5 text-[var(--shell-ink)]">
+    <div
+      class="flex flex-col"
+      :class="textMemory ? 'memory-card__text-footer' : 'flex-1 p-3.5'"
+    >
+      <p v-if="!textMemory" class="line-clamp-2 min-h-10 text-[13px] leading-5 text-[var(--shell-ink)]">
         {{ memory.ai_summary || t('memory.noContent') }}
       </p>
-      <div class="mt-2.5 flex min-h-6 items-center gap-2">
-        <template v-if="searching">
-          <span
-            v-for="kind in matchSourceKinds"
-            :key="kind"
-            class="rounded px-2 py-0.5 text-[11px] font-semibold"
-            :class="kind === 'exact'
-              ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
-              : 'bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] text-[var(--color-accent-hover)]'"
-          >
-            {{ t(kind === 'exact' ? 'match.exact' : 'match.semantic') }}
-          </span>
-        </template>
-        <time class="ml-auto text-xs text-[var(--shell-muted)]" :datetime="memory.created_at">
+      <div
+        class="memory-card__metadata-row mt-auto flex min-h-6 items-center gap-2"
+        :class="{ 'pt-2.5': !textMemory }"
+      >
+        <div class="memory-card__tag-area">
+          <template v-if="searching">
+            <span
+              v-for="kind in matchSourceKinds"
+              :key="kind"
+              class="rounded px-2 py-0.5 text-[11px] font-semibold"
+              :class="kind === 'exact'
+                ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
+                : 'bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] text-[var(--color-accent-hover)]'"
+            >
+              {{ t(kind === 'exact' ? 'match.exact' : 'match.semantic') }}
+            </span>
+          </template>
+        </div>
+        <time class="flex-none text-xs text-[var(--shell-muted)]" :datetime="memory.created_at">
           {{ formatTime(memory.created_at) }}
         </time>
       </div>
@@ -102,3 +120,33 @@ const handleKeydown = (event: KeyboardEvent) => {
     </div>
   </article>
 </template>
+
+<style scoped>
+.memory-card__text-body {
+  border-bottom: 1px solid var(--shell-line);
+}
+
+.memory-card__text-content {
+  height: 9rem;
+}
+
+.memory-card__text-footer {
+  min-height: 3.5rem;
+  padding: 0.75rem 0.875rem;
+  background: var(--shell-card);
+}
+
+.memory-card__tag-area {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.memory-card:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+</style>

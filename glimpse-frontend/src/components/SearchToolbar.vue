@@ -11,6 +11,7 @@ import type { SearchOptions } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { t } from '@/utils/i18n'
 import { requestOnboarding } from '@/utils/onboarding'
+import AddMemoryButton from './AddMemoryButton.vue'
 import CaptureButton from './CaptureButton.vue'
 
 const props = withDefaults(defineProps<{
@@ -19,6 +20,8 @@ const props = withDefaults(defineProps<{
   captureShortcutLabel?: string
   capturing?: boolean
   captureDisabled?: boolean
+  addingMemory?: boolean
+  addMemoryDisabled?: boolean
   refreshing?: boolean
 }>(), {
   modelValue: '',
@@ -26,12 +29,15 @@ const props = withDefaults(defineProps<{
   captureShortcutLabel: 'Ctrl+Shift+G',
   capturing: false,
   captureDisabled: false,
+  addingMemory: false,
+  addMemoryDisabled: false,
   refreshing: false,
 })
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: string): void
   (event: 'capture'): void
+  (event: 'add-memory'): void
   (event: 'refresh'): void
   (event: 'debug-panel-change', open: boolean): void
 }>()
@@ -58,6 +64,8 @@ const sources = [
 ] as const
 
 let debounceTimer: ReturnType<typeof window.setTimeout> | null = null
+let composing = false
+let clearImmediately = false
 
 const clampNumber = (value: unknown, fallback: number, minimum: number, maximum: number) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
@@ -90,6 +98,14 @@ const scheduleSearch = () => {
   debounceTimer = window.setTimeout(executeSearch, 300)
 }
 
+const cancelScheduledSearch = () => {
+  memoriesStore.invalidatePendingRequests()
+  if (debounceTimer) {
+    window.clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+}
+
 const handleDebugToggle = (event: Event) => {
   const open = (event.currentTarget as HTMLDetailsElement).open
   if (debugPanelOpen.value === open) return
@@ -113,6 +129,16 @@ watch(
 
 watch(query, (value) => {
   emit('update:modelValue', value)
+  if (clearImmediately) {
+    clearImmediately = false
+    cancelScheduledSearch()
+    void memoriesStore.load()
+    return
+  }
+  if (composing) {
+    cancelScheduledSearch()
+    return
+  }
   scheduleSearch()
 })
 
@@ -127,8 +153,23 @@ if (isDev) {
 }
 
 const clear = () => {
+  if (debounceTimer) {
+    window.clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+  if (query.value) clearImmediately = true
   query.value = ''
   searchInput.value?.focus()
+}
+
+const handleCompositionStart = () => {
+  composing = true
+  cancelScheduledSearch()
+}
+
+const handleCompositionEnd = () => {
+  composing = false
+  scheduleSearch()
 }
 
 const focus = () => {
@@ -160,6 +201,8 @@ defineExpose({ focus, clear })
             class="search-toolbar__control h-9 w-full border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[display:none]"
             :placeholder="t('search.placeholder')"
             @keydown.esc.stop.prevent="clear"
+            @compositionstart="handleCompositionStart"
+            @compositionend="handleCompositionEnd"
           />
           <div class="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
             <button
@@ -275,6 +318,13 @@ defineExpose({ focus, clear })
           show-shortcut
           @capture="emit('capture')"
         />
+        <AddMemoryButton
+          class="search-toolbar__add-memory"
+          :busy="addingMemory"
+          :disabled="addMemoryDisabled"
+          density="toolbar"
+          @add="emit('add-memory')"
+        />
         </div>
       </div>
     </div>
@@ -324,7 +374,8 @@ defineExpose({ focus, clear })
 }
 
 .search-toolbar__control,
-.search-toolbar__capture {
+.search-toolbar__capture,
+.search-toolbar__add-memory {
   border-radius: var(--search-toolbar-control-radius);
 }
 
@@ -346,7 +397,7 @@ defineExpose({ focus, clear })
 }
 
 
-@media (max-width: 724px) {
+@media (max-width: 960px) {
   .search-toolbar {
     padding-inline: 1rem;
   }
@@ -372,7 +423,7 @@ defineExpose({ focus, clear })
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .search-toolbar {
     padding-inline: 0.75rem;
   }

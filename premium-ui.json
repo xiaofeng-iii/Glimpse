@@ -1,0 +1,8 @@
+{
+  "sourceRoots": [
+    "glimpse-frontend/src"
+  ],
+  "ownership": {
+    "Date": "native"
+  }
+}

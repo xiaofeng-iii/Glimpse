@@ -88,7 +88,9 @@ export function useWebSocket() {
             memoriesStore.select(savedMemory)
           }
         })
-        notificationStore.show(t('message.saved'), 'success')
+        if (event.data.notify !== false) {
+          notificationStore.show(t('message.saved'), 'success')
+        }
         break
 
       case 'memory_updated': {

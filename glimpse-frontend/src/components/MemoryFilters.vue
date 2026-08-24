@@ -8,6 +8,7 @@ import {
   getActiveMemoryFilterCount,
   hasActiveMemoryFilters,
   resolveMemoryDatePreset,
+  type MemoryContentType,
   type MemoryDatePreset,
   type MemoryFilters,
 } from '@/utils/memory-filters'
@@ -36,16 +37,32 @@ const presets: Array<{ value: MemoryDatePreset; label: Parameters<typeof t>[0] }
   { value: 'custom', label: 'filter.custom' },
 ]
 
+const contentTypeOptions: Array<{ value: MemoryContentType; label: Parameters<typeof t>[0] }> = [
+  { value: 'screenshot', label: 'filter.screenshotMemory' },
+  { value: 'text', label: 'filter.textMemory' },
+]
+
 const active = computed(() => hasActiveMemoryFilters(props.modelValue))
 const activeCount = computed(() => getActiveMemoryFilterCount(props.modelValue))
 const activeDateLabel = computed(() => {
-  if (!active.value) return ''
+  if (!props.modelValue.dateFrom && !props.modelValue.dateTo) return ''
   if (props.modelValue.datePreset === 'custom') {
     return `${props.modelValue.dateFrom} ${t('filter.dateSeparator')} ${props.modelValue.dateTo}`
   }
   const preset = presets.find((item) => item.value === props.modelValue.datePreset)
   return preset ? t(preset.label) : ''
 })
+const activeContentTypeLabel = computed(() => {
+  const selected = new Set(props.modelValue.contentTypes)
+  return contentTypeOptions
+    .filter((option) => selected.has(option.value))
+    .map((option) => t(option.label))
+    .join(t('filter.valueSeparator'))
+})
+const activeFilterLabel = computed(() => [
+  activeDateLabel.value,
+  activeContentTypeLabel.value,
+].filter(Boolean).join(' · ') || t('filter.title'))
 
 const close = (restoreFocus = false) => {
   open.value = false
@@ -76,6 +93,19 @@ const choosePreset = (preset: MemoryDatePreset) => {
   draft.value = {
     ...draft.value,
     ...resolveMemoryDatePreset(preset),
+  }
+}
+
+const toggleContentType = (contentType: MemoryContentType) => {
+  const selected = new Set(draft.value.contentTypes)
+  if (selected.has(contentType)) selected.delete(contentType)
+  else selected.add(contentType)
+
+  draft.value = {
+    ...draft.value,
+    contentTypes: contentTypeOptions
+      .map((option) => option.value)
+      .filter((value) => selected.has(value)),
   }
 }
 
@@ -194,6 +224,27 @@ onUnmounted(() => {
             </div>
             <p v-if="error" class="memory-filters__error" role="alert">{{ error }}</p>
           </fieldset>
+
+          <fieldset class="memory-filters__group">
+            <legend class="memory-filters__group-label">{{ t('filter.contentType') }}</legend>
+            <div class="memory-filters__presets">
+              <label
+                v-for="contentType in contentTypeOptions"
+                :key="contentType.value"
+                class="memory-filters__preset-row"
+              >
+                <input
+                  :checked="draft.contentTypes.includes(contentType.value)"
+                  :value="contentType.value"
+                  class="memory-filters__content-type"
+                  type="checkbox"
+                  @change="toggleContentType(contentType.value)"
+                />
+                <span class="memory-filters__checkbox-indicator" aria-hidden="true"></span>
+                <span>{{ t(contentType.label) }}</span>
+              </label>
+            </div>
+          </fieldset>
         </div>
 
         <div class="memory-filters__actions">
@@ -211,10 +262,10 @@ onUnmounted(() => {
       v-if="active"
       type="button"
       class="memory-filters__tag"
-      :aria-label="t('filter.removeTime')"
+      :aria-label="t('filter.clearActive')"
       @click="clear"
     >
-      <span>{{ activeDateLabel }}</span>
+      <span>{{ activeFilterLabel }}</span>
       <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
     </button>
   </div>
@@ -349,8 +400,6 @@ onUnmounted(() => {
 
 .memory-filters__group + .memory-filters__group {
   margin-top: 1.125rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-border);
 }
 
 .memory-filters__group-label {
@@ -384,7 +433,8 @@ onUnmounted(() => {
   line-height: 1rem;
 }
 
-.memory-filters__preset {
+.memory-filters__preset,
+.memory-filters__content-type {
   position: absolute;
   width: 1rem;
   height: 1rem;
@@ -418,7 +468,36 @@ onUnmounted(() => {
   background: var(--color-on-primary);
 }
 
-.memory-filters__preset-row:has(.memory-filters__preset:focus-visible) {
+.memory-filters__checkbox-indicator {
+  display: inline-flex;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 1rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.1875rem;
+  background: transparent;
+}
+
+.memory-filters__content-type:checked + .memory-filters__checkbox-indicator {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.memory-filters__content-type:checked + .memory-filters__checkbox-indicator::after {
+  content: '';
+  width: 0.4375rem;
+  height: 0.25rem;
+  border-bottom: 2px solid var(--color-on-primary);
+  border-left: 2px solid var(--color-on-primary);
+  transform: translateY(-0.0625rem) rotate(-45deg);
+}
+
+.memory-filters__preset-row:has(
+  .memory-filters__preset:focus-visible,
+  .memory-filters__content-type:focus-visible
+) {
   background: var(--color-primary-soft);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-focus) 26%, transparent);
 }
@@ -499,6 +578,7 @@ onUnmounted(() => {
 
 .memory-filters__tag {
   display: inline-flex;
+  max-width: min(21rem, 48vw);
   min-height: 1.5rem;
   align-items: center;
   gap: 0.35rem;
@@ -511,6 +591,12 @@ onUnmounted(() => {
   font-size: 0.625rem;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.memory-filters__tag span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .memory-filters__tag:hover {

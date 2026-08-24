@@ -41,7 +41,7 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-@media (max-width: 1024px) {
+@media (max-width: 1120px) {
   .capture-shortcut {
     display: none;
   }

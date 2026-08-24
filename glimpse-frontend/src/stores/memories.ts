@@ -5,6 +5,7 @@ import { createLogger } from '@/utils/logger'
 import {
   cloneMemoryFilters,
   createEmptyMemoryFilters,
+  memoryMatchesFilters,
   toMemoryFilterQuery,
   type MemoryFilters,
 } from '@/utils/memory-filters'
@@ -81,6 +82,7 @@ export const useMemoriesStore = defineStore('memories', () => {
   const load = async (limit = 100) => {
     const requestId = ++latestRequest
     isLoading.value = true
+    searchQuery.value = ''
     try {
       const result = await memoriesApi.list({
         limit,
@@ -89,7 +91,6 @@ export const useMemoriesStore = defineStore('memories', () => {
       if (requestId !== latestRequest) return []
       applyResults(result.memories)
       total.value = result.total
-      searchQuery.value = ''
       selectedOutsideSearch.value = false
       return result.memories
     } catch (error) {
@@ -159,9 +160,16 @@ export const useMemoriesStore = defineStore('memories', () => {
 
   const upsert = (memory: Memory) => {
     const merged = mergeMemory(memory)
-    if (!searchQuery.value && !resultIds.value.includes(memory.id)) {
-      resultIds.value = [memory.id, ...resultIds.value]
-      total.value += 1
+    if (!searchQuery.value) {
+      const included = resultIds.value.includes(memory.id)
+      const matchesFilters = memoryMatchesFilters(merged, activeFilters.value)
+      if (matchesFilters && !included) {
+        resultIds.value = [memory.id, ...resultIds.value]
+        total.value += 1
+      } else if (!matchesFilters && included) {
+        resultIds.value = resultIds.value.filter((id) => id !== memory.id)
+        total.value = Math.max(0, total.value - 1)
+      }
     }
     return merged
   }

@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import type { Memory } from '@/api/client'
-import { clusterApi, screenshotApi, searchApi, settingsApi } from '@/api/client'
+import { clusterApi, memoriesApi, screenshotApi, searchApi, settingsApi } from '@/api/client'
 import { whenBackendRuntimeReady } from '@/config/runtime'
 import {
   getDesktopWindowMinimized,
@@ -14,8 +14,9 @@ import { useClusterStore } from '@/stores/cluster'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { createLogger } from '@/utils/logger'
-import type { MemoryFilters } from '@/utils/memory-filters'
+import { memoryMatchesFilters, type MemoryFilters } from '@/utils/memory-filters'
 import { t } from '@/utils/i18n'
+import AddTextMemoryDialog from '@/components/AddTextMemoryDialog.vue'
 import ClusterBar from '@/components/ClusterBar.vue'
 import MemoryInspector from '@/components/MemoryInspector.vue'
 import MemoryWall from '@/components/MemoryWall.vue'
@@ -42,6 +43,9 @@ const memoryInspector = ref<MemoryInspectorExpose | null>(null)
 const query = ref(memoriesStore.searchQuery)
 const isCapturing = ref(false)
 const isRefreshing = ref(false)
+const textMemoryDialogOpen = ref(false)
+const isAddingTextMemory = ref(false)
+const textMemoryError = ref('')
 const showSearchDebug = ref(false)
 const clusterModeEnabled = ref(false)
 const screenshotShortcutLabel = ref('Ctrl+Shift+G')
@@ -206,6 +210,56 @@ const handleRefresh = async () => {
   }
 }
 
+const openTextMemoryDialog = async () => {
+  if (!(await backendStatus.check())) {
+    notifications.show(t('addMemory.backendUnavailable'), 'error', 3200)
+    return
+  }
+  textMemoryError.value = ''
+  textMemoryDialogOpen.value = true
+}
+
+const closeTextMemoryDialog = () => {
+  if (isAddingTextMemory.value) return
+  textMemoryDialogOpen.value = false
+  textMemoryError.value = ''
+}
+
+const handleAddTextMemory = async (content: string) => {
+  if (isAddingTextMemory.value) return
+  isAddingTextMemory.value = true
+  textMemoryError.value = ''
+  try {
+    if (!(await backendStatus.check())) {
+      textMemoryError.value = t('addMemory.backendUnavailable')
+      return
+    }
+
+    const memory = await memoriesApi.createText(content)
+    if (query.value.trim()) {
+      searchToolbar.value?.clear()
+      await nextTick()
+    }
+    memoriesStore.upsert(memory)
+    if (memoryMatchesFilters(memory, memoriesStore.activeFilters)) {
+      memoriesStore.select(memory)
+    }
+    textMemoryDialogOpen.value = false
+    notifications.show(
+      t(memory.sync_status === 'FAILED'
+        ? 'message.textMemoryCreatedIndexFailed'
+        : 'message.textMemoryCreated'),
+      memory.sync_status === 'FAILED' ? 'warning' : 'success',
+      memory.sync_status === 'FAILED' ? 3600 : 2200,
+    )
+  } catch (error) {
+    logger.error('Text memory creation failed: %s', error)
+    textMemoryError.value = t('addMemory.saveFailed')
+  } finally {
+    isAddingTextMemory.value = false
+  }
+}
+
 const handleApplyFilters = async (filters: MemoryFilters) => {
   if (!(await confirmInspectorLeave())) return
   const results = await memoriesStore.applyFilters(filters)
@@ -226,7 +280,9 @@ const handleKeydown = (event: KeyboardEvent) => {
   const dialogOpen = Boolean(document.querySelector('[role="dialog"][aria-modal="true"]'))
   const editingText = target instanceof HTMLTextAreaElement || Boolean(target?.isContentEditable)
 
-  if (key === 'escape' && query.value && !dialogOpen && !editingText) {
+  if (dialogOpen) return
+
+  if (key === 'escape' && query.value && !editingText) {
     event.preventDefault()
     searchToolbar.value?.clear()
   } else if (event.ctrlKey && event.shiftKey && key === 'g' && !isDesktop) {
@@ -278,8 +334,11 @@ onUnmounted(() => {
       :capture-shortcut-label="screenshotShortcutLabel"
       :capturing="isCapturing"
       :capture-disabled="!backendStatus.isReady"
+      :adding-memory="isAddingTextMemory"
+      :add-memory-disabled="!backendStatus.isReady"
       :refreshing="isRefreshing"
       @capture="handleScreenshot()"
+      @add-memory="openTextMemoryDialog"
       @refresh="handleRefresh"
       @debug-panel-change="showSearchDebug = $event"
     />
@@ -301,10 +360,13 @@ onUnmounted(() => {
         :show-search-debug="showSearchDebug"
         :capturing="isCapturing"
         :capture-disabled="!backendStatus.isReady"
+        :adding-memory="isAddingTextMemory"
+        :add-memory-disabled="!backendStatus.isReady"
         :filters="memoriesStore.activeFilters"
         @select="handleSelectMemory"
         @open="handleOpenMemory"
         @capture="handleScreenshot()"
+        @add-memory="openTextMemoryDialog"
         @apply-filters="handleApplyFilters"
       />
 
@@ -322,6 +384,14 @@ onUnmounted(() => {
         </div>
       </Transition>
     </div>
+
+    <AddTextMemoryDialog
+      :open="textMemoryDialogOpen"
+      :busy="isAddingTextMemory"
+      :error-message="textMemoryError"
+      @cancel="closeTextMemoryDialog"
+      @submit="handleAddTextMemory"
+    />
   </main>
 </template>
 

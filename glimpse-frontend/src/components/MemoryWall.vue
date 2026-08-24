@@ -9,6 +9,7 @@ import {
   type MemoryFilters,
 } from '@/utils/memory-filters'
 import CaptureButton from './CaptureButton.vue'
+import AddMemoryButton from './AddMemoryButton.vue'
 import MemoryCard from './MemoryCard.vue'
 import MemoryFiltersControl from './MemoryFilters.vue'
 import LoadingSpinner from './LoadingSpinner.vue'
@@ -22,6 +23,8 @@ const props = defineProps<{
   showSearchDebug?: boolean
   capturing?: boolean
   captureDisabled?: boolean
+  addingMemory?: boolean
+  addMemoryDisabled?: boolean
   filters?: MemoryFilters
 }>()
 
@@ -29,6 +32,7 @@ const emit = defineEmits<{
   (event: 'select', memory: Memory): void
   (event: 'open', memory: Memory): void
   (event: 'capture'): void
+  (event: 'add-memory'): void
   (event: 'apply-filters', filters: MemoryFilters): void
 }>()
 
@@ -131,13 +135,18 @@ const groups = computed<MemoryGroup[]>(() => {
         >
           {{ t('filter.clear') }}
         </button>
-        <CaptureButton
-          v-else-if="!searching"
-          class="mt-4"
-          :capturing="capturing"
-          :disabled="captureDisabled"
-          @capture="emit('capture')"
-        />
+        <div v-else-if="!searching" class="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+          <CaptureButton
+            :capturing="capturing"
+            :disabled="captureDisabled"
+            @capture="emit('capture')"
+          />
+          <AddMemoryButton
+            :busy="addingMemory"
+            :disabled="addMemoryDisabled"
+            @add="emit('add-memory')"
+          />
+        </div>
       </div>
 
       <div v-else class="space-y-5">
@@ -205,6 +214,7 @@ const groups = computed<MemoryGroup[]>(() => {
 .memory-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  align-items: start;
   gap: 0.75rem;
 }
 

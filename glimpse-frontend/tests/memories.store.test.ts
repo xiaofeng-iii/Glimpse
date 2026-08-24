@@ -137,7 +137,7 @@ describe('memories store', () => {
     expect(store.memories[0].search_debug).toBeNull()
   })
 
-  it('applies the same date filter to browse and search requests', async () => {
+  it('applies the same date and content filters to browse and search requests', async () => {
     apiMocks.list.mockResolvedValue({ memories: [memory('1')], total: 1 })
     apiMocks.search.mockResolvedValue({
       memories: [memory('1')],
@@ -151,19 +151,43 @@ describe('memories store', () => {
       dateFrom: '2026-08-01',
       dateTo: '2026-08-24',
       sourceChannels: [],
-      contentTypes: [],
+      contentTypes: ['text'],
     })
 
     expect(apiMocks.list).toHaveBeenCalledWith(expect.objectContaining({
       dateFrom: '2026-08-01',
       dateTo: '2026-08-24',
+      memoryType: 'text',
     }))
 
     await store.search('summary')
     expect(apiMocks.search).toHaveBeenCalledWith('summary', 'all', expect.objectContaining({
       dateFrom: '2026-08-01',
       dateTo: '2026-08-24',
+      memoryType: 'text',
     }))
+  })
+
+  it('does not insert an upserted memory outside the active content filter', async () => {
+    const screenshot = { ...memory('1'), memory_type: 'screenshot' as const }
+    apiMocks.list.mockResolvedValue({ memories: [screenshot], total: 1 })
+
+    const store = useMemoriesStore()
+    await store.applyFilters({
+      datePreset: 'all',
+      dateFrom: '',
+      dateTo: '',
+      sourceChannels: [],
+      contentTypes: ['screenshot'],
+    })
+    store.upsert({
+      ...memory('text-1'),
+      image_path: '',
+      memory_type: 'text',
+    })
+
+    expect(store.memories.map((item) => item.id)).toEqual(['1'])
+    expect(store.total).toBe(1)
   })
 
   it('does not claim a summary edit removed a selection during an ordinary search change', async () => {

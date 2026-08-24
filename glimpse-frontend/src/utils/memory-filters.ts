@@ -1,16 +1,23 @@
 export type MemoryDatePreset = 'all' | 'today' | 'last7Days' | 'last30Days' | 'custom'
+export type MemoryContentType = 'screenshot' | 'text'
 
 export interface MemoryFilters {
   datePreset: MemoryDatePreset
   dateFrom: string
   dateTo: string
   sourceChannels: string[]
-  contentTypes: string[]
+  contentTypes: MemoryContentType[]
 }
 
 export interface MemoryFilterQuery {
   dateFrom?: string
   dateTo?: string
+  memoryType?: MemoryContentType
+}
+
+const effectiveContentType = (contentTypes: MemoryContentType[]) => {
+  const unique = Array.from(new Set(contentTypes))
+  return unique.length === 1 ? unique[0] : undefined
 }
 
 const toDateInputValue = (date: Date) => {
@@ -57,7 +64,21 @@ export const resolveMemoryDatePreset = (
 export const toMemoryFilterQuery = (filters: MemoryFilters): MemoryFilterQuery => ({
   dateFrom: filters.dateFrom || undefined,
   dateTo: filters.dateTo || undefined,
+  memoryType: effectiveContentType(filters.contentTypes),
 })
+
+export const memoryMatchesFilters = (
+  memory: { created_at: string; memory_type?: MemoryContentType },
+  filters: MemoryFilters,
+) => {
+  const contentType = effectiveContentType(filters.contentTypes)
+  if (contentType && (memory.memory_type ?? 'screenshot') !== contentType) return false
+
+  const memoryDate = memory.created_at.trim().slice(0, 10)
+  if (filters.dateFrom && memoryDate < filters.dateFrom) return false
+  if (filters.dateTo && memoryDate > filters.dateTo) return false
+  return true
+}
 
 export const hasActiveMemoryFilters = (filters: MemoryFilters) => Boolean(
   filters.dateFrom

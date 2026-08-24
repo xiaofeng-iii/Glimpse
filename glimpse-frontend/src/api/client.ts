@@ -34,6 +34,7 @@ export interface SearchOptions {
   debug?: boolean
   dateFrom?: string
   dateTo?: string
+  memoryType?: 'screenshot' | 'text'
 }
 
 export interface MemoryListOptions {
@@ -41,6 +42,7 @@ export interface MemoryListOptions {
   offset?: number
   dateFrom?: string
   dateTo?: string
+  memoryType?: 'screenshot' | 'text'
 }
 
 export interface Memory {
@@ -52,6 +54,7 @@ export interface Memory {
   text_content?: string
   extra_images?: string
   sync_status: string
+  memory_type?: 'screenshot' | 'text'
   match_sources: string[]
   search_debug?: SearchDebugInfo | null
 }
@@ -118,6 +121,11 @@ export interface SearchWarmupStatus {
 
 // Memories API
 export const memoriesApi = {
+  createText: async (content: string): Promise<Memory> => {
+    const response = await api.post('/memories', { content })
+    return response.data
+  },
+
   list: async (options: MemoryListOptions | number = {}): Promise<{ memories: Memory[], total: number }> => {
     const normalizedOptions = typeof options === 'number' ? { limit: options } : options
     const response = await api.get('/memories', {
@@ -126,6 +134,7 @@ export const memoriesApi = {
         offset: normalizedOptions.offset ?? 0,
         date_from: normalizedOptions.dateFrom,
         date_to: normalizedOptions.dateTo,
+        memory_type: normalizedOptions.memoryType,
       },
     })
     return response.data
@@ -165,6 +174,7 @@ export const searchApi = {
         debug: options.debug,
         date_from: options.dateFrom,
         date_to: options.dateTo,
+        memory_type: options.memoryType,
       },
     })
     return response.data

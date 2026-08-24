@@ -16,6 +16,7 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { createLogger } from '@/utils/logger'
 import { t } from '@/utils/i18n'
+import { isTextMemory } from '@/utils/memory-types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import MediaGallery from '@/components/MediaGallery.vue'
 import OcrText from '@/components/OcrText.vue'
@@ -38,6 +39,7 @@ const deleteDialogOpen = ref(false)
 const deleting = ref(false)
 const memoryId = computed(() => String(route.params.id ?? ''))
 const memory = computed(() => memoriesStore.entities[memoryId.value] ?? null)
+const textMemory = computed(() => Boolean(memory.value && isTextMemory(memory.value)))
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleString([], {
@@ -133,8 +135,8 @@ const confirmDelete = async () => {
         </button>
       </div>
 
-      <div v-else class="detail-layout">
-        <section class="min-w-0">
+      <div v-else class="detail-layout" :class="{ 'detail-layout--text': textMemory }">
+        <section v-if="!textMemory" class="min-w-0">
           <MediaGallery :memory="memory" />
         </section>
 
@@ -143,10 +145,10 @@ const confirmDelete = async () => {
 
           <button type="button" class="btn-secondary min-h-10" @click="copySummary">
             <ClipboardDocumentIcon class="h-5 w-5 flex-none" aria-hidden="true" />
-            {{ t('action.copySummary') }}
+            {{ t(textMemory ? 'action.copyContent' : 'action.copySummary') }}
           </button>
 
-          <div class="border-t border-[var(--shell-line)] pt-5">
+          <div v-if="!textMemory" class="border-t border-[var(--shell-line)] pt-5">
             <OcrText :text="memory.text_content" />
           </div>
 
@@ -177,6 +179,11 @@ const confirmDelete = async () => {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
   gap: 1.5rem;
+}
+
+.detail-layout--text {
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
 }
 
 @media (max-width: 960px) {

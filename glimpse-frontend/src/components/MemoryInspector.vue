@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import {
   ArrowTopRightOnSquareIcon,
   ClipboardDocumentIcon,
@@ -10,6 +10,7 @@ import type { Memory } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { t } from '@/utils/i18n'
+import { isTextMemory } from '@/utils/memory-types'
 import ConfirmDialog from './ConfirmDialog.vue'
 import MediaGallery from './MediaGallery.vue'
 import OcrText from './OcrText.vue'
@@ -29,6 +30,7 @@ const notifications = useNotificationStore()
 const summaryEditor = ref<InstanceType<typeof SummaryEditor> | null>(null)
 const deleteDialogOpen = ref(false)
 const deleting = ref(false)
+const textMemory = computed(() => isTextMemory(props.memory))
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleString([], {
@@ -86,7 +88,7 @@ defineExpose({ canLeave })
     </header>
 
     <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-      <MediaGallery :memory="memory" compact />
+      <MediaGallery v-if="!textMemory" :memory="memory" compact />
 
       <div
         v-if="memoriesStore.selectedOutsideSearch"
@@ -100,7 +102,7 @@ defineExpose({ canLeave })
       <div class="memory-inspector__summary-actions grid grid-cols-2 gap-2.5">
         <button type="button" class="btn-secondary min-h-10 justify-center" @click="copySummary">
           <ClipboardDocumentIcon class="h-5 w-5 flex-none" aria-hidden="true" />
-          {{ t('action.copySummary') }}
+          {{ t(textMemory ? 'action.copyContent' : 'action.copySummary') }}
         </button>
         <button type="button" class="btn-secondary min-h-10 justify-center" @click="emit('open', memory.id)">
           <ArrowTopRightOnSquareIcon class="h-5 w-5 flex-none" aria-hidden="true" />
@@ -108,7 +110,7 @@ defineExpose({ canLeave })
         </button>
       </div>
 
-      <OcrText :text="memory.text_content" />
+      <OcrText v-if="!textMemory" :text="memory.text_content" />
 
       <button
         type="button"

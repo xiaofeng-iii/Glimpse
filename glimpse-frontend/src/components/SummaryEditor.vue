@@ -10,7 +10,8 @@ import type { Memory } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
-import { t } from '@/utils/i18n'
+import { t, type MessageKey } from '@/utils/i18n'
+import { isTextMemory } from '@/utils/memory-types'
 import ConfirmDialog from './ConfirmDialog.vue'
 
 const props = withDefaults(defineProps<{
@@ -36,6 +37,10 @@ const compactEditor = ref<HTMLTextAreaElement | null>(null)
 const compactFrame = ref<HTMLElement | null>(null)
 const compactHeight = ref(80)
 const compactOverflowing = ref(false)
+const textMemory = computed(() => isTextMemory(props.memory))
+const contentLabel = computed(() => t(textMemory.value ? 'memory.content' : 'memory.summary'))
+const editorText = (key: string) =>
+  t(`${textMemory.value ? 'content' : 'summary'}.${key}` as MessageKey)
 let discardResolver: ((confirmed: boolean) => void) | null = null
 let pendingDiscardPromise: Promise<boolean> | null = null
 let unregisterGuard: (() => boolean) | null = null
@@ -74,8 +79,8 @@ const handleViewportResize = () => {
 const normalizedDraft = computed(() => draft.value.trim())
 const dirty = computed(() => normalizedDraft.value !== props.memory.ai_summary.trim())
 const validationMessage = computed(() => {
-  if (!normalizedDraft.value) return t('summary.required')
-  if (normalizedDraft.value.length > 4000) return t('summary.tooLong')
+  if (!normalizedDraft.value) return editorText('required')
+  if (normalizedDraft.value.length > 4000) return editorText('tooLong')
   return ''
 })
 const canSave = computed(() => dirty.value && !validationMessage.value && !saving.value)
@@ -146,8 +151,8 @@ const save = async () => {
     editing.value = false
     emit('saved', memory)
   } catch (error) {
-    errorMessage.value = t('summary.saveFailed')
-    notifications.show(t('summary.saveFailed'), 'error', 3000)
+    errorMessage.value = editorText('saveFailed')
+    notifications.show(editorText('saveFailed'), 'error', 3000)
   } finally {
     saving.value = false
   }
@@ -216,9 +221,9 @@ defineExpose({
 </script>
 
 <template>
-  <section class="summary-editor" :aria-label="t('memory.summary')">
+  <section class="summary-editor" :aria-label="contentLabel">
     <div class="summary-editor__header mb-2.5 flex min-h-10 items-center justify-between gap-3">
-      <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ t('memory.summary') }}</h3>
+      <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ contentLabel }}</h3>
       <button
         v-if="!editing"
         type="button"
@@ -226,7 +231,7 @@ defineExpose({
         @click="startEditing"
       >
         <PencilSquareIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
-        {{ t('summary.edit') }}
+        {{ editorText('edit') }}
       </button>
       <div v-else class="summary-editor__edit-actions flex flex-none items-center gap-2">
         <button
@@ -244,7 +249,7 @@ defineExpose({
           @click="save"
         >
           <ArrowPathIcon v-if="saving" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
-          {{ saving ? t('summary.saving') : t('summary.save') }}
+          {{ saving ? editorText('saving') : editorText('save') }}
         </button>
       </div>
     </div>
@@ -269,7 +274,7 @@ defineExpose({
         :class="compactOverflowing ? 'overflow-y-auto' : 'overflow-y-hidden'"
         :readonly="!editing"
         :tabindex="editing || compactOverflowing ? 0 : -1"
-        :aria-label="t('memory.summary')"
+        :aria-label="contentLabel"
         :aria-readonly="!editing"
         :aria-invalid="editing && Boolean(validationMessage)"
         :aria-describedby="editing ? 'summary-editor-feedback summary-editor-shortcut' : undefined"
@@ -301,6 +306,7 @@ defineExpose({
         aria-describedby="summary-editor-feedback summary-editor-shortcut"
         maxlength="4001"
         autofocus
+        :aria-label="contentLabel"
         @keydown="handleEditorKeydown"
       />
       <p v-else class="whitespace-pre-wrap text-sm leading-7 text-[var(--shell-ink)]">
@@ -330,22 +336,22 @@ defineExpose({
       <CheckCircleIcon v-else class="h-4 w-4 flex-none" aria-hidden="true" />
       {{
         memory.sync_status === 'FAILED'
-          ? t('summary.indexFailed')
+          ? editorText('indexFailed')
           : memory.sync_status === 'PENDING'
-            ? t('summary.indexPending')
-            : t('summary.indexSynced')
+            ? editorText('indexPending')
+            : editorText('indexSynced')
       }}
     </div>
 
-    <p id="summary-editor-shortcut" class="sr-only">{{ t('summary.shortcut') }}</p>
+    <p id="summary-editor-shortcut" class="sr-only">{{ editorText('shortcut') }}</p>
 
     <ConfirmDialog
       id="discard-summary"
       :open="discardDialogOpen"
-      :title="t('summary.discardTitle')"
-      :description="t('summary.discardDescription')"
-      :confirm-label="t('summary.discard')"
-      :cancel-label="t('summary.keepEditing')"
+      :title="editorText('discardTitle')"
+      :description="editorText('discardDescription')"
+      :confirm-label="editorText('discard')"
+      :cancel-label="editorText('keepEditing')"
       destructive
       @confirm="resolveDiscard(true)"
       @cancel="resolveDiscard(false)"

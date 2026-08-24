@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import type { Memory } from '@/api/client'
 import MemoryCard from '@/components/MemoryCard.vue'
+import MemoryInspector from '@/components/MemoryInspector.vue'
 import MemoryWall from '@/components/MemoryWall.vue'
 import MemoryFilters from '@/components/MemoryFilters.vue'
 import MediaGallery from '@/components/MediaGallery.vue'
@@ -10,6 +11,7 @@ import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 import SearchToolbar from '@/components/SearchToolbar.vue'
 import SummaryEditor from '@/components/SummaryEditor.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import OcrText from '@/components/OcrText.vue'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
@@ -124,7 +126,53 @@ describe('memory components', () => {
     expect(group.attributes('aria-label')).toBe('搜索模式')
     expect(labels).toEqual(['综合', '精确', '语义'])
     expect(actions.element.previousElementSibling).toBe(group.element)
-    expect(actions.element.lastElementChild).toBe(actions.get('.capture-button').element)
+    expect(actions.get('.capture-button').element.nextElementSibling)
+      .toBe(actions.get('.add-memory-button').element)
+    expect(actions.element.lastElementChild).toBe(actions.get('.add-memory-button').element)
+  })
+
+  it('renders a text memory as content instead of a missing-image placeholder', () => {
+    const wrapper = mount(MemoryCard, {
+      props: {
+        memory: createMemory({
+          memory_type: 'text',
+          image_path: '',
+          ai_summary: '下周二和产品团队复盘搜索体验',
+          text_content: undefined,
+        }),
+        selected: true,
+      },
+    })
+
+    expect(wrapper.text()).toContain('下周二和产品团队复盘搜索体验')
+    expect(wrapper.text()).not.toContain('文本记忆')
+    expect(wrapper.text()).not.toContain('手动添加')
+    expect(wrapper.get('.memory-card').classes()).toContain('memory-card--text')
+    expect(wrapper.get('.memory-card__text-body').classes()).toContain('bg-[var(--color-primary-soft)]')
+    expect(wrapper.get('.memory-card__text-content').classes()).toContain('line-clamp-6')
+    expect(wrapper.get('.memory-card__tag-area').text()).toBe('')
+    expect(wrapper.get('.memory-card__text-footer time').text()).toBeTruthy()
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.find('svg').exists()).toBe(false)
+  })
+
+  it('omits media and OCR modules from the text-memory inspector', () => {
+    const wrapper = mount(MemoryInspector, {
+      props: {
+        memory: createMemory({
+          memory_type: 'text',
+          image_path: '',
+          ai_summary: '一条手动录入内容',
+          text_content: undefined,
+        }),
+      },
+    })
+
+    expect(wrapper.text()).not.toContain('文本记忆')
+    expect(wrapper.text()).toContain('记忆内容')
+    expect(wrapper.text()).toContain('复制内容')
+    expect(wrapper.findComponent(MediaGallery).exists()).toBe(false)
+    expect(wrapper.findComponent(OcrText).exists()).toBe(false)
   })
 
   it('keeps compact search modes clear in English', () => {
@@ -198,6 +246,29 @@ describe('memory components', () => {
     })
     expect((applied as { dateFrom: string }).dateFrom).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect((applied as { dateTo: string }).dateTo).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('applies a content type through the shared memory filter panel', async () => {
+    const wrapper = mount(MemoryFilters, {
+      props: { modelValue: createEmptyMemoryFilters() },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('.memory-filters__trigger').trigger('click')
+    const contentTypes = wrapper.findAll<HTMLInputElement>('.memory-filters__content-type')
+    expect(contentTypes.map((input) => input.attributes('type'))).toEqual(['checkbox', 'checkbox'])
+    expect(contentTypes.map((input) => input.element.value)).toEqual(['screenshot', 'text'])
+    await contentTypes[0].trigger('click')
+    await contentTypes[1].trigger('click')
+    await wrapper.get('.memory-filters__actions .btn-primary').trigger('click')
+
+    expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({
+      datePreset: 'all',
+      dateFrom: '',
+      dateTo: '',
+      contentTypes: ['screenshot', 'text'],
+    })
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
