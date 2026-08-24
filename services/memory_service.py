@@ -221,6 +221,7 @@ class MemoryService:
                     "memory_id": memory.id,
                     "created_at": memory.created_at,
                     "app_name": memory.app_name,
+                    "memory_type": getattr(memory, "memory_type", "screenshot"),
                 },
             )
         except Exception as exc:
@@ -333,6 +334,7 @@ class MemoryService:
             app_name=app_name,
             text_content=text_content,
             sync_status="PENDING",
+            memory_type="screenshot",
         )
         if not self._sqlite_manager.insert_memory(record):
             raise RuntimeError(f"Failed to insert memory {memory_id} to SQLite")
@@ -342,6 +344,55 @@ class MemoryService:
         self._reindex_memory(memory_id, emit_update=False)
         self._report_progress("记忆已保存")
         return memory_id
+
+    def create_text_memory(
+        self,
+        content: str,
+        app_name: str = "",
+    ) -> Optional[str]:
+        """Create a user-authored text memory without OCR or image analysis."""
+        if not isinstance(content, str):
+            raise ValueError("Text memory content must be a string")
+        normalized = content.strip()
+        if not normalized or len(normalized) > SUMMARY_MAX_LENGTH:
+            raise ValueError(
+                f"Text memory must contain between 1 and {SUMMARY_MAX_LENGTH} characters"
+            )
+
+        acquired = self._semaphore.acquire(timeout=30)
+        if not acquired:
+            raise RuntimeError("Too many memory creation tasks in progress")
+
+        try:
+            with self._active_lock:
+                self._active_count += 1
+
+            memory_id = str(uuid.uuid4())
+            created_at = time.strftime("%Y-%m-%d %H:%M:%S")
+            from db.sqlite_manager import MemoryRecord
+
+            record = MemoryRecord(
+                id=memory_id,
+                created_at=created_at,
+                image_path="",
+                ai_summary=normalized,
+                app_name=app_name,
+                text_content=None,
+                sync_status="PENDING",
+                memory_type="text",
+            )
+            if not self._sqlite_manager.insert_memory(record):
+                raise RuntimeError(f"Failed to insert text memory {memory_id} to SQLite")
+
+            # Keep the request open through the first local indexing attempt so
+            # exact and semantic search state is final when creation completes.
+            self._reindex_memory(memory_id, emit_update=False)
+            self._report_progress("文本记忆已保存")
+            return memory_id
+        finally:
+            with self._active_lock:
+                self._active_count -= 1
+            self._semaphore.release()
 
     def create_memory_async(
         self,
@@ -436,6 +487,7 @@ class MemoryService:
             text_content=text_content,
             extra_images=json.dumps(extra_images, ensure_ascii=False) if extra_images else None,
             sync_status="PENDING",
+            memory_type="screenshot",
         )
         if not self._sqlite_manager.insert_memory(record):
             raise RuntimeError(f"Failed to insert cluster memory {memory_id} to SQLite")
@@ -659,6 +711,11 @@ class MemoryService:
                     self._set_ocr_backfill_progress(progress)
                     continue
                 if current.text_content and current.text_content.strip():
+                    progress["processed"] += 1
+                    progress["skipped"] += 1
+                    self._set_ocr_backfill_progress(progress)
+                    continue
+                if getattr(current, "memory_type", "screenshot") == "text":
                     progress["processed"] += 1
                     progress["skipped"] += 1
                     self._set_ocr_backfill_progress(progress)

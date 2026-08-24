@@ -51,7 +51,7 @@ def test_search_route_forwards_development_tuning_options():
     assert result.memories[0].search_debug.semantic_distance == 1.2
 
 
-def test_search_route_forwards_date_filter_bounds():
+def test_search_route_forwards_date_and_content_type_filters():
     from api.routes.search import search
 
     search_service = MagicMock()
@@ -69,6 +69,7 @@ def test_search_route_forwards_date_filter_bounds():
                 debug=False,
                 date_from=date(2026, 8, 1),
                 date_to=date(2026, 8, 24),
+                memory_type="text",
             )
         )
 
@@ -82,4 +83,5 @@ def test_search_route_forwards_date_filter_bounds():
         include_debug=False,
         created_after="2026-08-01 00:00:00",
         created_before="2026-08-25 00:00:00",
+        memory_type="text",
     )

@@ -122,6 +122,7 @@ def rebuild_chroma():
             "memory_id": memory.id,
             "created_at": memory.created_at,
             "app_name": memory.app_name,
+            "memory_type": getattr(memory, "memory_type", "screenshot"),
         }
         
         if chroma_manager.add_memory(

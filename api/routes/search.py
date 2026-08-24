@@ -4,7 +4,7 @@ Search Routes - Search functionality
 from fastapi import APIRouter, HTTPException, Query
 from datetime import date
 
-from api.schemas import SearchResult, MemoryResponse
+from api.schemas import MemoryResponse, MemoryType, SearchResult
 from api.dependencies import get_search_service, get_task_queue
 from api.memory_filters import normalize_memory_date_range
 
@@ -50,6 +50,7 @@ def memory_to_response(memory) -> dict:
         "text_content": memory.text_content,
         "extra_images": memory.extra_images,
         "sync_status": getattr(memory, "sync_status", "PENDING"),
+        "memory_type": getattr(memory, "memory_type", "screenshot"),
         "match_sources": getattr(memory, "match_sources", []),
         "search_debug": getattr(memory, "search_debug", None),
     }
@@ -76,6 +77,7 @@ async def search(
     debug: bool = Query(False, description="Include development search scores"),
     date_from: date | None = None,
     date_to: date | None = None,
+    memory_type: MemoryType | None = None,
 ):
     """Search memories by query"""
     try:
@@ -94,6 +96,8 @@ async def search(
                 created_after=bounds.created_after,
                 created_before=bounds.created_before,
             )
+        if memory_type:
+            search_options["memory_type"] = memory_type
         memories = search_service.search(
             q,
             **search_options,

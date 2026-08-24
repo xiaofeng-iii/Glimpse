@@ -256,6 +256,38 @@ class TestSQLiteManagerQuery:
         )] == ["start", "end"]
         mgr.close()
 
+    def test_filters_browse_count_ids_and_search_by_memory_type(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager, MemoryRecord
+
+        mgr = SQLiteManager(mock_path_manager)
+        mgr.insert_memory(
+            MemoryRecord(
+                id="screenshot",
+                created_at="2026-08-24 10:00:00",
+                image_path="/img.png",
+                ai_summary="shared filter phrase",
+                app_name="test",
+            )
+        )
+        mgr.insert_memory(
+            MemoryRecord(
+                id="text",
+                created_at="2026-08-24 11:00:00",
+                image_path="",
+                ai_summary="shared filter phrase",
+                app_name="Glimpse",
+                memory_type="text",
+            )
+        )
+
+        assert [memory.id for memory in mgr.get_all_memories(memory_type="text")] == ["text"]
+        assert mgr.get_memories_count(memory_type="text") == 1
+        assert mgr.get_memory_ids(memory_type="text") == ["text"]
+        assert [
+            memory.id for memory in mgr.search_memories("shared", memory_type="text")
+        ] == ["text"]
+        mgr.close()
+
 
 class TestSQLiteManagerSearch:
     def test_search_memories_text(self, mock_path_manager):

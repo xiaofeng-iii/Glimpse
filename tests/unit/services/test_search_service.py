@@ -224,6 +224,31 @@ class TestSearchServiceSearch:
             where={"memory_id": {"$in": ["in-range-1", "in-range-2"]}},
         )
 
+    def test_semantic_content_type_filter_is_applied_inside_the_vector_query(
+        self,
+        mock_services,
+    ):
+        from services.search_service import SearchService
+
+        mock_services["sqlite_manager"].get_memory_ids.return_value = ["text-1"]
+        mock_services["chroma_manager"].search_similar.return_value = []
+
+        results = SearchService(**mock_services).search(
+            "test",
+            source_filter="semantic",
+            memory_type="text",
+        )
+
+        assert results == []
+        mock_services["sqlite_manager"].get_memory_ids.assert_called_once_with(
+            memory_type="text",
+        )
+        mock_services["chroma_manager"].search_similar.assert_called_once_with(
+            mock_services["embedding_client"].get_embedding.return_value,
+            n_results=40,
+            where={"memory_id": {"$in": ["text-1"]}},
+        )
+
     @pytest.mark.parametrize("sync_status", ["PENDING", "FAILED"])
     def test_semantic_search_ignores_unsynced_vectors(
         self,

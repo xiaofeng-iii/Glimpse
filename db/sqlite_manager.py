@@ -26,6 +26,7 @@ class MemoryRecord:
     text_content: Optional[str] = None
     extra_images: Optional[str] = None
     sync_status: str = "PENDING"
+    memory_type: str = "screenshot"
     match_sources: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -44,6 +45,11 @@ class MemoryRecord:
                 text_content=row["text_content"] if "text_content" in row.keys() else None,
                 extra_images=row["extra_images"] if "extra_images" in row.keys() else None,
                 sync_status=row["sync_status"] if "sync_status" in row.keys() else "PENDING",
+                memory_type=(
+                    row["memory_type"]
+                    if "memory_type" in row.keys() and row["memory_type"]
+                    else "screenshot"
+                ),
             )
         # Fallback for plain tuples (tests)
         if len(row) >= 8:
@@ -56,6 +62,7 @@ class MemoryRecord:
                 text_content=row[5] if len(row) > 5 else None,
                 extra_images=row[6],
                 sync_status=row[7],
+                memory_type=row[8] if len(row) > 8 and row[8] else "screenshot",
             )
         return cls(
             id=row[0],
@@ -66,6 +73,7 @@ class MemoryRecord:
             text_content=row[5] if len(row) > 5 else None,
             extra_images=None,
             sync_status=row[6] if len(row) > 6 else "PENDING",
+            memory_type="screenshot",
         )
 
 
@@ -96,7 +104,8 @@ class SQLiteManager:
                 app_name TEXT,
                 text_content TEXT,
                 extra_images TEXT,
-                sync_status TEXT DEFAULT 'PENDING'
+                sync_status TEXT DEFAULT 'PENDING',
+                memory_type TEXT NOT NULL DEFAULT 'screenshot'
             )
         """)
 
@@ -142,11 +151,29 @@ class SQLiteManager:
             cursor.execute(
                 "ALTER TABLE memories ADD COLUMN sync_status TEXT DEFAULT 'PENDING'"
             )
+        if "memory_type" not in columns:
+            cursor.execute(
+                "ALTER TABLE memories ADD COLUMN memory_type TEXT NOT NULL "
+                "DEFAULT 'screenshot'"
+            )
         cursor.execute(
             """
             UPDATE memories
             SET sync_status = 'PENDING'
             WHERE sync_status IS NULL OR TRIM(sync_status) = ''
+            """
+        )
+        cursor.execute(
+            """
+            UPDATE memories
+            SET memory_type = 'screenshot'
+            WHERE memory_type IS NULL OR TRIM(memory_type) = ''
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_memories_type_created_at
+            ON memories(memory_type, created_at DESC)
             """
         )
 
@@ -158,8 +185,8 @@ class SQLiteManager:
                 cursor = self._conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO memories (id, created_at, image_path, ai_summary, app_name, text_content, extra_images, sync_status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO memories (id, created_at, image_path, ai_summary, app_name, text_content, extra_images, sync_status, memory_type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         record.id,
@@ -170,6 +197,7 @@ class SQLiteManager:
                         record.text_content,
                         record.extra_images,
                         record.sync_status,
+                        record.memory_type,
                     ),
                 )
                 self._conn.commit()
@@ -190,6 +218,7 @@ class SQLiteManager:
     def _memory_filter_clause(
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
+        memory_type: Optional[str] = None,
     ) -> tuple[str, List[str]]:
         clauses = []
         params = []
@@ -199,6 +228,9 @@ class SQLiteManager:
         if created_before:
             clauses.append("m.created_at < ?")
             params.append(created_before)
+        if memory_type:
+            clauses.append("m.memory_type = ?")
+            params.append(memory_type)
         return (" AND ".join(clauses), params)
 
     def get_all_memories(
@@ -207,11 +239,13 @@ class SQLiteManager:
         offset: int = 0,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
+        memory_type: Optional[str] = None,
     ) -> List[MemoryRecord]:
         cursor = self._conn.cursor()
         filter_clause, filter_params = self._memory_filter_clause(
             created_after,
             created_before,
+            memory_type,
         )
         where_sql = f"WHERE {filter_clause}" if filter_clause else ""
         cursor.execute(
@@ -226,11 +260,13 @@ class SQLiteManager:
         self,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
+        memory_type: Optional[str] = None,
     ) -> List[str]:
         cursor = self._conn.cursor()
         filter_clause, filter_params = self._memory_filter_clause(
             created_after,
             created_before,
+            memory_type,
         )
         where_sql = f"WHERE {filter_clause}" if filter_clause else ""
         cursor.execute(
@@ -245,11 +281,13 @@ class SQLiteManager:
         limit: int = 20,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
+        memory_type: Optional[str] = None,
     ) -> List[MemoryRecord]:
         cursor = self._conn.cursor()
         filter_clause, filter_params = self._memory_filter_clause(
             created_after,
             created_before,
+            memory_type,
         )
         filter_sql = f" AND {filter_clause}" if filter_clause else ""
         try:
@@ -379,7 +417,8 @@ class SQLiteManager:
         cursor.execute(
             """
             SELECT * FROM memories
-            WHERE text_content IS NULL OR TRIM(text_content) = ''
+            WHERE (text_content IS NULL OR TRIM(text_content) = '')
+              AND memory_type != 'text'
             ORDER BY created_at ASC, id ASC
             """
         )
@@ -400,11 +439,13 @@ class SQLiteManager:
         self,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
+        memory_type: Optional[str] = None,
     ) -> int:
         cursor = self._conn.cursor()
         filter_clause, filter_params = self._memory_filter_clause(
             created_after,
             created_before,
+            memory_type,
         )
         where_sql = f"WHERE {filter_clause}" if filter_clause else ""
         cursor.execute(

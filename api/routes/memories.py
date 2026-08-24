@@ -4,7 +4,15 @@ Memory Routes - CRUD operations for memories
 from fastapi import APIRouter, HTTPException, Query
 from datetime import date
 
-from api.schemas import MemoryListResponse, MemoryResponse, MemoryUpdateRequest
+from starlette.concurrency import run_in_threadpool
+
+from api.schemas import (
+    MemoryCreateRequest,
+    MemoryListResponse,
+    MemoryResponse,
+    MemoryType,
+    MemoryUpdateRequest,
+)
 from api.dependencies import get_search_service, get_memory_service
 from api.memory_filters import normalize_memory_date_range
 from api.websocket import broadcast_event
@@ -26,8 +34,43 @@ def memory_to_response(memory) -> dict:
         "text_content": memory.text_content,
         "extra_images": memory.extra_images,
         "sync_status": getattr(memory, "sync_status", "PENDING"),
+        "memory_type": getattr(memory, "memory_type", "screenshot"),
         "match_sources": getattr(memory, "match_sources", []),
     }
+
+
+@router.post("", response_model=MemoryResponse, status_code=201)
+async def create_text_memory(request: MemoryCreateRequest):
+    """Create a user-authored text memory and finish its first index attempt."""
+    try:
+        memory_service = get_memory_service()
+        memory_id = await run_in_threadpool(
+            memory_service.create_text_memory,
+            request.content,
+        )
+        memory = memory_service.get_memory(memory_id) if memory_id else None
+        if memory is None:
+            raise RuntimeError("Text memory was created without a readable record")
+
+        response = MemoryResponse(**memory_to_response(memory))
+        try:
+            await broadcast_event(
+                "memory_saved",
+                {
+                    "memory_id": memory.id,
+                    "source": "text",
+                    "notify": False,
+                },
+            )
+        except Exception as exc:
+            logger.warning("Failed to broadcast text memory %s: %s", memory.id, exc)
+        return response
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("", response_model=MemoryListResponse)
@@ -36,26 +79,33 @@ async def list_memories(
     offset: int = Query(0, ge=0),
     date_from: date | None = None,
     date_to: date | None = None,
+    memory_type: MemoryType | None = None,
 ):
     """Get list of recent memories"""
     try:
         search_service = get_search_service()
         bounds = normalize_memory_date_range(date_from, date_to)
-        if offset or bounds.created_after or bounds.created_before:
-            memories = search_service.get_recent_memories(
-                limit=limit,
-                offset=offset,
-                created_after=bounds.created_after,
-                created_before=bounds.created_before,
-            )
+        if offset or bounds.created_after or bounds.created_before or memory_type:
+            recent_options = {
+                "limit": limit,
+                "offset": offset,
+                "created_after": bounds.created_after,
+                "created_before": bounds.created_before,
+            }
+            if memory_type:
+                recent_options["memory_type"] = memory_type
+            memories = search_service.get_recent_memories(**recent_options)
         else:
             memories = search_service.get_recent_memories(limit=limit)
+        count_options = {
+            "created_after": bounds.created_after,
+            "created_before": bounds.created_before,
+        }
+        if memory_type:
+            count_options["memory_type"] = memory_type
         return MemoryListResponse(
             memories=[MemoryResponse(**memory_to_response(m)) for m in memories],
-            total=search_service.get_recent_memories_count(
-                created_after=bounds.created_after,
-                created_before=bounds.created_before,
-            ),
+            total=search_service.get_recent_memories_count(**count_options),
         )
     except HTTPException:
         raise

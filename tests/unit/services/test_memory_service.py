@@ -209,6 +209,25 @@ class TestMemoryServiceCreate:
         with pytest.raises(ValueError, match="at least one image"):
             service.create_cluster_memory([])
 
+    def test_text_memory_skips_capture_ocr_and_ai(self, mock_services):
+        service = make_service(mock_services)
+
+        memory_id = service.create_text_memory("  手动记录的内容  ")
+
+        record = mock_services["sqlite_manager"]._records[memory_id]
+        assert record.memory_type == "text"
+        assert record.image_path == ""
+        assert record.ai_summary == "手动记录的内容"
+        assert record.text_content is None
+        assert record.sync_status == "SYNCED"
+        mock_services["ocr_engine"].extract_text.assert_not_called()
+        mock_services["ai_client"].analyze_image.assert_not_called()
+        mock_services["ai_client"].analyze_images.assert_not_called()
+        assert (
+            mock_services["chroma_manager"].upsert_memory.call_args.kwargs["text"]
+            == "手动记录的内容"
+        )
+
 
 class TestMemoryServiceAsync:
     def test_create_memory_async_requires_queue(self, mock_services):
@@ -479,6 +498,23 @@ class TestOCRBackfill:
         assert result["processed"] == 2
         assert result["failed"] == 1
         assert result["updated"] == 1
+
+    def test_backfill_skips_text_memories_without_calling_ocr(self, mock_services):
+        add_record(
+            mock_services,
+            image_path="",
+            ai_summary="手动记录",
+            text_content=None,
+            memory_type="text",
+        )
+        service = make_service(mock_services)
+
+        result = service.backfill_ocr()
+
+        assert result["processed"] == 1
+        assert result["skipped"] == 1
+        assert result["updated"] == 0
+        mock_services["ocr_engine"].extract_text.assert_not_called()
 
 
 class TestMemoryServiceQueryAndDelete:

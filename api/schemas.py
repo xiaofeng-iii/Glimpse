@@ -1,9 +1,12 @@
 """
 API Schemas - Pydantic models for request/response validation
 """
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
+
+
+MemoryType = Literal["screenshot", "text"]
 
 
 class SearchDebugInfo(BaseModel):
@@ -25,6 +28,7 @@ class MemoryResponse(BaseModel):
     text_content: Optional[str] = None
     extra_images: Optional[str] = None
     sync_status: str = "PENDING"
+    memory_type: MemoryType = "screenshot"
     match_sources: List[str] = Field(default_factory=list)
     search_debug: Optional[SearchDebugInfo] = None
 
@@ -36,6 +40,22 @@ class MemoryListResponse(BaseModel):
     """List of memories response"""
     memories: List[MemoryResponse]
     total: int
+
+
+class MemoryCreateRequest(BaseModel):
+    """User-authored text for a new memory."""
+
+    content: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def normalize_content(cls, value):
+        if not isinstance(value, str):
+            raise ValueError("content must be a string")
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("content must not be blank")
+        return normalized
 
 
 class MemoryUpdateRequest(BaseModel):
