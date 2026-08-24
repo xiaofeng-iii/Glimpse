@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { Memory } from '@/api/client'
 import MemoryCard from '@/components/MemoryCard.vue'
 import MemoryWall from '@/components/MemoryWall.vue'
+import MemoryFilters from '@/components/MemoryFilters.vue'
 import MediaGallery from '@/components/MediaGallery.vue'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 import SearchToolbar from '@/components/SearchToolbar.vue'
@@ -14,6 +15,7 @@ import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
 import { setLanguagePreference } from '@/utils/i18n'
 import { ONBOARDING_REQUEST_EVENT } from '@/utils/onboarding'
+import { createEmptyMemoryFilters } from '@/utils/memory-filters'
 
 const apiMocks = vi.hoisted(() => ({
   updateSummary: vi.fn(),
@@ -98,7 +100,12 @@ describe('memory components', () => {
     const group = wrapper.get('.search-toolbar__source-switcher')
     const buttons = group.findAll('.search-toolbar__source-button')
 
-    expect(group.classes()).toEqual(expect.arrayContaining(['inline-grid', 'auto-cols-fr', 'p-[3px]']))
+    expect(group.classes()).toEqual(expect.arrayContaining([
+      'search-toolbar__control',
+      'search-toolbar__source-switcher',
+      'inline-grid',
+      'auto-cols-fr',
+    ]))
     expect(buttons).toHaveLength(3)
     expect(buttons.map((button) => button.attributes('aria-pressed'))).toEqual(['true', 'false', 'false'])
     for (const button of buttons) {
@@ -171,6 +178,45 @@ describe('memory components', () => {
     expect(emptyCapture.attributes('aria-busy')).toBe('false')
     expect(emptyCapture.element.disabled).toBe(true)
     expect(emptyCapture.text()).toContain('截图')
+  })
+
+  it('applies a date preset through the extensible memory filter panel', async () => {
+    const wrapper = mount(MemoryFilters, {
+      props: { modelValue: createEmptyMemoryFilters() },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('.memory-filters__trigger').trigger('click')
+    await wrapper.get<HTMLInputElement>('.memory-filters__preset[value="last7Days"]').trigger('click')
+    await wrapper.get('.memory-filters__actions .btn-primary').trigger('click')
+
+    const applied = wrapper.emitted('apply')?.[0]?.[0]
+    expect(applied).toMatchObject({
+      datePreset: 'last7Days',
+      sourceChannels: [],
+      contentTypes: [],
+    })
+    expect((applied as { dateFrom: string }).dateFrom).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect((applied as { dateTo: string }).dateTo).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('keeps an invalid custom date range open with inline recovery guidance', async () => {
+    const wrapper = mount(MemoryFilters, {
+      props: { modelValue: createEmptyMemoryFilters() },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('.memory-filters__trigger').trigger('click')
+    await wrapper.get<HTMLInputElement>('.memory-filters__preset[value="custom"]').trigger('click')
+    const dates = wrapper.findAll<HTMLInputElement>('input[type="date"]')
+    await dates[0].setValue('2026-08-24')
+    await dates[1].setValue('2026-08-01')
+    await wrapper.get('.memory-filters__actions .btn-primary').trigger('click')
+
+    expect(wrapper.emitted('apply')).toBeUndefined()
+    expect(wrapper.get('[role="alert"]').text()).toContain('开始日期不能晚于结束日期')
+    expect(wrapper.get('[role="dialog"]').exists()).toBe(true)
   })
 
   it('closes the DEV panel before requesting the onboarding guide', async () => {

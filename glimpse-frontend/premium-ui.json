@@ -1,6 +1,7 @@
 {
   "sourceRoots": ["src"],
   "ownership": {
-    "Select/Listbox": "authored"
+    "Select/Listbox": "authored",
+    "Date": "native"
   }
 }

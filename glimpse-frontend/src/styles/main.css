@@ -16,6 +16,7 @@
   --color-primary: #3b56c9;
   --color-primary-hover: #3048ab;
   --color-primary-soft: #edf0fa;
+  --color-on-primary: #ffffff;
   --color-accent: #d9601c;
   --color-accent-hover: #c25414;
   --color-success: #1f9d62;
@@ -31,6 +32,11 @@
   --radius-md: 8px;
   --radius-lg: 10px;
   --radius-xl: 12px;
+  --z-dropdown: 200;
+  --z-popover: 300;
+  --z-backdrop: 500;
+  --z-dialog: 600;
+  --z-toast: 900;
 
   /* Compatibility aliases for existing components during the redesign. */
   --shell-ink: var(--color-text);
@@ -200,8 +206,12 @@ button {
   padding: 0 1.25rem;
   border-bottom: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-surface) 96%, transparent);
-  box-shadow: 0 1px 0 rgba(20, 31, 54, 0.02);
+  box-shadow: 0 4px 12px rgba(20, 31, 54, 0.08);
   user-select: none;
+}
+
+:root[data-theme='dark'] .desktop-shell__titlebar {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
 }
 
 .desktop-shell__drag-layer {

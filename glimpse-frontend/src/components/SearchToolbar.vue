@@ -145,67 +145,68 @@ defineExpose({ focus, clear })
 </script>
 
 <template>
-  <section class="border-b border-[var(--shell-line)] bg-[var(--shell-frame-bg)] px-5 py-2">
-    <div class="search-toolbar__layout">
-      <div class="search-toolbar__input relative min-w-0">
-        <MagnifyingGlassIcon
-          class="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--shell-muted)]"
-          aria-hidden="true"
-        />
-        <input
-          ref="searchInput"
-          v-model="query"
-          type="search"
-          class="h-9 w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[display:none]"
-          :placeholder="t('search.placeholder')"
-          @keydown.esc.stop.prevent="clear"
-        />
-        <div class="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
-          <button
-            v-if="query"
-            type="button"
-            class="flex h-[22px] min-h-0 w-[22px] flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
-            :aria-label="t('search.clear')"
-            @click="clear"
-          >
-            <XMarkIcon class="h-3 w-3" aria-hidden="true" />
-          </button>
-          <kbd class="rounded-md border border-[var(--shell-line)] px-1.5 py-0.5 text-xs text-[var(--shell-muted)]">
-            {{ shortcutLabel }}
-          </kbd>
+  <section class="search-toolbar">
+    <div class="search-toolbar__surface">
+      <div class="search-toolbar__layout">
+        <div class="search-toolbar__input relative min-w-0">
+          <MagnifyingGlassIcon
+            class="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--shell-muted)]"
+            aria-hidden="true"
+          />
+          <input
+            ref="searchInput"
+            v-model="query"
+            type="search"
+            class="search-toolbar__control h-9 w-full border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[display:none]"
+            :placeholder="t('search.placeholder')"
+            @keydown.esc.stop.prevent="clear"
+          />
+          <div class="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            <button
+              v-if="query"
+              type="button"
+              class="search-toolbar__detail-control flex h-[22px] min-h-0 w-[22px] flex-none items-center justify-center text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+              :aria-label="t('search.clear')"
+              @click="clear"
+            >
+              <XMarkIcon class="h-3 w-3" aria-hidden="true" />
+            </button>
+            <kbd class="search-toolbar__detail-control border border-[var(--shell-line)] px-1.5 py-0.5 text-xs text-[var(--shell-muted)]">
+              {{ shortcutLabel }}
+            </kbd>
+          </div>
         </div>
-      </div>
 
-      <div
-        class="search-toolbar__source-switcher inline-grid h-9 grid-flow-col auto-cols-fr items-center rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-[3px]"
-        role="group"
-        :aria-label="t('search.sourceLabel')"
-      >
-        <button
-          v-for="item in sources"
-          :key="item.value"
-          type="button"
-          class="search-toolbar__source-button h-7 min-h-0 rounded-md px-3 text-sm font-medium transition"
-          :class="source === item.value
-            ? 'bg-[var(--color-primary)] text-white shadow-sm'
-            : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
-          :aria-pressed="source === item.value"
-          @click="source = item.value"
+        <div
+          class="search-toolbar__control search-toolbar__source-switcher inline-grid h-9 grid-flow-col auto-cols-fr items-center border border-[var(--shell-line)] bg-[var(--shell-control-bg)]"
+          role="group"
+          :aria-label="t('search.sourceLabel')"
         >
-          {{ t(item.labelKey) }}
-        </button>
-      </div>
+          <button
+            v-for="item in sources"
+            :key="item.value"
+            type="button"
+            class="search-toolbar__source-button h-7 min-h-0 px-3 text-sm font-medium transition"
+            :class="source === item.value
+              ? 'bg-[var(--color-primary)] text-white shadow-sm'
+              : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
+            :aria-pressed="source === item.value"
+            @click="source = item.value"
+          >
+            {{ t(item.labelKey) }}
+          </button>
+        </div>
 
-      <div class="search-toolbar__actions flex shrink-0 items-center gap-2.5">
-        <button
-          type="button"
-          class="inline-flex h-9 min-h-0 w-9 items-center justify-center rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:opacity-50"
-          :aria-label="t('action.refresh')"
-          :disabled="refreshing"
-          @click="emit('refresh')"
-        >
-          <ArrowPathIcon class="h-5 w-5" :class="{ 'animate-spin': refreshing }" aria-hidden="true" />
-        </button>
+        <div class="search-toolbar__actions flex shrink-0 items-center gap-2.5">
+          <button
+            type="button"
+            class="search-toolbar__control inline-flex h-9 min-h-0 w-9 items-center justify-center border border-[var(--shell-line)] bg-[var(--shell-control-bg)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:opacity-50"
+            :aria-label="t('action.refresh')"
+            :disabled="refreshing"
+            @click="emit('refresh')"
+          >
+            <ArrowPathIcon class="h-5 w-5" :class="{ 'animate-spin': refreshing }" aria-hidden="true" />
+          </button>
 
         <details
           ref="debugPanelElement"
@@ -215,7 +216,7 @@ defineExpose({ focus, clear })
           @toggle="handleDebugToggle"
         >
           <summary
-            class="flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
+            class="search-toolbar__control flex h-9 cursor-pointer list-none items-center gap-1.5 border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
             :aria-label="t('search.debugTitle')"
           >
             <AdjustmentsHorizontalIcon class="h-4 w-4 flex-none" aria-hidden="true" />
@@ -266,6 +267,7 @@ defineExpose({ focus, clear })
         </details>
 
         <CaptureButton
+          class="search-toolbar__capture"
           :capturing="capturing"
           :disabled="captureDisabled"
           :shortcut-label="captureShortcutLabel"
@@ -273,12 +275,41 @@ defineExpose({ focus, clear })
           show-shortcut
           @capture="emit('capture')"
         />
+        </div>
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
+.search-toolbar {
+  --search-toolbar-surface-radius: var(--radius-xl);
+  --search-toolbar-surface-inset: 0.75rem;
+  --search-toolbar-control-radius: var(--radius-sm);
+  --search-toolbar-segment-inset: 3px;
+  --search-toolbar-segment-radius: max(
+    1px,
+    calc(var(--search-toolbar-control-radius) - var(--search-toolbar-segment-inset))
+  );
+  --search-toolbar-detail-radius: var(--search-toolbar-control-radius);
+  --search-toolbar-surface-shadow:
+    0 1px 2px rgba(26, 38, 64, 0.04),
+    0 2px 6px rgba(26, 38, 64, 0.035);
+
+  padding: 0.625rem 1.25rem 0.5rem;
+  background: var(--shell-window-bg);
+}
+
+.search-toolbar__surface {
+  padding: var(--search-toolbar-surface-inset);
+  border: 1px solid var(--shell-card-border);
+  border-radius: var(--search-toolbar-surface-radius);
+  background: var(--shell-card);
+  box-shadow: var(--search-toolbar-surface-shadow);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
 .search-toolbar__layout {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) 13.5rem auto;
@@ -288,6 +319,21 @@ defineExpose({ focus, clear })
 
 .search-toolbar__source-switcher {
   width: 13.5rem;
+  gap: var(--search-toolbar-segment-inset);
+  padding: var(--search-toolbar-segment-inset);
+}
+
+.search-toolbar__control,
+.search-toolbar__capture {
+  border-radius: var(--search-toolbar-control-radius);
+}
+
+.search-toolbar__source-button {
+  border-radius: var(--search-toolbar-segment-radius);
+}
+
+.search-toolbar__detail-control {
+  border-radius: var(--search-toolbar-detail-radius);
 }
 
 .search-toolbar__actions {
@@ -295,7 +341,16 @@ defineExpose({ focus, clear })
   border-left: 1px solid var(--shell-line);
 }
 
+:global(:root[data-theme='dark']) .search-toolbar {
+  --search-toolbar-surface-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+
 @media (max-width: 724px) {
+  .search-toolbar {
+    padding-inline: 1rem;
+  }
+
   .search-toolbar__layout {
     grid-template-columns: minmax(0, 1fr) auto;
   }
@@ -318,6 +373,10 @@ defineExpose({ focus, clear })
 }
 
 @media (max-width: 520px) {
+  .search-toolbar {
+    padding-inline: 0.75rem;
+  }
+
   .search-toolbar__layout {
     grid-template-columns: minmax(0, 1fr);
   }
