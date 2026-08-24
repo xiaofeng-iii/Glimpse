@@ -14,6 +14,7 @@ import { useClusterStore } from '@/stores/cluster'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { createLogger } from '@/utils/logger'
+import type { MemoryFilters } from '@/utils/memory-filters'
 import { t } from '@/utils/i18n'
 import ClusterBar from '@/components/ClusterBar.vue'
 import MemoryInspector from '@/components/MemoryInspector.vue'
@@ -205,6 +206,12 @@ const handleRefresh = async () => {
   }
 }
 
+const handleApplyFilters = async (filters: MemoryFilters) => {
+  if (!(await confirmInspectorLeave())) return
+  const results = await memoriesStore.applyFilters(filters)
+  memoriesStore.select(wideLayout.value ? results[0] ?? null : null)
+}
+
 const handleResize = () => {
   const wasWide = wideLayout.value
   wideLayout.value = window.innerWidth >= 1180
@@ -294,9 +301,11 @@ onUnmounted(() => {
         :show-search-debug="showSearchDebug"
         :capturing="isCapturing"
         :capture-disabled="!backendStatus.isReady"
+        :filters="memoriesStore.activeFilters"
         @select="handleSelectMemory"
         @open="handleOpenMemory"
         @capture="handleScreenshot()"
+        @apply-filters="handleApplyFilters"
       />
 
       <Transition name="inspector">

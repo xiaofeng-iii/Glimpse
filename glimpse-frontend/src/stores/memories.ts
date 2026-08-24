@@ -2,6 +2,12 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { memoriesApi, searchApi, type Memory, type SearchOptions } from '@/api/client'
 import { createLogger } from '@/utils/logger'
+import {
+  cloneMemoryFilters,
+  createEmptyMemoryFilters,
+  toMemoryFilterQuery,
+  type MemoryFilters,
+} from '@/utils/memory-filters'
 
 const logger = createLogger('stores/memories')
 
@@ -15,6 +21,7 @@ export const useMemoriesStore = defineStore('memories', () => {
   const isLoading = ref(false)
   const total = ref(0)
   const selectedOutsideSearch = ref(false)
+  const activeFilters = ref<MemoryFilters>(createEmptyMemoryFilters())
   let latestRequest = 0
 
   const memories = computed(() =>
@@ -75,7 +82,10 @@ export const useMemoriesStore = defineStore('memories', () => {
     const requestId = ++latestRequest
     isLoading.value = true
     try {
-      const result = await memoriesApi.list(limit)
+      const result = await memoriesApi.list({
+        limit,
+        ...toMemoryFilterQuery(activeFilters.value),
+      })
       if (requestId !== latestRequest) return []
       applyResults(result.memories)
       total.value = result.total
@@ -110,7 +120,10 @@ export const useMemoriesStore = defineStore('memories', () => {
     searchOptions.value = { ...options }
 
     try {
-      const result = await searchApi.search(normalizedQuery, source, options)
+      const result = await searchApi.search(normalizedQuery, source, {
+        ...options,
+        ...toMemoryFilterQuery(activeFilters.value),
+      })
       if (requestId !== latestRequest) return []
       applyResults(result.memories, true)
       total.value = result.memories.length
@@ -191,6 +204,12 @@ export const useMemoriesStore = defineStore('memories', () => {
     }
   }
 
+  const applyFilters = async (filters: MemoryFilters) => {
+    activeFilters.value = cloneMemoryFilters(filters)
+    await refresh()
+    return memories.value
+  }
+
   return {
     entities,
     resultIds,
@@ -198,6 +217,7 @@ export const useMemoriesStore = defineStore('memories', () => {
     selectedId,
     selectedMemory,
     selectedOutsideSearch,
+    activeFilters,
     searchQuery,
     searchSource,
     searchOptions,
@@ -212,5 +232,6 @@ export const useMemoriesStore = defineStore('memories', () => {
     updateSummary,
     remove,
     refresh,
+    applyFilters,
   }
 })

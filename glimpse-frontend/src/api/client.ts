@@ -32,6 +32,15 @@ export interface SearchOptions {
   candidateMultiplier?: number
   rrfK?: number
   debug?: boolean
+  dateFrom?: string
+  dateTo?: string
+}
+
+export interface MemoryListOptions {
+  limit?: number
+  offset?: number
+  dateFrom?: string
+  dateTo?: string
 }
 
 export interface Memory {
@@ -109,8 +118,16 @@ export interface SearchWarmupStatus {
 
 // Memories API
 export const memoriesApi = {
-  list: async (limit = 100, offset = 0): Promise<{ memories: Memory[], total: number }> => {
-    const response = await api.get(`/memories?limit=${limit}&offset=${offset}`)
+  list: async (options: MemoryListOptions | number = {}): Promise<{ memories: Memory[], total: number }> => {
+    const normalizedOptions = typeof options === 'number' ? { limit: options } : options
+    const response = await api.get('/memories', {
+      params: {
+        limit: normalizedOptions.limit ?? 100,
+        offset: normalizedOptions.offset ?? 0,
+        date_from: normalizedOptions.dateFrom,
+        date_to: normalizedOptions.dateTo,
+      },
+    })
     return response.data
   },
 
@@ -146,6 +163,8 @@ export const searchApi = {
         candidate_multiplier: options.candidateMultiplier,
         rrf_k: options.rrfK,
         debug: options.debug,
+        date_from: options.dateFrom,
+        date_to: options.dateTo,
       },
     })
     return response.data

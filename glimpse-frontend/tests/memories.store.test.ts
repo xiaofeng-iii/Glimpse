@@ -137,6 +137,35 @@ describe('memories store', () => {
     expect(store.memories[0].search_debug).toBeNull()
   })
 
+  it('applies the same date filter to browse and search requests', async () => {
+    apiMocks.list.mockResolvedValue({ memories: [memory('1')], total: 1 })
+    apiMocks.search.mockResolvedValue({
+      memories: [memory('1')],
+      query: 'summary',
+      source: 'all',
+    })
+
+    const store = useMemoriesStore()
+    await store.applyFilters({
+      datePreset: 'custom',
+      dateFrom: '2026-08-01',
+      dateTo: '2026-08-24',
+      sourceChannels: [],
+      contentTypes: [],
+    })
+
+    expect(apiMocks.list).toHaveBeenCalledWith(expect.objectContaining({
+      dateFrom: '2026-08-01',
+      dateTo: '2026-08-24',
+    }))
+
+    await store.search('summary')
+    expect(apiMocks.search).toHaveBeenCalledWith('summary', 'all', expect.objectContaining({
+      dateFrom: '2026-08-01',
+      dateTo: '2026-08-24',
+    }))
+  })
+
   it('does not claim a summary edit removed a selection during an ordinary search change', async () => {
     apiMocks.search
       .mockResolvedValueOnce({ memories: [memory('1')], query: 'first', source: 'all' })

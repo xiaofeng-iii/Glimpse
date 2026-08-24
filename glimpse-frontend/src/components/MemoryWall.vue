@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CameraIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
+import { CameraIcon, FunnelIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { languagePreference, t } from '@/utils/i18n'
+import {
+  createEmptyMemoryFilters,
+  hasActiveMemoryFilters,
+  type MemoryFilters,
+} from '@/utils/memory-filters'
 import CaptureButton from './CaptureButton.vue'
 import MemoryCard from './MemoryCard.vue'
+import MemoryFiltersControl from './MemoryFilters.vue'
 import LoadingSpinner from './LoadingSpinner.vue'
 
 const props = defineProps<{
@@ -16,17 +22,21 @@ const props = defineProps<{
   showSearchDebug?: boolean
   capturing?: boolean
   captureDisabled?: boolean
+  filters?: MemoryFilters
 }>()
 
 const emit = defineEmits<{
   (event: 'select', memory: Memory): void
   (event: 'open', memory: Memory): void
   (event: 'capture'): void
+  (event: 'apply-filters', filters: MemoryFilters): void
 }>()
 
 type MemoryGroup = { key: string; label: string; memories: Memory[] }
 
 const searching = computed(() => Boolean(props.query?.trim()))
+const filters = computed(() => props.filters ?? createEmptyMemoryFilters())
+const filtering = computed(() => hasActiveMemoryFilters(filters.value))
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 
 const groups = computed<MemoryGroup[]>(() => {
@@ -70,8 +80,8 @@ const groups = computed<MemoryGroup[]>(() => {
 </script>
 
 <template>
-  <section class="memory-wall-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4" aria-live="polite">
-    <div class="mb-3">
+  <section class="memory-wall min-h-0 flex-1">
+    <header class="memory-wall__header">
       <h1 class="text-base font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">
         {{
           searching
@@ -79,62 +89,112 @@ const groups = computed<MemoryGroup[]>(() => {
             : t('memory.count', { count: total })
         }}
       </h1>
-    </div>
-
-    <div v-if="loading" class="flex min-h-64 items-center justify-center">
-      <LoadingSpinner />
-    </div>
-
-    <div v-else-if="!memories.length" class="flex min-h-[52vh] flex-col items-center justify-center text-center">
-      <div
-        class="flex h-14 w-14 items-center justify-center rounded-xl"
-        :class="searching
-          ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
-          : 'memory-wall__capture-icon'"
-      >
-        <MagnifyingGlassIcon v-if="searching" class="h-7 w-7" aria-hidden="true" />
-        <CameraIcon v-else class="h-7 w-7" aria-hidden="true" />
-      </div>
-      <h2 class="mt-4 text-base font-semibold text-[var(--shell-ink)]">
-        {{ searching ? t('memory.noSearchResults') : t('memory.emptyTitle') }}
-      </h2>
-      <p class="mt-1.5 max-w-sm text-sm leading-6 text-[var(--shell-muted)]">
-        {{ searching ? t('memory.noSearchResultsHint') : t('memory.emptyHint') }}
-      </p>
-      <CaptureButton
-        v-if="!searching"
-        class="mt-4"
-        :capturing="capturing"
-        :disabled="captureDisabled"
-        @capture="emit('capture')"
+      <MemoryFiltersControl
+        :model-value="filters"
+        :loading="loading"
+        @apply="emit('apply-filters', $event)"
       />
-    </div>
+    </header>
 
-    <div v-else class="space-y-5">
-      <section v-for="group in groups" :key="group.key">
-        <h2 v-if="group.label" class="mb-2.5 text-xs font-semibold tracking-wide text-[var(--shell-muted)]">
-          {{ group.label }}
-        </h2>
-        <div class="memory-grid">
-          <MemoryCard
-            v-for="memory in group.memories"
-            :key="memory.id"
-            :memory="memory"
-            :selected="selectedId === memory.id"
-            :searching="searching"
-            :show-debug="showSearchDebug"
-            @select="emit('select', $event)"
-            @open="emit('open', $event)"
-          />
+    <div class="memory-wall-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4" aria-live="polite">
+
+      <div v-if="loading" class="flex min-h-64 items-center justify-center">
+        <LoadingSpinner />
+      </div>
+
+      <div v-else-if="!memories.length" class="flex min-h-[52vh] flex-col items-center justify-center text-center">
+        <div
+          class="flex h-14 w-14 items-center justify-center rounded-xl"
+          :class="searching || filtering
+            ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+            : 'memory-wall__capture-icon'"
+        >
+          <FunnelIcon v-if="filtering" class="h-7 w-7" aria-hidden="true" />
+          <MagnifyingGlassIcon v-else-if="searching" class="h-7 w-7" aria-hidden="true" />
+          <CameraIcon v-else class="h-7 w-7" aria-hidden="true" />
         </div>
-      </section>
+        <h2 class="mt-4 text-base font-semibold text-[var(--shell-ink)]">
+          {{ filtering
+            ? t('memory.noFilterResults')
+            : searching ? t('memory.noSearchResults') : t('memory.emptyTitle') }}
+        </h2>
+        <p class="mt-1.5 max-w-sm text-sm leading-6 text-[var(--shell-muted)]">
+          {{ filtering
+            ? t('memory.noFilterResultsHint')
+            : searching ? t('memory.noSearchResultsHint') : t('memory.emptyHint') }}
+        </p>
+        <button
+          v-if="filtering"
+          type="button"
+          class="btn-secondary mt-4"
+          @click="emit('apply-filters', createEmptyMemoryFilters())"
+        >
+          {{ t('filter.clear') }}
+        </button>
+        <CaptureButton
+          v-else-if="!searching"
+          class="mt-4"
+          :capturing="capturing"
+          :disabled="captureDisabled"
+          @capture="emit('capture')"
+        />
+      </div>
+
+      <div v-else class="space-y-5">
+        <section v-for="group in groups" :key="group.key">
+          <h2 v-if="group.label" class="mb-2.5 text-xs font-semibold tracking-wide text-[var(--shell-muted)]">
+            {{ group.label }}
+          </h2>
+          <div class="memory-grid">
+            <MemoryCard
+              v-for="memory in group.memories"
+              :key="memory.id"
+              :memory="memory"
+              :selected="selectedId === memory.id"
+              :searching="searching"
+              :show-debug="showSearchDebug"
+              @select="emit('select', $event)"
+              @open="emit('open', $event)"
+            />
+          </div>
+        </section>
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.memory-wall-scroll {
+.memory-wall {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   container-type: inline-size;
+}
+
+.memory-wall__header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.375rem 1.25rem 0.25rem;
+  background: var(--shell-window-bg);
+}
+
+.memory-wall__header::after {
+  content: '';
+  position: absolute;
+  right: 1.25rem;
+  bottom: 0;
+  left: 1.25rem;
+  height: 1px;
+  background: color-mix(in srgb, var(--shell-line) 72%, transparent);
+}
+
+.memory-wall-scroll {
+  position: relative;
 }
 
 .memory-wall__capture-icon {
@@ -160,6 +220,12 @@ const groups = computed<MemoryGroup[]>(() => {
 @container (min-width: 760px) {
   .memory-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 560px) {
+  .memory-wall__header {
+    align-items: flex-start;
   }
 }
 </style>

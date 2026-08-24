@@ -1,0 +1,541 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { FunnelIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { t } from '@/utils/i18n'
+import {
+  cloneMemoryFilters,
+  createEmptyMemoryFilters,
+  getActiveMemoryFilterCount,
+  hasActiveMemoryFilters,
+  resolveMemoryDatePreset,
+  type MemoryDatePreset,
+  type MemoryFilters,
+} from '@/utils/memory-filters'
+
+const props = defineProps<{
+  modelValue: MemoryFilters
+  loading?: boolean
+}>()
+
+const emit = defineEmits<{
+  (event: 'apply', filters: MemoryFilters): void
+}>()
+
+const root = ref<HTMLElement | null>(null)
+const trigger = ref<HTMLButtonElement | null>(null)
+const open = ref(false)
+const draft = ref<MemoryFilters>(cloneMemoryFilters(props.modelValue))
+const error = ref('')
+const panelId = 'memory-filter-panel'
+
+const presets: Array<{ value: MemoryDatePreset; label: Parameters<typeof t>[0] }> = [
+  { value: 'today', label: 'filter.today' },
+  { value: 'last7Days', label: 'filter.last7Days' },
+  { value: 'last30Days', label: 'filter.last30Days' },
+  { value: 'all', label: 'filter.allTime' },
+  { value: 'custom', label: 'filter.custom' },
+]
+
+const active = computed(() => hasActiveMemoryFilters(props.modelValue))
+const activeCount = computed(() => getActiveMemoryFilterCount(props.modelValue))
+const activeDateLabel = computed(() => {
+  if (!active.value) return ''
+  if (props.modelValue.datePreset === 'custom') {
+    return `${props.modelValue.dateFrom} ${t('filter.dateSeparator')} ${props.modelValue.dateTo}`
+  }
+  const preset = presets.find((item) => item.value === props.modelValue.datePreset)
+  return preset ? t(preset.label) : ''
+})
+
+const close = (restoreFocus = false) => {
+  open.value = false
+  error.value = ''
+  if (restoreFocus) void nextTick(() => trigger.value?.focus())
+}
+
+const show = () => {
+  draft.value = cloneMemoryFilters(props.modelValue)
+  error.value = ''
+  open.value = true
+}
+
+const toggle = () => {
+  if (open.value) close()
+  else show()
+}
+
+const choosePreset = (preset: MemoryDatePreset) => {
+  error.value = ''
+  if (preset === 'custom') {
+    draft.value = {
+      ...draft.value,
+      datePreset: preset,
+    }
+    return
+  }
+  draft.value = {
+    ...draft.value,
+    ...resolveMemoryDatePreset(preset),
+  }
+}
+
+const apply = () => {
+  if (draft.value.datePreset === 'custom' && (!draft.value.dateFrom || !draft.value.dateTo)) {
+    error.value = t('filter.dateRequired')
+    return
+  }
+  if (draft.value.dateFrom && draft.value.dateTo && draft.value.dateFrom > draft.value.dateTo) {
+    error.value = t('filter.dateOrder')
+    return
+  }
+  emit('apply', cloneMemoryFilters(draft.value))
+  close(true)
+}
+
+const clear = () => {
+  emit('apply', createEmptyMemoryFilters())
+  close(true)
+}
+
+const handlePointerDown = (event: MouseEvent) => {
+  if (open.value && !root.value?.contains(event.target as Node)) close()
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+  if (open.value && event.key === 'Escape') {
+    event.preventDefault()
+    close(true)
+  }
+}
+
+const handleScroll = (event: Event) => {
+  if (open.value && !root.value?.contains(event.target as Node)) close()
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', handlePointerDown)
+  document.addEventListener('keydown', handleKeydown)
+  document.addEventListener('scroll', handleScroll, true)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handlePointerDown)
+  document.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener('scroll', handleScroll, true)
+})
+</script>
+
+<template>
+  <div ref="root" class="memory-filters relative">
+    <button
+      ref="trigger"
+      type="button"
+      class="memory-filters__trigger"
+      :class="{ 'memory-filters__trigger--active': active }"
+      :aria-expanded="open"
+      :aria-controls="panelId"
+      :disabled="loading"
+      @click="toggle"
+    >
+      <FunnelIcon class="h-[18px] w-[18px]" aria-hidden="true" />
+      <span>{{ t('filter.open') }}</span>
+      <span v-if="activeCount" class="memory-filters__count" aria-hidden="true">{{ activeCount }}</span>
+    </button>
+
+    <Transition name="filter-popover">
+      <div
+        v-if="open"
+        :id="panelId"
+        class="memory-filters__panel"
+        role="dialog"
+        aria-modal="false"
+        :aria-label="t('filter.title')"
+      >
+        <div class="memory-filters__heading">
+          <h2>{{ t('filter.open') }}</h2>
+          <button
+            type="button"
+            class="memory-filters__close"
+            :aria-label="t('action.close')"
+            @click="close(true)"
+          >
+            <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div class="memory-filters__body">
+          <fieldset class="memory-filters__group">
+            <legend class="memory-filters__group-label">{{ t('filter.timeRange') }}</legend>
+            <div class="memory-filters__presets">
+              <label v-for="preset in presets" :key="preset.value" class="memory-filters__preset-row">
+                <input
+                  :checked="draft.datePreset === preset.value"
+                  :value="preset.value"
+                  class="memory-filters__preset"
+                  name="memory-date-preset"
+                  type="radio"
+                  @change="choosePreset(preset.value)"
+                />
+                <span class="memory-filters__preset-indicator" aria-hidden="true"></span>
+                <span>{{ t(preset.label) }}</span>
+              </label>
+            </div>
+
+            <div v-if="draft.datePreset === 'custom'" class="memory-filters__dates">
+              <label>
+                <span>{{ t('filter.dateFrom') }}</span>
+                <input v-model="draft.dateFrom" type="date" :aria-invalid="Boolean(error)" @input="error = ''" />
+              </label>
+              <span class="memory-filters__date-separator" aria-hidden="true">{{ t('filter.dateSeparator') }}</span>
+              <label>
+                <span>{{ t('filter.dateTo') }}</span>
+                <input v-model="draft.dateTo" type="date" :aria-invalid="Boolean(error)" @input="error = ''" />
+              </label>
+            </div>
+            <p v-if="error" class="memory-filters__error" role="alert">{{ error }}</p>
+          </fieldset>
+        </div>
+
+        <div class="memory-filters__actions">
+          <button type="button" class="btn-primary" @click="apply">
+            {{ t('filter.apply') }}
+          </button>
+          <button type="button" class="btn-secondary" @click="clear">
+            {{ t('filter.clear') }}
+          </button>
+        </div>
+      </div>
+    </Transition>
+
+    <button
+      v-if="active"
+      type="button"
+      class="memory-filters__tag"
+      :aria-label="t('filter.removeTime')"
+      @click="clear"
+    >
+      <span>{{ activeDateLabel }}</span>
+      <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+    </button>
+  </div>
+</template>
+
+<style scoped>
+.memory-filters {
+  --memory-filter-panel-width: 18.125rem;
+  --memory-filter-option-height: 1.375rem;
+
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.memory-filters__trigger {
+  display: inline-flex;
+  height: 2rem;
+  min-height: 0;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.55rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-primary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.memory-filters__trigger:hover,
+.memory-filters__trigger--active {
+  border-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  background: var(--color-primary-soft);
+}
+
+.memory-filters__trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.memory-filters__count {
+  display: inline-flex;
+  min-width: 1rem;
+  height: 1rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: white;
+  background: var(--color-primary);
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-filters__panel {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: calc(100% + 0.5rem);
+  right: 0;
+  display: flex;
+  width: min(var(--memory-filter-panel-width), calc(100vw - 2.5rem));
+  max-height: min(35rem, calc(100vh - 12rem));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+  box-shadow: var(--shadow-card);
+}
+
+.memory-filters__heading {
+  display: flex;
+  min-height: 3.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+.memory-filters__heading h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.memory-filters__close {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.memory-filters__close:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.memory-filters__close:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.memory-filters__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem 1.25rem 1.125rem;
+  scrollbar-gutter: stable;
+}
+
+.memory-filters__group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.memory-filters__group + .memory-filters__group {
+  margin-top: 1.125rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.memory-filters__group-label {
+  display: block;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+}
+
+.memory-filters__presets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.memory-filters__preset-row {
+  position: relative;
+  display: flex;
+  min-height: var(--memory-filter-option-height);
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 -0.375rem;
+  padding: 0 0.375rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1rem;
+}
+
+.memory-filters__preset {
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.memory-filters__preset-indicator {
+  display: inline-flex;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 1rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.memory-filters__preset:checked + .memory-filters__preset-indicator {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.memory-filters__preset:checked + .memory-filters__preset-indicator::after {
+  content: '';
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border-radius: 50%;
+  background: var(--color-on-primary);
+}
+
+.memory-filters__preset-row:has(.memory-filters__preset:focus-visible) {
+  background: var(--color-primary-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-focus) 26%, transparent);
+}
+
+.memory-filters__dates {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.memory-filters__dates label {
+  display: grid;
+  gap: 0.375rem;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+}
+
+.memory-filters__dates input {
+  min-width: 0;
+  height: 2.25rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  font-size: 0.75rem;
+}
+
+.memory-filters__dates input:focus-visible {
+  border-color: var(--color-focus);
+  outline: 2px solid color-mix(in srgb, var(--color-focus) 24%, transparent);
+  outline-offset: 1px;
+}
+
+.memory-filters__date-separator {
+  padding-bottom: 0.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.625rem;
+}
+
+.memory-filters__error {
+  margin: 0.625rem 0 0;
+  color: var(--color-danger);
+  font-size: 0.75rem;
+}
+
+.memory-filters__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+.memory-filters__actions button {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+}
+
+.memory-filters__actions .btn-primary {
+  box-shadow: none;
+}
+
+.memory-filters__actions .btn-secondary {
+  border-color: transparent;
+  background: var(--color-surface-hover);
+}
+
+.memory-filters__actions .btn-secondary:hover {
+  border-color: var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-hover) 82%, var(--color-border));
+}
+
+.memory-filters__tag {
+  display: inline-flex;
+  min-height: 1.5rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
+  border-radius: var(--radius-sm);
+  color: var(--color-primary-hover);
+  background: var(--color-primary-soft);
+  cursor: pointer;
+  font-size: 0.625rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.memory-filters__tag:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+}
+
+.filter-popover-enter-active,
+.filter-popover-leave-active {
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.filter-popover-enter-from,
+.filter-popover-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+@media (max-width: 520px) {
+  .memory-filters__panel {
+    position: fixed;
+    top: 4.5rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    width: auto;
+    max-height: calc(100vh - 5.25rem);
+  }
+}
+</style>
