@@ -37,6 +37,7 @@ import {
 } from '@/utils/i18n'
 import { createLogger } from '@/utils/logger'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import AppSelect from '@/components/AppSelect.vue'
 
 const logger = createLogger('views/Settings')
 const router = useRouter()
@@ -396,9 +397,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-5 sm:p-6">
+  <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-4 sm:p-5">
     <div class="mx-auto flex h-full min-h-0 max-w-[1420px] flex-col">
-      <header class="mb-5 flex-none">
+      <header class="mb-4 flex-none">
         <h1 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('settings.title') }}</h1>
       </header>
 
@@ -412,7 +413,7 @@ onUnmounted(() => {
             v-for="section in sections"
             :key="section.id"
             type="button"
-            class="flex min-h-12 w-full items-center gap-3 rounded-lg px-3.5 text-left text-sm font-medium transition"
+            class="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition"
             :class="activeSection === section.id
               ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
               : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
@@ -425,12 +426,12 @@ onUnmounted(() => {
         </nav>
 
         <section class="settings-content min-h-0">
-          <header class="flex-none border-b border-[var(--shell-line)] px-6 py-5 sm:px-7">
+          <header class="flex-none border-b border-[var(--shell-line)] px-5 py-3.5 sm:px-6">
             <h2 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t(currentSection.labelKey) }}</h2>
             <p class="mt-1.5 text-sm leading-6 text-[var(--shell-muted)]">{{ t(currentSection.descriptionKey) }}</p>
           </header>
 
-          <div class="settings-content__body min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5 sm:px-7">
+          <div class="settings-content__body min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
             <template v-if="activeSection === 'hotkeys'">
               <div class="setting-row">
                 <div>
@@ -439,7 +440,7 @@ onUnmounted(() => {
                 </div>
                 <button
                   type="button"
-                  class="setting-input flex min-h-11 items-center justify-between text-left"
+                  class="setting-input flex min-h-10 items-center justify-between text-left"
                   :class="{ 'border-[var(--color-primary)] ring-2 ring-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]': recordingHotkey }"
                   @click="recordingHotkey = true"
                   @keydown="recordHotkey"
@@ -471,7 +472,7 @@ onUnmounted(() => {
                 <input v-model.number="clusterThreshold" class="setting-input" type="number" min="1" max="20" />
               </label>
 
-              <div class="rounded-lg border border-[var(--shell-line)] p-4">
+              <div class="rounded-lg border border-[var(--shell-line)] p-3.5">
                 <label class="flex cursor-pointer items-center justify-between gap-4">
                   <span>
                     <span class="setting-label">{{ t('settings.enableCluster') }}</span>
@@ -479,14 +480,14 @@ onUnmounted(() => {
                   </span>
                   <input v-model="clusterMode" type="checkbox" class="h-5 w-5 accent-[var(--color-primary)]" />
                 </label>
-                <div class="mt-4 grid gap-3.5 sm:grid-cols-3" :class="{ 'opacity-50': !clusterMode }">
+                <div class="mt-3.5 grid gap-3 sm:grid-cols-3" :class="{ 'opacity-50': !clusterMode }">
                   <label>
                     <span class="setting-label">{{ t('settings.maxImages') }}</span>
-                    <input v-model.number="clusterMaxImages" class="setting-input mt-2" type="number" min="2" max="20" :disabled="!clusterMode" />
+                    <input v-model.number="clusterMaxImages" class="setting-input mt-1.5" type="number" min="2" max="20" :disabled="!clusterMode" />
                   </label>
                   <label>
                     <span class="setting-label">{{ t('settings.timeoutSeconds') }}</span>
-                    <input v-model.number="clusterTimeout" class="setting-input mt-2" type="number" min="1" max="120" :disabled="!clusterMode" />
+                    <input v-model.number="clusterTimeout" class="setting-input mt-1.5" type="number" min="1" max="120" :disabled="!clusterMode" />
                   </label>
                   <label class="flex items-center gap-3 pt-8">
                     <input v-model="clusterAutoSubmit" type="checkbox" class="h-5 w-5 accent-[var(--color-primary)]" :disabled="!clusterMode" />
@@ -560,7 +561,7 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <div class="rounded-lg border border-[color-mix(in_srgb,var(--color-primary)_20%,transparent)] bg-[var(--color-primary-soft)] p-4">
+              <div class="rounded-lg border border-[color-mix(in_srgb,var(--color-primary)_20%,transparent)] bg-[var(--color-primary-soft)] p-3.5">
                 <div class="flex items-center gap-2 text-sm font-semibold text-[var(--color-primary-hover)]">
                   <CpuChipIcon class="h-5 w-5 flex-none" aria-hidden="true" />
                   {{ t('settings.localOcr') }}
@@ -577,7 +578,7 @@ onUnmounted(() => {
             <template v-else-if="activeSection === 'ui'">
               <fieldset>
                 <legend class="setting-label">{{ t('settings.theme') }}</legend>
-                <div class="mt-3 grid grid-cols-3 gap-3">
+                <div class="mt-2.5 grid grid-cols-3 gap-2.5">
                   <label
                     v-for="option in [
                       { value: 'light', label: t('settings.themeLight') },
@@ -585,7 +586,7 @@ onUnmounted(() => {
                       { value: 'system', label: t('settings.themeSystem') },
                     ]"
                     :key="option.value"
-                    class="cursor-pointer rounded-lg border p-3.5 text-center text-sm font-medium transition"
+                    class="cursor-pointer rounded-lg border p-2.5 text-center text-sm font-medium transition"
                     :class="themePreference === option.value ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]' : 'border-[var(--shell-line)]'"
                   >
                     <input v-model="themePreference" class="sr-only" type="radio" :value="option.value" />
@@ -593,26 +594,36 @@ onUnmounted(() => {
                   </label>
                 </div>
               </fieldset>
-              <label class="setting-row">
-                <span class="setting-label">{{ t('settings.language') }}</span>
-                <select v-model="language" class="setting-input">
-                  <option value="zh-CN">{{ t('settings.languageZh') }}</option>
-                  <option value="en-US">{{ t('settings.languageEn') }}</option>
-                </select>
-              </label>
-              <label class="setting-row">
-                <span class="setting-label">{{ t('settings.closeAction') }}</span>
-                <select v-model="closeAction" class="setting-input">
-                  <option value="ask">{{ t('settings.closeAsk') }}</option>
-                  <option value="minimize">{{ t('settings.closeMinimize') }}</option>
-                  <option value="exit">{{ t('settings.closeExit') }}</option>
-                </select>
-              </label>
+              <div class="setting-row">
+                <label id="settings-language-label" for="settings-language" class="setting-label">{{ t('settings.language') }}</label>
+                <AppSelect
+                  id="settings-language"
+                  v-model="language"
+                  aria-labelledby="settings-language-label"
+                  :options="[
+                    { value: 'zh-CN', label: t('settings.languageZh') },
+                    { value: 'en-US', label: t('settings.languageEn') },
+                  ]"
+                />
+              </div>
+              <div class="setting-row">
+                <label id="settings-close-action-label" for="settings-close-action" class="setting-label">{{ t('settings.closeAction') }}</label>
+                <AppSelect
+                  id="settings-close-action"
+                  v-model="closeAction"
+                  aria-labelledby="settings-close-action-label"
+                  :options="[
+                    { value: 'ask', label: t('settings.closeAsk') },
+                    { value: 'minimize', label: t('settings.closeMinimize') },
+                    { value: 'exit', label: t('settings.closeExit') },
+                  ]"
+                />
+              </div>
             </template>
 
             <template v-else>
               <div class="maintenance-card">
-                <div class="flex items-start gap-4">
+                <div class="flex items-start gap-3.5">
                   <CircleStackIcon class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.semanticIndex') }}</h3>
@@ -645,7 +656,7 @@ onUnmounted(() => {
               </div>
 
               <div class="maintenance-card">
-                <div class="flex items-start gap-4">
+                <div class="flex items-start gap-3.5">
                   <CpuChipIcon class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.ocrBackfill') }}</h3>
@@ -679,7 +690,7 @@ onUnmounted(() => {
             </template>
           </div>
 
-          <footer class="flex flex-none flex-wrap items-center justify-between gap-3 border-t border-[var(--shell-line)] px-6 py-4 sm:px-7">
+          <footer class="flex flex-none flex-wrap items-center justify-between gap-2.5 border-t border-[var(--shell-line)] px-5 py-2.5 sm:px-6">
             <button type="button" class="min-h-10 rounded-md px-3 text-sm font-medium text-red-600 hover:bg-red-50" @click="openConfirmation('reset')">
               {{ t('action.reset') }}
             </button>
@@ -727,7 +738,7 @@ onUnmounted(() => {
   min-height: 0;
   grid-template-columns: 250px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .settings-page {
@@ -745,9 +756,9 @@ onUnmounted(() => {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: .375rem;
+  gap: .25rem;
   border-radius: var(--radius-xl);
-  padding: .75rem;
+  padding: .5rem;
 }
 
 .settings-content {
@@ -763,7 +774,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(260px, 1fr);
   align-items: center;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .setting-label {
@@ -775,20 +786,20 @@ onUnmounted(() => {
 
 .setting-help {
   display: block;
-  margin-top: .375rem;
+  margin-top: .25rem;
   font-size: .75rem;
-  line-height: 1.25rem;
+  line-height: 1.125rem;
   color: var(--shell-muted);
 }
 
 .setting-input,
 .setting-readonly {
   width: 100%;
-  min-height: 2.625rem;
+  min-height: 2.5rem;
   border: 1px solid var(--shell-line);
   border-radius: var(--radius-md);
   background: var(--shell-control-bg);
-  padding: .55rem .85rem;
+  padding: .45rem .75rem;
   color: var(--shell-ink);
   outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease;
@@ -807,7 +818,7 @@ onUnmounted(() => {
 .maintenance-card {
   border: 1px solid var(--shell-line);
   border-radius: var(--radius-lg);
-  padding: 1rem;
+  padding: .875rem;
 }
 
 @media (max-width: 900px) {
@@ -816,8 +827,9 @@ onUnmounted(() => {
   }
 
   .settings-layout {
+    flex: none;
     grid-template-columns: 1fr;
-    grid-template-rows: none;
+    grid-template-rows: auto auto;
   }
 
   .settings-nav {
