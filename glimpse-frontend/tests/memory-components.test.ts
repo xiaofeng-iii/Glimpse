@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import type { Memory } from '@/api/client'
 import MemoryCard from '@/components/MemoryCard.vue'
+import MemoryWall from '@/components/MemoryWall.vue'
 import MediaGallery from '@/components/MediaGallery.vue'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 import SearchToolbar from '@/components/SearchToolbar.vue'
@@ -11,6 +12,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
+import { setLanguagePreference } from '@/utils/i18n'
 import { ONBOARDING_REQUEST_EVENT } from '@/utils/onboarding'
 
 const apiMocks = vi.hoisted(() => ({
@@ -45,6 +47,7 @@ describe('memory components', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setActivePinia(createPinia())
+    setLanguagePreference('zh-CN')
   })
 
   it('shows exact and semantic badges for each search match combination only', async () => {
@@ -99,8 +102,75 @@ describe('memory components', () => {
     expect(buttons).toHaveLength(3)
     expect(buttons.map((button) => button.attributes('aria-pressed'))).toEqual(['true', 'false', 'false'])
     for (const button of buttons) {
-      expect(button.classes()).toEqual(expect.arrayContaining(['h-9', 'min-h-0']))
+      expect(button.classes()).toEqual(expect.arrayContaining(['h-7', 'min-h-0']))
     }
+  })
+
+  it('presents the compact search modes as one group before separated actions', () => {
+    const wrapper = mount(SearchToolbar)
+    const layout = wrapper.get('.search-toolbar__layout')
+    const group = wrapper.get('.search-toolbar__source-switcher')
+    const actions = wrapper.get('.search-toolbar__actions')
+    const labels = group.findAll('.search-toolbar__source-button').map((button) => button.text())
+
+    expect(layout.exists()).toBe(true)
+    expect(group.attributes('aria-label')).toBe('搜索模式')
+    expect(labels).toEqual(['综合', '精确', '语义'])
+    expect(actions.element.previousElementSibling).toBe(group.element)
+    expect(actions.element.lastElementChild).toBe(actions.get('.capture-button').element)
+  })
+
+  it('keeps compact search modes clear in English', () => {
+    setLanguagePreference('en-US')
+    const wrapper = mount(SearchToolbar)
+    const group = wrapper.get('.search-toolbar__source-switcher')
+
+    expect(group.attributes('aria-label')).toBe('Search mode')
+    expect(group.findAll('.search-toolbar__source-button').map((button) => button.text()))
+      .toEqual(['All', 'Exact', 'Semantic'])
+  })
+
+  it('shares capture styling and disabled or busy state across toolbar and empty wall', async () => {
+    const toolbar = mount(SearchToolbar, {
+      props: { capturing: true, captureDisabled: false },
+    })
+    const toolbarCapture = toolbar.get<HTMLButtonElement>('.capture-button')
+    const busyToolbarText = toolbarCapture.text()
+
+    expect(toolbarCapture.attributes('aria-busy')).toBe('true')
+    expect(toolbarCapture.attributes('aria-label')).toBe('截图，处理中...')
+    expect(toolbarCapture.element.disabled).toBe(true)
+    expect(toolbarCapture.find('.animate-spin').exists()).toBe(true)
+    expect(toolbarCapture.classes()).toEqual(expect.arrayContaining(['h-9', 'min-h-0']))
+    expect(busyToolbarText).toContain('截图')
+
+    await toolbar.setProps({ capturing: false })
+    expect(toolbarCapture.attributes('aria-busy')).toBe('false')
+    expect(toolbarCapture.attributes('aria-label')).toBeUndefined()
+    expect(toolbarCapture.element.disabled).toBe(false)
+    expect(toolbarCapture.text()).toBe(busyToolbarText)
+
+    const wall = mount(MemoryWall, {
+      props: {
+        memories: [],
+        total: 0,
+        capturing: true,
+        captureDisabled: false,
+      },
+    })
+    const emptyCapture = wall.get<HTMLButtonElement>('.capture-button')
+
+    expect(wall.get('.memory-wall__capture-icon').exists()).toBe(true)
+    expect(emptyCapture.attributes('aria-busy')).toBe('true')
+    expect(emptyCapture.attributes('aria-label')).toBe('截图，处理中...')
+    expect(emptyCapture.element.disabled).toBe(true)
+    expect(emptyCapture.find('.animate-spin').exists()).toBe(true)
+    expect(emptyCapture.classes()).toContain('h-11')
+
+    await wall.setProps({ capturing: false, captureDisabled: true })
+    expect(emptyCapture.attributes('aria-busy')).toBe('false')
+    expect(emptyCapture.element.disabled).toBe(true)
+    expect(emptyCapture.text()).toContain('截图')
   })
 
   it('closes the DEV panel before requesting the onboarding guide', async () => {

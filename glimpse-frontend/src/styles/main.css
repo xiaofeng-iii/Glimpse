@@ -492,25 +492,34 @@ button {
   box-shadow: 0 2px 8px rgba(217, 96, 28, 0.16);
 }
 
-.btn-primary:hover,
-.capture-button:hover {
+.btn-primary:not(:disabled):hover,
+.capture-button:not(:disabled):hover {
   box-shadow: 0 4px 12px var(--shell-primary-shadow-hover);
 }
 
-.btn-primary:hover {
+.btn-primary:not(:disabled):hover {
   background: var(--color-primary-hover);
 }
 
-.capture-button:hover {
+.capture-button:not(:disabled):hover {
   background: var(--color-accent-hover);
   box-shadow: 0 4px 12px rgba(217, 96, 28, 0.22);
 }
 
-.btn-primary:disabled,
-.capture-button:disabled {
+.btn-primary:disabled {
   opacity: 0.7;
   cursor: wait;
   transform: none;
+}
+
+.capture-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.capture-button[aria-busy='true'] {
+  cursor: wait;
 }
 
 .btn-secondary {

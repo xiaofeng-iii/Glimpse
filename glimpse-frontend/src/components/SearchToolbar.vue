@@ -2,7 +2,6 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import {
   AdjustmentsHorizontalIcon,
-  CameraIcon,
   MagnifyingGlassIcon,
   QuestionMarkCircleIcon,
   ArrowPathIcon,
@@ -12,6 +11,7 @@ import type { SearchOptions } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { t } from '@/utils/i18n'
 import { requestOnboarding } from '@/utils/onboarding'
+import CaptureButton from './CaptureButton.vue'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
@@ -145,9 +145,9 @@ defineExpose({ focus, clear })
 </script>
 
 <template>
-  <section class="border-b border-[var(--shell-line)] bg-[var(--shell-frame-bg)] px-5 py-3">
-    <div class="flex flex-wrap items-center gap-2.5">
-      <div class="relative min-w-[260px] flex-1">
+  <section class="border-b border-[var(--shell-line)] bg-[var(--shell-frame-bg)] px-5 py-2">
+    <div class="search-toolbar__layout">
+      <div class="search-toolbar__input relative min-w-0">
         <MagnifyingGlassIcon
           class="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--shell-muted)]"
           aria-hidden="true"
@@ -156,7 +156,7 @@ defineExpose({ focus, clear })
           ref="searchInput"
           v-model="query"
           type="search"
-          class="h-11 w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[display:none]"
+          class="h-9 w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[display:none]"
           :placeholder="t('search.placeholder')"
           @keydown.esc.stop.prevent="clear"
         />
@@ -177,7 +177,7 @@ defineExpose({ focus, clear })
       </div>
 
       <div
-        class="search-toolbar__source-switcher inline-grid h-11 grid-flow-col auto-cols-fr items-center rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-[3px]"
+        class="search-toolbar__source-switcher inline-grid h-9 grid-flow-col auto-cols-fr items-center rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-[3px]"
         role="group"
         :aria-label="t('search.sourceLabel')"
       >
@@ -185,7 +185,7 @@ defineExpose({ focus, clear })
           v-for="item in sources"
           :key="item.value"
           type="button"
-          class="search-toolbar__source-button h-9 min-h-0 rounded-md px-3.5 text-sm font-medium transition"
+          class="search-toolbar__source-button h-7 min-h-0 rounded-md px-3 text-sm font-medium transition"
           :class="source === item.value
             ? 'bg-[var(--color-primary)] text-white shadow-sm'
             : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
@@ -196,10 +196,10 @@ defineExpose({ focus, clear })
         </button>
       </div>
 
-      <div class="toolbar-actions flex shrink-0 items-center gap-2.5">
+      <div class="search-toolbar__actions flex shrink-0 items-center gap-2.5">
         <button
           type="button"
-          class="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:opacity-50"
+          class="inline-flex h-9 min-h-0 w-9 items-center justify-center rounded-lg border border-[var(--shell-line)] bg-[var(--shell-control-bg)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:opacity-50"
           :aria-label="t('action.refresh')"
           :disabled="refreshing"
           @click="emit('refresh')"
@@ -215,7 +215,7 @@ defineExpose({ focus, clear })
           @toggle="handleDebugToggle"
         >
           <summary
-            class="flex h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
+            class="flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
             :aria-label="t('search.debugTitle')"
           >
             <AdjustmentsHorizontalIcon class="h-4 w-4 flex-none" aria-hidden="true" />
@@ -265,29 +265,74 @@ defineExpose({ focus, clear })
           </div>
         </details>
 
-        <button
-          type="button"
-          class="capture-button inline-flex h-11 items-center gap-2 rounded-lg px-4 font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-55"
-          :disabled="capturing || captureDisabled"
-          @click="emit('capture')"
-        >
-          <CameraIcon class="h-5 w-5" aria-hidden="true" />
-          {{ capturing ? t('action.processing') : t('action.capture') }}
-          <kbd class="capture-shortcut rounded-md bg-white/18 px-1.5 py-0.5 text-xs">{{ captureShortcutLabel }}</kbd>
-        </button>
+        <CaptureButton
+          :capturing="capturing"
+          :disabled="captureDisabled"
+          :shortcut-label="captureShortcutLabel"
+          density="toolbar"
+          show-shortcut
+          @capture="emit('capture')"
+        />
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-@media (max-width: 1024px) {
-  .capture-button {
-    padding-inline: 1rem;
+.search-toolbar__layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 13.5rem auto;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.search-toolbar__source-switcher {
+  width: 13.5rem;
+}
+
+.search-toolbar__actions {
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--shell-line);
+}
+
+@media (max-width: 724px) {
+  .search-toolbar__layout {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .capture-shortcut {
-    display: none;
+  .search-toolbar__input {
+    grid-column: 1 / -1;
+  }
+
+  .search-toolbar__source-switcher {
+    grid-column: 1;
+    width: 12rem;
+  }
+
+  .search-toolbar__actions {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    padding-left: 0.625rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .search-toolbar__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .search-toolbar__source-switcher {
+    grid-column: 1;
+    width: 100%;
+  }
+
+  .search-toolbar__actions {
+    grid-column: 1;
+    grid-row: 3;
+    justify-self: end;
+    padding-left: 0;
+    border-left: 0;
   }
 }
 </style>

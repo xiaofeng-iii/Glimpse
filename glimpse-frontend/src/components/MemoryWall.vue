@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { CameraIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { languagePreference, t } from '@/utils/i18n'
+import CaptureButton from './CaptureButton.vue'
 import MemoryCard from './MemoryCard.vue'
 import LoadingSpinner from './LoadingSpinner.vue'
 
@@ -13,6 +14,8 @@ const props = defineProps<{
   selectedId?: string | null
   query?: string
   showSearchDebug?: boolean
+  capturing?: boolean
+  captureDisabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -83,7 +86,12 @@ const groups = computed<MemoryGroup[]>(() => {
     </div>
 
     <div v-else-if="!memories.length" class="flex min-h-[52vh] flex-col items-center justify-center text-center">
-      <div class="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
+      <div
+        class="flex h-14 w-14 items-center justify-center rounded-xl"
+        :class="searching
+          ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+          : 'memory-wall__capture-icon'"
+      >
         <MagnifyingGlassIcon v-if="searching" class="h-7 w-7" aria-hidden="true" />
         <CameraIcon v-else class="h-7 w-7" aria-hidden="true" />
       </div>
@@ -93,10 +101,13 @@ const groups = computed<MemoryGroup[]>(() => {
       <p class="mt-1.5 max-w-sm text-sm leading-6 text-[var(--shell-muted)]">
         {{ searching ? t('memory.noSearchResultsHint') : t('memory.emptyHint') }}
       </p>
-      <button v-if="!searching" type="button" class="btn-primary mt-4 min-h-10" @click="emit('capture')">
-        <CameraIcon class="h-5 w-5" aria-hidden="true" />
-        {{ t('action.capture') }}
-      </button>
+      <CaptureButton
+        v-if="!searching"
+        class="mt-4"
+        :capturing="capturing"
+        :disabled="captureDisabled"
+        @capture="emit('capture')"
+      />
     </div>
 
     <div v-else class="space-y-5">
@@ -124,6 +135,11 @@ const groups = computed<MemoryGroup[]>(() => {
 <style scoped>
 .memory-wall-scroll {
   container-type: inline-size;
+}
+
+.memory-wall__capture-icon {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
 }
 
 .memory-grid {
