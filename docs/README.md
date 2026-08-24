@@ -14,7 +14,8 @@
 
 Glimpse 是一个桌面记忆助手。用户通过快捷键或界面按钮截取屏幕，系统先在
 本地识别文字，再按配置调用多模态 AI 生成摘要，并在本地保存事实记录与建立
-索引；之后用户可以通过关键词或自然语言找回记忆。首次启动时，界面会展示
+索引；用户也可以直接输入纯文本建立记忆，无需截图、OCR 或 AI 分析。之后用户
+可以通过关键词或自然语言找回两类记忆。首次启动时，界面会展示
 截图、自动整理和搜索的三步使用指引。
 
 产品设计围绕四个原则：
@@ -80,14 +81,34 @@ FastAPI / Python
 已经保存，即使向量化或 ChromaDB 写入失败，也会广播 `memory_saved`；消费者
 应通过 `sync_status` 判断语义索引是否可用，不能把该事件等同于索引成功。
 
-### 3.2 集群记忆
+### 3.2 纯文本记忆
+
+```text
+首页“添加记忆”
+→ POST /api/memories 提交用户输入
+→ MemoryService 跳过截图、OCR 与 AI 分析
+→ SQLite 以 memory_type=text、PENDING 状态保存事实记录
+→ EmbeddingClient 对正文生成本地中文向量
+→ ChromaDB 写入派生向量索引
+→ SQLite 将 sync_status 更新为 SYNCED 或 FAILED
+→ Vue 将记录加入记忆墙并显示文本卡片
+```
+
+纯文本正文保存在 `ai_summary` 所代表的主内容字段中，`text_content` 保持为空，
+避免被误认为 OCR 识别结果。详情页和侧边检查器不会为这类记忆渲染图片或 OCR
+模块，也不额外显示内容类型标签；精确搜索仍由 SQLite FTS/LIKE 完成，语义搜索
+复用同一向量索引链路。`GET /api/memories` 与 `GET /api/search` 都接受
+`memory_type=screenshot|text`，首页“内容类型”筛选会同时约束浏览、精确、语义和
+混合检索结果。
+
+### 3.3 集群记忆
 
 集群模式将多张连续截图合并为一条记忆。达到图片数量上限时总会提交；等待
 超时后仅在 `cluster_auto_submit` 开启时自动提交，否则继续等待用户手动提交。
 提交后，`MemoryService.create_cluster_memory*()` 先识别全部图片文字，再按配置
 调用多图 AI；第一张图作为主图，其余图片记录在 `extra_images`。
 
-### 3.3 搜索
+### 3.4 搜索
 
 `SearchService.search()` 支持：
 
@@ -100,7 +121,7 @@ FastAPI / Python
 语义向量使用 `BAAI/bge-small-zh-v1.5`，首次使用时延迟加载。返回记录通过
 `match_sources` 标记“精确”和“语义”来源。
 
-### 3.4 记忆管理
+### 3.5 记忆管理
 
 当前界面支持记忆列表、图片缩略图、详情、原图预览、复制摘要、编辑摘要和
 删除。摘要更新后，SQLite 记录先进入 `PENDING`，后台再串行重建向量索引并
