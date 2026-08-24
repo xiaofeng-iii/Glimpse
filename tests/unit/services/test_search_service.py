@@ -194,6 +194,36 @@ class TestSearchServiceSearch:
         assert "语义" in results[0].match_sources
         assert "精确" not in results[0].match_sources
 
+    def test_semantic_date_filter_is_applied_inside_the_vector_query(
+        self,
+        mock_services,
+    ):
+        from services.search_service import SearchService
+
+        mock_services["sqlite_manager"].get_memory_ids.return_value = [
+            "in-range-1",
+            "in-range-2",
+        ]
+        mock_services["chroma_manager"].search_similar.return_value = []
+
+        results = SearchService(**mock_services).search(
+            "test",
+            source_filter="semantic",
+            created_after="2026-08-01 00:00:00",
+            created_before="2026-08-25 00:00:00",
+        )
+
+        assert results == []
+        mock_services["sqlite_manager"].get_memory_ids.assert_called_once_with(
+            created_after="2026-08-01 00:00:00",
+            created_before="2026-08-25 00:00:00",
+        )
+        mock_services["chroma_manager"].search_similar.assert_called_once_with(
+            mock_services["embedding_client"].get_embedding.return_value,
+            n_results=40,
+            where={"memory_id": {"$in": ["in-range-1", "in-range-2"]}},
+        )
+
     @pytest.mark.parametrize("sync_status", ["PENDING", "FAILED"])
     def test_semantic_search_ignores_unsynced_vectors(
         self,

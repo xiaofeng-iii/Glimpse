@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -44,6 +45,53 @@ def test_patch_memory_returns_canonical_record_without_duplicate_broadcast():
         "memory-1",
         "updated",
     )
+
+
+def test_list_memories_forwards_inclusive_date_filters_and_filtered_total():
+    from api.routes.memories import list_memories
+
+    search_service = MagicMock()
+    search_service.get_recent_memories.return_value = [make_memory()]
+    search_service.get_recent_memories_count.return_value = 1
+
+    with patch("api.routes.memories.get_search_service", return_value=search_service):
+        response = asyncio.run(
+            list_memories(
+                limit=100,
+                offset=0,
+                date_from=date(2026, 8, 1),
+                date_to=date(2026, 8, 24),
+            )
+        )
+
+    assert response.total == 1
+    search_service.get_recent_memories.assert_called_once_with(
+        limit=100,
+        offset=0,
+        created_after="2026-08-01 00:00:00",
+        created_before="2026-08-25 00:00:00",
+    )
+    search_service.get_recent_memories_count.assert_called_once_with(
+        created_after="2026-08-01 00:00:00",
+        created_before="2026-08-25 00:00:00",
+    )
+
+
+def test_list_memories_preserves_a_reversed_range_as_422():
+    from api.routes.memories import list_memories
+
+    with patch("api.routes.memories.get_search_service", return_value=MagicMock()):
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(
+                list_memories(
+                    limit=100,
+                    offset=0,
+                    date_from=date(2026, 8, 24),
+                    date_to=date(2026, 8, 1),
+                )
+            )
+
+    assert error.value.status_code == 422
 
 
 def test_patch_memory_missing_returns_404():

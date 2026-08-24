@@ -186,27 +186,82 @@ class SQLiteManager:
             return MemoryRecord.from_row(row)
         return None
 
-    def get_all_memories(self, limit: int = 100, offset: int = 0) -> List[MemoryRecord]:
+    @staticmethod
+    def _memory_filter_clause(
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+    ) -> tuple[str, List[str]]:
+        clauses = []
+        params = []
+        if created_after:
+            clauses.append("m.created_at >= ?")
+            params.append(created_after)
+        if created_before:
+            clauses.append("m.created_at < ?")
+            params.append(created_before)
+        return (" AND ".join(clauses), params)
+
+    def get_all_memories(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+    ) -> List[MemoryRecord]:
         cursor = self._conn.cursor()
+        filter_clause, filter_params = self._memory_filter_clause(
+            created_after,
+            created_before,
+        )
+        where_sql = f"WHERE {filter_clause}" if filter_clause else ""
         cursor.execute(
-            "SELECT * FROM memories ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            (limit, offset),
+            f"SELECT m.* FROM memories m {where_sql} "
+            "ORDER BY m.created_at DESC LIMIT ? OFFSET ?",
+            (*filter_params, limit, offset),
         )
         rows = cursor.fetchall()
         return [MemoryRecord.from_row(row) for row in rows]
 
-    def search_memories(self, query: str, limit: int = 20) -> List[MemoryRecord]:
+    def get_memory_ids(
+        self,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+    ) -> List[str]:
         cursor = self._conn.cursor()
+        filter_clause, filter_params = self._memory_filter_clause(
+            created_after,
+            created_before,
+        )
+        where_sql = f"WHERE {filter_clause}" if filter_clause else ""
+        cursor.execute(
+            f"SELECT m.id FROM memories m {where_sql} ORDER BY m.created_at DESC",
+            filter_params,
+        )
+        return [row[0] for row in cursor.fetchall()]
+
+    def search_memories(
+        self,
+        query: str,
+        limit: int = 20,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+    ) -> List[MemoryRecord]:
+        cursor = self._conn.cursor()
+        filter_clause, filter_params = self._memory_filter_clause(
+            created_after,
+            created_before,
+        )
+        filter_sql = f" AND {filter_clause}" if filter_clause else ""
         try:
             cursor.execute(
-                """
+                f"""
                 SELECT m.* FROM memories m
                 JOIN memories_fts fts ON m.rowid = fts.rowid
-                WHERE memories_fts MATCH ?
+                WHERE memories_fts MATCH ?{filter_sql}
                 ORDER BY rank
                 LIMIT ?
                 """,
-                (query, limit),
+                (query, *filter_params, limit),
             )
             rows = cursor.fetchall()
             if rows:
@@ -215,13 +270,13 @@ class SQLiteManager:
             pass
 
         cursor.execute(
-            """
+            f"""
             SELECT m.* FROM memories m
-            WHERE m.ai_summary LIKE ? OR m.text_content LIKE ?
+            WHERE (m.ai_summary LIKE ? OR m.text_content LIKE ?){filter_sql}
             ORDER BY m.created_at DESC
             LIMIT ?
             """,
-            (f"%{query}%", f"%{query}%", limit),
+            (f"%{query}%", f"%{query}%", *filter_params, limit),
         )
         rows = cursor.fetchall()
         return [MemoryRecord.from_row(row) for row in rows]
@@ -341,9 +396,21 @@ class SQLiteManager:
                 logger.error("Delete memory error: %s", e)
                 return False
 
-    def get_memories_count(self) -> int:
+    def get_memories_count(
+        self,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+    ) -> int:
         cursor = self._conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM memories")
+        filter_clause, filter_params = self._memory_filter_clause(
+            created_after,
+            created_before,
+        )
+        where_sql = f"WHERE {filter_clause}" if filter_clause else ""
+        cursor.execute(
+            f"SELECT COUNT(*) FROM memories m {where_sql}",
+            filter_params,
+        )
         return cursor.fetchone()[0]
 
     def get_unsynced_memories_count(self) -> int:

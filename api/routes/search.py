@@ -2,9 +2,11 @@
 Search Routes - Search functionality
 """
 from fastapi import APIRouter, HTTPException, Query
+from datetime import date
 
 from api.schemas import SearchResult, MemoryResponse
 from api.dependencies import get_search_service, get_task_queue
+from api.memory_filters import normalize_memory_date_range
 
 router = APIRouter(prefix="/search", tags=["search"])
 SEARCH_WARMUP_TASK_ID = "semantic_search_warmup"
@@ -72,24 +74,37 @@ async def search(
     ),
     rrf_k: int = Query(60, ge=1, le=200, description="RRF rank constant"),
     debug: bool = Query(False, description="Include development search scores"),
+    date_from: date | None = None,
+    date_to: date | None = None,
 ):
     """Search memories by query"""
     try:
         search_service = get_search_service()
+        bounds = normalize_memory_date_range(date_from, date_to)
+        search_options = {
+            "limit": limit,
+            "source_filter": source,
+            "semantic_threshold": semantic_threshold,
+            "candidate_multiplier": candidate_multiplier,
+            "rrf_k": rrf_k,
+            "include_debug": debug,
+        }
+        if bounds.created_after or bounds.created_before:
+            search_options.update(
+                created_after=bounds.created_after,
+                created_before=bounds.created_before,
+            )
         memories = search_service.search(
             q,
-            limit=limit,
-            source_filter=source,
-            semantic_threshold=semantic_threshold,
-            candidate_multiplier=candidate_multiplier,
-            rrf_k=rrf_k,
-            include_debug=debug,
+            **search_options,
         )
         return SearchResult(
             memories=[MemoryResponse(**memory_to_response(m)) for m in memories],
             query=q,
             source=source,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

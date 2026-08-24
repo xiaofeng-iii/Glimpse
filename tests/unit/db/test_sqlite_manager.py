@@ -215,6 +215,47 @@ class TestSQLiteManagerQuery:
         assert len(results) == 2
         mgr.close()
 
+    def test_filters_memories_by_inclusive_local_date_range(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager, MemoryRecord
+
+        mgr = SQLiteManager(mock_path_manager)
+        for memory_id, created_at in [
+            ("before", "2026-07-31 23:59:59"),
+            ("start", "2026-08-01 00:00:00"),
+            ("end", "2026-08-24 23:59:59"),
+            ("after", "2026-08-25 00:00:00"),
+        ]:
+            mgr.insert_memory(
+                MemoryRecord(
+                    id=memory_id,
+                    created_at=created_at,
+                    image_path="/img.png",
+                    ai_summary="filter me",
+                    app_name="test",
+                )
+            )
+
+        results = mgr.get_all_memories(
+            limit=10,
+            created_after="2026-08-01 00:00:00",
+            created_before="2026-08-25 00:00:00",
+        )
+        assert [memory.id for memory in results] == ["end", "start"]
+        assert mgr.get_memories_count(
+            created_after="2026-08-01 00:00:00",
+            created_before="2026-08-25 00:00:00",
+        ) == 2
+        assert mgr.get_memory_ids(
+            created_after="2026-08-01 00:00:00",
+            created_before="2026-08-25 00:00:00",
+        ) == ["end", "start"]
+        assert [memory.id for memory in mgr.search_memories(
+            "filter",
+            created_after="2026-08-01 00:00:00",
+            created_before="2026-08-25 00:00:00",
+        )] == ["start", "end"]
+        mgr.close()
+
 
 class TestSQLiteManagerSearch:
     def test_search_memories_text(self, mock_path_manager):

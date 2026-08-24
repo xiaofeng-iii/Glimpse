@@ -69,9 +69,15 @@ class SearchService:
         candidate_multiplier: int = 2,
         rrf_k: Optional[int] = None,
         include_debug: bool = False,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
     ) -> List:
         if not query.strip():
-            return self.get_recent_memories(limit=limit)
+            return self.get_recent_memories(
+                limit=limit,
+                created_after=created_after,
+                created_before=created_before,
+            )
 
         threshold = (
             self._semantic_threshold
@@ -92,7 +98,13 @@ class SearchService:
             mode = "hybrid"
 
         if mode == "text":
-            return self._search_text(query, limit, include_debug)
+            return self._search_text(
+                query,
+                limit,
+                include_debug,
+                created_after,
+                created_before,
+            )
         elif mode == "vector":
             return self._search_vector(
                 query,
@@ -100,6 +112,8 @@ class SearchService:
                 threshold,
                 candidate_multiplier,
                 include_debug,
+                created_after,
+                created_before,
             )
         else:
             return self._search_hybrid(
@@ -109,6 +123,8 @@ class SearchService:
                 candidate_multiplier,
                 fusion_rrf_k,
                 include_debug,
+                created_after,
+                created_before,
             )
 
     @staticmethod
@@ -136,8 +152,62 @@ class SearchService:
             else None
         )
 
-    def _search_text(self, query: str, limit: int, include_debug: bool) -> List:
-        results = self._sqlite_manager.search_memories(query, limit=limit)
+    def _search_memory_records(
+        self,
+        query: str,
+        limit: int,
+        created_after: Optional[str],
+        created_before: Optional[str],
+    ) -> List:
+        if created_after or created_before:
+            return self._sqlite_manager.search_memories(
+                query,
+                limit=limit,
+                created_after=created_after,
+                created_before=created_before,
+            )
+        return self._sqlite_manager.search_memories(query, limit=limit)
+
+    @staticmethod
+    def _memory_matches_date_range(
+        memory,
+        created_after: Optional[str],
+        created_before: Optional[str],
+    ) -> bool:
+        return not (
+            (created_after and memory.created_at < created_after)
+            or (created_before and memory.created_at >= created_before)
+        )
+
+    def _build_vector_date_filter(
+        self,
+        created_after: Optional[str],
+        created_before: Optional[str],
+    ) -> tuple[Optional[Dict], bool]:
+        if not created_after and not created_before:
+            return None, True
+        memory_ids = self._sqlite_manager.get_memory_ids(
+            created_after=created_after,
+            created_before=created_before,
+        )
+        if not memory_ids:
+            return None, False
+        return {"memory_id": {"$in": memory_ids}}, True
+
+    def _search_text(
+        self,
+        query: str,
+        limit: int,
+        include_debug: bool,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+    ) -> List:
+        results = self._search_memory_records(
+            query,
+            limit,
+            created_after,
+            created_before,
+        )
         for rank, memory in enumerate(results, start=1):
             self._set_search_metadata(
                 memory,
@@ -155,15 +225,23 @@ class SearchService:
         semantic_threshold: float,
         candidate_multiplier: int,
         include_debug: bool,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
     ) -> List:
         embedding = self._embedding_client.get_embedding(query)
         if not embedding:
             return []
 
-        results = self._chroma_manager.search_similar(
-            embedding,
-            n_results=limit * candidate_multiplier,
+        vector_where, has_date_candidates = self._build_vector_date_filter(
+            created_after,
+            created_before,
         )
+        if not has_date_candidates:
+            return []
+        vector_options = {"n_results": limit * candidate_multiplier}
+        if vector_where:
+            vector_options["where"] = vector_where
+        results = self._chroma_manager.search_similar(embedding, **vector_options)
         if not results:
             return []
 
@@ -177,7 +255,15 @@ class SearchService:
                 continue
 
             memory = self._sqlite_manager.get_memory_by_id(mem_id)
-            if memory and memory.sync_status == "SYNCED":
+            if (
+                memory
+                and memory.sync_status == "SYNCED"
+                and self._memory_matches_date_range(
+                    memory,
+                    created_after,
+                    created_before,
+                )
+            ):
                 self._set_search_metadata(
                     memory,
                     ["语义"],
@@ -200,9 +286,16 @@ class SearchService:
         candidate_multiplier: int,
         rrf_k: int,
         include_debug: bool,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
     ) -> List:
         candidate_limit = limit * candidate_multiplier
-        text_results = self._sqlite_manager.search_memories(query, limit=candidate_limit)
+        text_results = self._search_memory_records(
+            query,
+            candidate_limit,
+            created_after,
+            created_before,
+        )
 
         embedding = self._embedding_client.get_embedding(query)
         if not embedding:
@@ -216,10 +309,20 @@ class SearchService:
                 )
             return text_results[:limit]
 
-        vector_results = self._chroma_manager.search_similar(
-            embedding,
-            n_results=candidate_limit,
+        vector_where, has_date_candidates = self._build_vector_date_filter(
+            created_after,
+            created_before,
         )
+        if has_date_candidates:
+            vector_options = {"n_results": candidate_limit}
+            if vector_where:
+                vector_options["where"] = vector_where
+            vector_results = self._chroma_manager.search_similar(
+                embedding,
+                **vector_options,
+            )
+        else:
+            vector_results = []
 
         text_rank: Dict[str, float] = {}
         text_position: Dict[str, int] = {}
@@ -234,7 +337,15 @@ class SearchService:
         for rank, result in enumerate(vector_results):
             result_id = result["id"]
             memory = self._sqlite_manager.get_memory_by_id(result_id)
-            if memory is None or memory.sync_status != "SYNCED":
+            if (
+                memory is None
+                or memory.sync_status != "SYNCED"
+                or not self._memory_matches_date_range(
+                    memory,
+                    created_after,
+                    created_before,
+                )
+            ):
                 continue
             vector_rank[result_id] = 1.0 / (rrf_k + rank + 1)
             vector_position[result_id] = rank + 1
@@ -284,8 +395,33 @@ class SearchService:
 
         return merged
 
-    def get_recent_memories(self, limit: int = 100) -> List:
+    def get_recent_memories(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+    ) -> List:
+        if created_after or created_before or offset:
+            return self._sqlite_manager.get_all_memories(
+                limit=limit,
+                offset=offset,
+                created_after=created_after,
+                created_before=created_before,
+            )
         return self._sqlite_manager.get_all_memories(limit=limit)
+
+    def get_recent_memories_count(
+        self,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+    ) -> int:
+        if created_after or created_before:
+            return self._sqlite_manager.get_memories_count(
+                created_after=created_after,
+                created_before=created_before,
+            )
+        return self._sqlite_manager.get_memories_count()
 
     def get_memory_by_id(self, memory_id: str):
         return self._sqlite_manager.get_memory_by_id(memory_id)

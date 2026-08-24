@@ -2,10 +2,11 @@
 Memory Routes - CRUD operations for memories
 """
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from datetime import date
 
 from api.schemas import MemoryListResponse, MemoryResponse, MemoryUpdateRequest
 from api.dependencies import get_search_service, get_memory_service
+from api.memory_filters import normalize_memory_date_range
 from api.websocket import broadcast_event
 from utils.logger import get_logger
 
@@ -33,15 +34,31 @@ def memory_to_response(memory) -> dict:
 async def list_memories(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
+    date_from: date | None = None,
+    date_to: date | None = None,
 ):
     """Get list of recent memories"""
     try:
         search_service = get_search_service()
-        memories = search_service.get_recent_memories(limit=limit)
+        bounds = normalize_memory_date_range(date_from, date_to)
+        if offset or bounds.created_after or bounds.created_before:
+            memories = search_service.get_recent_memories(
+                limit=limit,
+                offset=offset,
+                created_after=bounds.created_after,
+                created_before=bounds.created_before,
+            )
+        else:
+            memories = search_service.get_recent_memories(limit=limit)
         return MemoryListResponse(
             memories=[MemoryResponse(**memory_to_response(m)) for m in memories],
-            total=len(memories),
+            total=search_service.get_recent_memories_count(
+                created_after=bounds.created_after,
+                created_before=bounds.created_before,
+            ),
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
