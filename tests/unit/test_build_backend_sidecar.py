@@ -45,11 +45,18 @@ def test_read_package_version_reads_canonical_cargo_version(tmp_path: Path):
     assert sidecar.read_package_version(manifest) == "3.4.5"
 
 
-def test_read_package_version_rejects_non_stable_version(tmp_path: Path):
+def test_read_package_version_accepts_prerelease_version(tmp_path: Path):
     manifest = tmp_path / "Cargo.toml"
-    _write_manifest(manifest, "3.4.5-beta.1")
+    _write_manifest(manifest, "3.4.5-preview.20260825")
 
-    with pytest.raises(RuntimeError, match="stable x.y.z"):
+    assert sidecar.read_package_version(manifest) == "3.4.5-preview.20260825"
+
+
+def test_read_package_version_rejects_invalid_semver(tmp_path: Path):
+    manifest = tmp_path / "Cargo.toml"
+    _write_manifest(manifest, "3.4-preview")
+
+    with pytest.raises(RuntimeError, match="valid SemVer"):
         sidecar.read_package_version(manifest)
 
 
@@ -57,6 +64,10 @@ def test_read_package_version_rejects_non_stable_version(tmp_path: Path):
 def test_windows_version_tuple_rejects_invalid_version(version: str):
     with pytest.raises(ValueError):
         sidecar.windows_version_tuple(version)
+
+
+def test_windows_version_tuple_uses_numeric_core_for_prerelease():
+    assert sidecar.windows_version_tuple("0.3.1-preview.20260825") == (0, 3, 1, 0)
 
 
 def test_write_windows_version_file_contains_branded_metadata(tmp_path: Path):
@@ -75,6 +86,18 @@ def test_write_windows_version_file_contains_branded_metadata(tmp_path: Path):
     assert "StringStruct(u'ProductName', u'Glimpse')" in text
     assert "StringStruct(u'ProductVersion', u'1.2.3')" in text
     assert "VarStruct(u'Translation', [2052, 1200])" in text
+
+
+def test_write_windows_version_file_preserves_prerelease_label(tmp_path: Path):
+    output = tmp_path / "version-info.txt"
+
+    sidecar.write_windows_version_file("0.3.1-preview.20260825", output)
+
+    text = output.read_text(encoding="utf-8")
+    assert "filevers=(0, 3, 1, 0)" in text
+    assert "prodvers=(0, 3, 1, 0)" in text
+    assert "StringStruct(u'FileVersion', u'0.3.1-preview.20260825')" in text
+    assert "StringStruct(u'ProductVersion', u'0.3.1-preview.20260825')" in text
 
 
 def test_build_pyinstaller_args_include_windows_metadata(

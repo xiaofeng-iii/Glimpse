@@ -16,6 +16,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+if __package__:
+    from .set_version import VersionSyncError, validate_version
+else:
+    from set_version import VersionSyncError, validate_version
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENTRYPOINT = PROJECT_ROOT / "main_api.py"
@@ -32,9 +37,6 @@ LEGACY_BUILD_NAMES = ("glimpse-backend", "python-backend")
 WINDOWS_FILE_DESCRIPTION = "Glimpse 核心服务"
 WINDOWS_PRODUCT_NAME = "Glimpse"
 WINDOWS_COMPANY_NAME = "Glimpse Team"
-_STABLE_VERSION_PATTERN = re.compile(
-    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$"
-)
 
 HASH_INPUTS = [
     "main_api.py",
@@ -178,21 +180,24 @@ def read_package_version(manifest_path: Path = CARGO_MANIFEST) -> str:
         match = re.fullmatch(r'version\s*=\s*"([^"]+)"', line)
         if match:
             version = match.group(1)
-            if not _STABLE_VERSION_PATTERN.fullmatch(version):
+            try:
+                return validate_version(version)
+            except VersionSyncError as exc:
                 raise RuntimeError(
-                    f"Cargo package version must be stable x.y.z, got: {version}"
-                )
-            return version
+                    f"Cargo package version must be valid SemVer, got: {version}"
+                ) from exc
 
     raise RuntimeError(f"Cargo package version was not found in {manifest_path}")
 
 
 def windows_version_tuple(version: str) -> tuple[int, int, int, int]:
-    match = _STABLE_VERSION_PATTERN.fullmatch(version)
-    if not match:
-        raise ValueError(f"Windows version must use stable x.y.z format: {version}")
+    try:
+        validated_version = validate_version(version)
+    except VersionSyncError as exc:
+        raise ValueError(f"Windows version must use valid SemVer: {version}") from exc
 
-    components = tuple(int(value) for value in match.groups())
+    numeric_core = validated_version.split("-", 1)[0].split("+", 1)[0]
+    components = tuple(int(value) for value in numeric_core.split("."))
     if any(value > 65535 for value in components):
         raise ValueError(
             f"Windows version components must be between 0 and 65535: {version}"
