@@ -236,7 +236,6 @@ describe('memory components', () => {
 
     await wrapper.get('.memory-filters__trigger').trigger('click')
     await wrapper.get<HTMLInputElement>('.memory-filters__preset[value="last7Days"]').trigger('click')
-    await wrapper.get('.memory-filters__actions .btn-primary').trigger('click')
 
     const applied = wrapper.emitted('apply')?.[0]?.[0]
     expect(applied).toMatchObject({
@@ -246,6 +245,10 @@ describe('memory components', () => {
     })
     expect((applied as { dateFrom: string }).dateFrom).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect((applied as { dateTo: string }).dateTo).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+
+    await wrapper.get('.memory-filters__actions .btn-primary').trigger('click')
+    expect(wrapper.emitted('apply')).toHaveLength(2)
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
@@ -260,10 +263,12 @@ describe('memory components', () => {
     expect(contentTypes.map((input) => input.attributes('type'))).toEqual(['checkbox', 'checkbox'])
     expect(contentTypes.map((input) => input.element.value)).toEqual(['screenshot', 'text'])
     await contentTypes[0].trigger('click')
+    expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({ contentTypes: ['screenshot'] })
     await contentTypes[1].trigger('click')
+    expect(wrapper.emitted('apply')?.[1]?.[0]).toMatchObject({ contentTypes: ['screenshot', 'text'] })
     await wrapper.get('.memory-filters__actions .btn-primary').trigger('click')
 
-    expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({
+    expect(wrapper.emitted('apply')?.[2]?.[0]).toMatchObject({
       datePreset: 'all',
       dateFrom: '',
       dateTo: '',

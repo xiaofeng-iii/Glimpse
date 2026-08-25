@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { FunnelIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { FunnelIcon as FunnelOutlineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { FunnelIcon as FunnelSolidIcon } from '@heroicons/vue/24/solid'
 import { t } from '@/utils/i18n'
 import {
   cloneMemoryFilters,
   createEmptyMemoryFilters,
-  getActiveMemoryFilterCount,
   hasActiveMemoryFilters,
   resolveMemoryDatePreset,
   type MemoryContentType,
@@ -43,26 +43,6 @@ const contentTypeOptions: Array<{ value: MemoryContentType; label: Parameters<ty
 ]
 
 const active = computed(() => hasActiveMemoryFilters(props.modelValue))
-const activeCount = computed(() => getActiveMemoryFilterCount(props.modelValue))
-const activeDateLabel = computed(() => {
-  if (!props.modelValue.dateFrom && !props.modelValue.dateTo) return ''
-  if (props.modelValue.datePreset === 'custom') {
-    return `${props.modelValue.dateFrom} ${t('filter.dateSeparator')} ${props.modelValue.dateTo}`
-  }
-  const preset = presets.find((item) => item.value === props.modelValue.datePreset)
-  return preset ? t(preset.label) : ''
-})
-const activeContentTypeLabel = computed(() => {
-  const selected = new Set(props.modelValue.contentTypes)
-  return contentTypeOptions
-    .filter((option) => selected.has(option.value))
-    .map((option) => t(option.label))
-    .join(t('filter.valueSeparator'))
-})
-const activeFilterLabel = computed(() => [
-  activeDateLabel.value,
-  activeContentTypeLabel.value,
-].filter(Boolean).join(' · ') || t('filter.title'))
 
 const close = (restoreFocus = false) => {
   open.value = false
@@ -81,6 +61,26 @@ const toggle = () => {
   else show()
 }
 
+const draftValidationError = () => {
+  if (draft.value.datePreset === 'custom' && (!draft.value.dateFrom || !draft.value.dateTo)) {
+    return 'filter.dateRequired' as const
+  }
+  if (draft.value.dateFrom && draft.value.dateTo && draft.value.dateFrom > draft.value.dateTo) {
+    return 'filter.dateOrder' as const
+  }
+  return null
+}
+
+const emitDraft = () => {
+  emit('apply', cloneMemoryFilters(draft.value))
+}
+
+const emitDraftIfValid = () => {
+  error.value = ''
+  if (draftValidationError()) return
+  emitDraft()
+}
+
 const choosePreset = (preset: MemoryDatePreset) => {
   error.value = ''
   if (preset === 'custom') {
@@ -88,12 +88,14 @@ const choosePreset = (preset: MemoryDatePreset) => {
       ...draft.value,
       datePreset: preset,
     }
+    emitDraftIfValid()
     return
   }
   draft.value = {
     ...draft.value,
     ...resolveMemoryDatePreset(preset),
   }
+  emitDraft()
 }
 
 const toggleContentType = (contentType: MemoryContentType) => {
@@ -107,18 +109,16 @@ const toggleContentType = (contentType: MemoryContentType) => {
       .map((option) => option.value)
       .filter((value) => selected.has(value)),
   }
+  emitDraftIfValid()
 }
 
 const apply = () => {
-  if (draft.value.datePreset === 'custom' && (!draft.value.dateFrom || !draft.value.dateTo)) {
-    error.value = t('filter.dateRequired')
+  const validationError = draftValidationError()
+  if (validationError) {
+    error.value = t(validationError)
     return
   }
-  if (draft.value.dateFrom && draft.value.dateTo && draft.value.dateFrom > draft.value.dateTo) {
-    error.value = t('filter.dateOrder')
-    return
-  }
-  emit('apply', cloneMemoryFilters(draft.value))
+  emitDraft()
   close(true)
 }
 
@@ -167,9 +167,10 @@ onUnmounted(() => {
       :disabled="loading"
       @click="toggle"
     >
-      <FunnelIcon class="h-[18px] w-[18px]" aria-hidden="true" />
+      <FunnelSolidIcon v-if="active" class="memory-filters__trigger-icon" aria-hidden="true" />
+      <FunnelOutlineIcon v-else class="memory-filters__trigger-icon" aria-hidden="true" />
       <span>{{ t('filter.open') }}</span>
-      <span v-if="activeCount" class="memory-filters__count" aria-hidden="true">{{ activeCount }}</span>
+      <span v-if="active" class="sr-only">{{ t('filter.active') }}</span>
     </button>
 
     <Transition name="filter-popover">
@@ -214,12 +215,22 @@ onUnmounted(() => {
             <div v-if="draft.datePreset === 'custom'" class="memory-filters__dates">
               <label>
                 <span>{{ t('filter.dateFrom') }}</span>
-                <input v-model="draft.dateFrom" type="date" :aria-invalid="Boolean(error)" @input="error = ''" />
+                <input
+                  v-model="draft.dateFrom"
+                  type="date"
+                  :aria-invalid="Boolean(error)"
+                  @change="emitDraftIfValid"
+                />
               </label>
               <span class="memory-filters__date-separator" aria-hidden="true">{{ t('filter.dateSeparator') }}</span>
               <label>
                 <span>{{ t('filter.dateTo') }}</span>
-                <input v-model="draft.dateTo" type="date" :aria-invalid="Boolean(error)" @input="error = ''" />
+                <input
+                  v-model="draft.dateTo"
+                  type="date"
+                  :aria-invalid="Boolean(error)"
+                  @change="emitDraftIfValid"
+                />
               </label>
             </div>
             <p v-if="error" class="memory-filters__error" role="alert">{{ error }}</p>
@@ -258,16 +269,6 @@ onUnmounted(() => {
       </div>
     </Transition>
 
-    <button
-      v-if="active"
-      type="button"
-      class="memory-filters__tag"
-      :aria-label="t('filter.clearActive')"
-      @click="clear"
-    >
-      <span>{{ activeFilterLabel }}</span>
-      <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
-    </button>
   </div>
 </template>
 
@@ -298,28 +299,24 @@ onUnmounted(() => {
   transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 
-.memory-filters__trigger:hover,
-.memory-filters__trigger--active {
+.memory-filters__trigger:hover {
   border-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
   background: var(--color-primary-soft);
+}
+
+.memory-filters__trigger-icon {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  flex: 0 0 0.9375rem;
+}
+
+.memory-filters__trigger--active .memory-filters__trigger-icon {
+  color: var(--color-primary-hover);
 }
 
 .memory-filters__trigger:disabled {
   cursor: not-allowed;
   opacity: 0.55;
-}
-
-.memory-filters__count {
-  display: inline-flex;
-  min-width: 1rem;
-  height: 1rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  color: white;
-  background: var(--color-primary);
-  font-size: 0.625rem;
-  font-variant-numeric: tabular-nums;
 }
 
 .memory-filters__panel {
@@ -462,8 +459,8 @@ onUnmounted(() => {
 
 .memory-filters__preset:checked + .memory-filters__preset-indicator::after {
   content: '';
-  width: 0.3125rem;
-  height: 0.3125rem;
+  width: 0.375rem;
+  height: 0.375rem;
   border-radius: 50%;
   background: var(--color-on-primary);
 }
@@ -556,8 +553,9 @@ onUnmounted(() => {
 }
 
 .memory-filters__actions button {
-  min-height: 2.5rem;
-  padding: 0.5rem 0.75rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
   border-radius: var(--radius-sm);
   font-size: 0.8125rem;
 }
@@ -574,33 +572,6 @@ onUnmounted(() => {
 .memory-filters__actions .btn-secondary:hover {
   border-color: var(--color-border);
   background: color-mix(in srgb, var(--color-surface-hover) 82%, var(--color-border));
-}
-
-.memory-filters__tag {
-  display: inline-flex;
-  max-width: min(21rem, 48vw);
-  min-height: 1.5rem;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0 0.4rem;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
-  border-radius: var(--radius-sm);
-  color: var(--color-primary-hover);
-  background: var(--color-primary-soft);
-  cursor: pointer;
-  font-size: 0.625rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.memory-filters__tag span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.memory-filters__tag:hover {
-  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
 }
 
 .filter-popover-enter-active,
