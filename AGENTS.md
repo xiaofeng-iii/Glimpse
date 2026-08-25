@@ -112,7 +112,13 @@ Keep `AGENTS.md` tracked. It is the one generic document meant for the next AI s
 
 ## Testing
 
-Run focused tests for the area you changed. Useful defaults:
+默认只做与当前改动直接相关的最小验证，不自动运行全量测试。细小的视觉、间距、
+颜色或文案调整无需测试；前端改动以确认受影响页面能够渲染、显示无明显错误为主，
+只有涉及组件行为、状态逻辑或构建链路时才补充直接相关的检查。后端改动只运行受影响
+模块的最小单元或 API 测试，必要时再补充直接相关的集成检查。完整测试套件、完整前端
+测试或安装包验证仅在用户明确要求时运行。交付时说明实际运行和跳过的验证。
+
+按上述边界选择改动范围内的 focused tests。Useful defaults:
 
 ```powershell
 conda run -n glimpse python -m pytest tests/unit/config/test_settings_manager.py tests/unit/services/test_keyboard_manager.py -v

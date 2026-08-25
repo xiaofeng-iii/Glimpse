@@ -3,6 +3,22 @@
 本文档只记录当前可执行的验证方式。测试配置位于根目录 `pyproject.toml`，
 Python 命令使用 Conda `glimpse` 环境。
 
+## 0. 执行策略
+
+默认只做与当前改动直接相关的最小验证，不自动执行全量测试。验证深度按改动类型
+区分：
+
+| 改动类型 | 默认策略 |
+|---|---|
+| 前端细小样式、间距、颜色或文案调整 | 不运行测试；必要时只确认页面能够渲染、显示无明显错误 |
+| 前端组件、页面或交互行为 | 只做受影响组件或流程的最小检查，并确认页面能够渲染；不自动运行全量 Vitest、完整构建或全量 E2E |
+| 后端模块或 API | 只运行受影响模块的最小单元或 API 测试；仅在跨模块边界受影响时补充直接相关集成检查 |
+| Tauri、sidecar 或发布配置 | 只运行能够证明受影响链路的最小构建或冒烟检查 |
+| 全量验证 | 仅在用户明确要求时运行完整后端、前端、安装包或跨层测试 |
+
+每次交付都应说明实际运行和未运行的验证。此策略是默认执行边界；安全、CI 或正式
+发布流程中明确要求的检查仍按其要求执行。
+
 ## 1. 常用命令
 
 后端快速检查：
@@ -67,13 +83,13 @@ npm test
 
 | 改动区域 | 最小验证 |
 |---|---|
-| `services/memory_service.py` | memory service 单测 + AI 管道 + database sync |
-| `services/search_service.py` | search service 单测 + search pipeline |
-| `core/capture.py` | capture 单测 + capture-to-storage |
-| `db/` | 对应 DB 单测 + database sync |
-| `api/` | `tests/test_api.py` + 对应 API 单测 |
-| Vue 组件或 stores | `npm run test:run` + `npm run build` + 手动检查受影响流程 |
-| Tauri/Rust 或 sidecar | 前端构建 + `build_release.bat` |
+| `services/memory_service.py` | memory service 单测；仅在 AI 或数据库边界受影响时补直接相关检查 |
+| `services/search_service.py` | search service 单测；仅在搜索管道边界受影响时补直接相关检查 |
+| `core/capture.py` | capture 单测；仅在存储边界受影响时补 capture-to-storage 检查 |
+| `db/` | 对应 DB 单测；仅在同步路径受影响时补 database sync 检查 |
+| `api/` | 受影响的 `tests/test_api.py` 或对应 API 单测 |
+| Vue 组件或 stores | 受影响组件测试（如有）+ 最小渲染/显示检查；仅在逻辑或构建链路受影响时补 `npm run build` |
+| Tauri/Rust 或 sidecar | 受影响链路的最小前端构建或冒烟检查；仅在发布配置受影响时运行 `build_release.bat` |
 | 设置或快捷键 | settings、hotkey、keyboard 单测 |
 
 ## 4. 外部服务
@@ -86,10 +102,10 @@ Embedding 模型首次加载可能较慢；测试应优先使用 fixture 或 moc
 
 ## 5. 完成标准
 
-- 运行与改动范围相匹配的测试。
-- 新行为有对应的单元或集成验证。
-- 前端改动至少通过 `npm run build`。
-- 前端新行为需要对应 Vitest 组件或 store 测试，并通过 `npm run test:run`。
+- 运行与改动范围相匹配的最小验证，并记录实际运行和跳过的命令。
+- 新行为优先补充对应的单元或集成验证；是否执行完整测试按“执行策略”和用户要求决定。
+- 前端行为或构建链路变更时，完成最小渲染检查，必要时补 `npm run build`。
+- 全量后端、前端、安装包或跨层测试仅在用户明确要求时执行。
 - 不依赖测试执行顺序。
 - 不在测试中写入真实 `GlimpseData/`。
 - 失败时报告实际命令、通过数和失败原因，不以“环境问题”笼统代替。
