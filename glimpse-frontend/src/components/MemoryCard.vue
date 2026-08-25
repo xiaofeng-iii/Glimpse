@@ -64,7 +64,7 @@ const handleKeydown = (event: KeyboardEvent) => {
       </p>
     </div>
 
-    <div v-else class="relative flex aspect-[1.28/1] items-center justify-center overflow-hidden bg-slate-100/70">
+    <div v-else class="relative flex aspect-[1.4/1] items-center justify-center overflow-hidden bg-slate-100/70">
       <img
         v-if="imageUrl && !imageFailed"
         :src="imageUrl"

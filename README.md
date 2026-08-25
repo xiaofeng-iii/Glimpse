@@ -250,6 +250,17 @@ python scripts/set_version.py --check
 提交列表或 compare 链接，不能作为最终发布说明。Workflow 成功且安装包上传后，
 必须补写面向用户的中文说明，完成正文验收后才能宣布发布完成。
 
+发布说明的内容边界：
+
+- 以最近一个正式版本标签到当前版本标签之间的变化为范围，只写最终用户能感知的
+  能力、体验优化和修复。
+- 某项主功能本来就必须具备的搜索、筛选、索引或接口适配，不单独包装成发布亮点；
+  可以合并到主功能描述中。
+- 开发过程中的返工、设计波折、临时方案、内部重构、测试补充、文档和版本元数据不
+  写入 Release 正文。
+- 独立影响用户操作的人机交互或稳定性改进可以保留，但文案应描述用户得到的结果，
+  不写“调整了某组件”这类实现过程。
+
 1. 从上一正式版到本版的提交记录收集素材，只保留用户能感知的变化：
 
    ```powershell
@@ -294,6 +305,12 @@ python scripts/set_version.py --check
    ```powershell
    gh release edit $CurrentTag --notes-file $NotesFile
    ```
+
+标准流程是先由 Workflow 创建 Release，再使用上面的命令覆盖正文。若需要在长时间
+构建开始前就准备好正式文案，也可以在标签已推送且 Release 尚不存在时手动执行
+`gh release create $CurrentTag --verify-tag --notes-file $NotesFile`；随后 Workflow
+会检测到已有 Release，只上传安装包和 `SHA256SUMS.txt`，不会自动覆盖正文。无论采用
+哪种写入方式，都必须在最后回读正文、发布状态和资产。
 
 4. 重新读取 GitHub Release，确认正文、正式发布状态和链接都正确：
 

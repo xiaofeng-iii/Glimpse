@@ -149,7 +149,7 @@ const messages = {
     'content.discard': '放弃修改',
     'content.keepEditing': '继续编辑',
     'addMemory.title': '添加文本记忆',
-    'addMemory.description': '直接写下需要记住的内容；保存后会出现在记忆墙，并可参与搜索。',
+    'addMemory.description': '写下需要记忆的内容，保存后会出现在记忆墙',
     'addMemory.contentLabel': '记忆内容',
     'addMemory.placeholder': '输入想要记住的内容...',
     'addMemory.required': '请输入记忆内容',
