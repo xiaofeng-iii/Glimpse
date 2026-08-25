@@ -266,7 +266,7 @@ defineExpose({ focus, clear })
             <span class="text-[10px] font-bold tracking-wide">DEV</span>
           </summary>
           <div
-            class="absolute right-0 top-[calc(100%+.5rem)] z-50 w-[min(440px,calc(100vw-2.5rem))] rounded-lg border border-amber-200/80 bg-[var(--shell-card)] p-4 text-left shadow-2xl"
+            class="search-toolbar__debug-panel absolute right-0 top-[calc(100%+.5rem)] w-[min(440px,calc(100vw-2.5rem))] rounded-lg border border-amber-200/80 bg-[var(--shell-card)] p-4 text-left shadow-2xl"
           >
             <div class="flex items-start gap-2 text-xs text-amber-800">
               <AdjustmentsHorizontalIcon class="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
@@ -346,18 +346,49 @@ defineExpose({ focus, clear })
     0 1px 2px rgba(26, 38, 64, 0.04),
     0 2px 6px rgba(26, 38, 64, 0.035);
 
+  position: sticky;
+  z-index: var(--z-sticky);
+  top: 0;
+  isolation: isolate;
   padding: 0.625rem 1.25rem 0.5rem;
-  background: var(--shell-window-bg);
+  background: transparent;
+}
+
+.search-toolbar::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0 0 -0.75rem;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--shell-window-bg) 78%, transparent) 0%,
+    color-mix(in srgb, var(--shell-window-bg) 28%, transparent) 62%,
+    transparent 100%
+  );
+  content: '';
+}
+
+.search-toolbar::after {
+  position: absolute;
+  z-index: 0;
+  inset: 0 0 -0.75rem;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--shell-window-bg) 1%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 72%) 46%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 72%) 46%, transparent 100%);
+  content: '';
 }
 
 .search-toolbar__surface {
+  position: relative;
+  z-index: 1;
   padding: var(--search-toolbar-surface-inset);
   border: 1px solid var(--shell-card-border);
   border-radius: var(--search-toolbar-surface-radius);
   background: var(--shell-card);
   box-shadow: var(--search-toolbar-surface-shadow);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
 }
 
 .search-toolbar__layout {
@@ -392,12 +423,16 @@ defineExpose({ focus, clear })
   border-left: 1px solid var(--shell-line);
 }
 
+.search-toolbar__debug-panel {
+  z-index: var(--z-popover);
+}
+
 :global(:root[data-theme='dark']) .search-toolbar {
   --search-toolbar-surface-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 
-@media (max-width: 960px) {
+@container memory-pane (max-width: 960px) {
   .search-toolbar {
     padding-inline: 1rem;
   }
@@ -423,7 +458,7 @@ defineExpose({ focus, clear })
   }
 }
 
-@media (max-width: 640px) {
+@container memory-pane (max-width: 640px) {
   .search-toolbar {
     padding-inline: 0.75rem;
   }

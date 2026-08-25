@@ -80,6 +80,11 @@ describe('Home capture state wiring', () => {
     const backendStatus = useBackendStatusStore(pinia)
     const toolbar = () => wrapper.findComponent({ name: 'SearchToolbar' })
     const wall = () => wrapper.findComponent({ name: 'MemoryWall' })
+    const memoryPane = wrapper.get('.home-memory-pane')
+
+    expect(memoryPane.classes()).toContain('overflow-y-auto')
+    expect(memoryPane.find('[data-testid="search-toolbar"]').exists()).toBe(true)
+    expect(memoryPane.find('[data-testid="memory-wall"]').exists()).toBe(true)
 
     expect(toolbar().props('captureDisabled')).toBe(true)
     expect(wall().props('captureDisabled')).toBe(true)

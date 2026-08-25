@@ -327,48 +327,50 @@ onUnmounted(() => {
 
 <template>
   <main class="relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--shell-window-bg)]">
-    <SearchToolbar
-      ref="searchToolbar"
-      v-model="query"
-      shortcut-label="Ctrl+F"
-      :capture-shortcut-label="screenshotShortcutLabel"
-      :capturing="isCapturing"
-      :capture-disabled="!backendStatus.isReady"
-      :adding-memory="isAddingTextMemory"
-      :add-memory-disabled="!backendStatus.isReady"
-      :refreshing="isRefreshing"
-      @capture="handleScreenshot()"
-      @add-memory="openTextMemoryDialog"
-      @refresh="handleRefresh"
-      @debug-panel-change="showSearchDebug = $event"
-    />
-
-    <ClusterBar
-      v-if="clusterStore.isCollecting"
-      class="mx-5 mt-3"
-      @submit="clusterApi.submit()"
-      @cancel="clusterApi.cancel()"
-    />
-
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
-      <MemoryWall
-        :memories="memoriesStore.memories"
-        :total="memoriesStore.total"
-        :loading="memoriesStore.isLoading"
-        :selected-id="memoriesStore.selectedId"
-        :query="query"
-        :show-search-debug="showSearchDebug"
-        :capturing="isCapturing"
-        :capture-disabled="!backendStatus.isReady"
-        :adding-memory="isAddingTextMemory"
-        :add-memory-disabled="!backendStatus.isReady"
-        :filters="memoriesStore.activeFilters"
-        @select="handleSelectMemory"
-        @open="handleOpenMemory"
-        @capture="handleScreenshot()"
-        @add-memory="openTextMemoryDialog"
-        @apply-filters="handleApplyFilters"
-      />
+      <div class="home-memory-pane min-w-0 flex-1 overflow-y-auto">
+        <SearchToolbar
+          ref="searchToolbar"
+          v-model="query"
+          shortcut-label="Ctrl+F"
+          :capture-shortcut-label="screenshotShortcutLabel"
+          :capturing="isCapturing"
+          :capture-disabled="!backendStatus.isReady"
+          :adding-memory="isAddingTextMemory"
+          :add-memory-disabled="!backendStatus.isReady"
+          :refreshing="isRefreshing"
+          @capture="handleScreenshot()"
+          @add-memory="openTextMemoryDialog"
+          @refresh="handleRefresh"
+          @debug-panel-change="showSearchDebug = $event"
+        />
+
+        <ClusterBar
+          v-if="clusterStore.isCollecting"
+          class="mx-5 mt-3"
+          @submit="clusterApi.submit()"
+          @cancel="clusterApi.cancel()"
+        />
+
+        <MemoryWall
+          :memories="memoriesStore.memories"
+          :total="memoriesStore.total"
+          :loading="memoriesStore.isLoading"
+          :selected-id="memoriesStore.selectedId"
+          :query="query"
+          :show-search-debug="showSearchDebug"
+          :capturing="isCapturing"
+          :capture-disabled="!backendStatus.isReady"
+          :adding-memory="isAddingTextMemory"
+          :add-memory-disabled="!backendStatus.isReady"
+          :filters="memoriesStore.activeFilters"
+          @select="handleSelectMemory"
+          @open="handleOpenMemory"
+          @capture="handleScreenshot()"
+          @add-memory="openTextMemoryDialog"
+          @apply-filters="handleApplyFilters"
+        />
+      </div>
 
       <Transition name="inspector">
         <div
@@ -396,6 +398,15 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.home-memory-pane {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  scrollbar-gutter: stable;
+  container-name: memory-pane;
+  container-type: inline-size;
+}
+
 .inspector-panel {
   width: 380px;
   flex: 0 0 380px;

@@ -84,7 +84,7 @@ const groups = computed<MemoryGroup[]>(() => {
 </script>
 
 <template>
-  <section class="memory-wall min-h-0 flex-1">
+  <section class="memory-wall">
     <header class="memory-wall__header">
       <h1 class="text-base font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">
         {{
@@ -100,7 +100,7 @@ const groups = computed<MemoryGroup[]>(() => {
       />
     </header>
 
-    <div class="memory-wall-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4" aria-live="polite">
+    <div class="memory-wall-scroll pb-6 pt-4" aria-live="polite">
 
       <div v-if="loading" class="flex min-h-64 items-center justify-center">
         <LoadingSpinner />
@@ -174,6 +174,8 @@ const groups = computed<MemoryGroup[]>(() => {
 
 <style scoped>
 .memory-wall {
+  --memory-wall-inline-inset: 1rem;
+
   position: relative;
   display: flex;
   flex-direction: column;
@@ -188,22 +190,23 @@ const groups = computed<MemoryGroup[]>(() => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.375rem 1.25rem 0.25rem;
+  padding: 0.375rem var(--memory-wall-inline-inset) 0.25rem;
   background: var(--shell-window-bg);
 }
 
 .memory-wall__header::after {
   content: '';
   position: absolute;
-  right: 1.25rem;
+  right: var(--memory-wall-inline-inset);
   bottom: 0;
-  left: 1.25rem;
+  left: var(--memory-wall-inline-inset);
   height: 1px;
   background: color-mix(in srgb, var(--shell-line) 72%, transparent);
 }
 
 .memory-wall-scroll {
   position: relative;
+  padding-inline: var(--memory-wall-inline-inset);
 }
 
 .memory-wall__capture-icon {
@@ -230,6 +233,18 @@ const groups = computed<MemoryGroup[]>(() => {
 @container (min-width: 760px) {
   .memory-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container memory-pane (max-width: 960px) {
+  .memory-wall {
+    --memory-wall-inline-inset: 0.75rem;
+  }
+}
+
+@container memory-pane (max-width: 640px) {
+  .memory-wall {
+    --memory-wall-inline-inset: 0.5rem;
   }
 }
 
