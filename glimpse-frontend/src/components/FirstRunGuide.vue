@@ -169,7 +169,7 @@ onBeforeUnmount(() => {
             <h1 id="first-run-guide-title" class="mt-2 text-2xl font-semibold tracking-[-0.02em] text-[var(--shell-ink)]">
               {{ t('onboarding.title') }}
             </h1>
-            <p id="first-run-guide-description" class="mt-2 max-w-2xl text-sm leading-6 text-[var(--shell-muted)]">
+            <p id="first-run-guide-description" class="mt-2 max-w-2xl text-sm text-[var(--shell-muted)]">
               {{ t('onboarding.description') }}
             </p>
           </div>
@@ -200,7 +200,7 @@ onBeforeUnmount(() => {
               <h2 class="mt-4 text-sm font-semibold text-[var(--shell-ink)]">
                 {{ t(item.titleKey) }}
               </h2>
-              <p class="mt-1.5 text-sm leading-6 text-[var(--shell-muted)]">
+              <p class="mt-1.5 text-sm text-[var(--shell-muted)]">
                 {{ t(item.descriptionKey) }}
               </p>
               <kbd
@@ -214,7 +214,7 @@ onBeforeUnmount(() => {
 
           <div class="mt-5 flex items-start gap-3 rounded-xl bg-[var(--color-primary-soft)] px-4 py-3.5">
             <Cog6ToothIcon class="mt-0.5 h-5 w-5 flex-none text-[var(--color-primary)]" aria-hidden="true" />
-            <p class="text-sm leading-6 text-[var(--shell-ink)]">
+            <p class="text-sm text-[var(--shell-ink)]">
               <span class="font-semibold">{{ t('onboarding.aiTitle') }}</span>
               {{ t('onboarding.aiDescription') }}
             </p>

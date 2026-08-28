@@ -135,7 +135,7 @@ onBeforeUnmount(() => {
             </h2>
             <p
               :id="`${$attrs.id ?? 'confirm'}-description`"
-              class="mt-1.5 text-sm leading-6 text-[var(--shell-muted)]"
+              class="mt-1.5 text-sm text-[var(--shell-muted)]"
             >
               {{ description }}
             </p>

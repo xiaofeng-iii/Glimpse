@@ -14,7 +14,7 @@
         "title": "Glimpse - AI 桌面记忆助手",
         "width": 1024,
         "height": 720,
-        "minWidth": 820,
+        "minWidth": 520,
         "minHeight": 560,
         "resizable": true,
         "fullscreen": false,

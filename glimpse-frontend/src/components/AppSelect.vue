@@ -185,7 +185,7 @@ const selectedOption = computed(() => props.options.find((option) => option.valu
   color: var(--color-text-secondary);
   cursor: pointer;
   font-size: .875rem;
-  line-height: 1.25rem;
+  line-height: var(--line-height-14);
   outline: none;
   user-select: none;
   transition: color 120ms ease, background-color 120ms ease;

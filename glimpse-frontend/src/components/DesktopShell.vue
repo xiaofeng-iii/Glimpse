@@ -4,12 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeftIcon,
   ArrowPathIcon,
-  ArrowsPointingInIcon,
-  ArrowsPointingOutIcon,
   CheckCircleIcon,
   Cog6ToothIcon,
   ExclamationCircleIcon,
   MinusIcon,
+  Square2StackIcon,
+  StopIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import CloseActionDialog from '@/components/CloseActionDialog.vue'
@@ -47,17 +47,6 @@ const logger = createLogger('components/DesktopShell')
 
 const isDesktop = isDesktopShell()
 const isHome = computed(() => route.name === 'home')
-const sectionTitle = computed(() => {
-  if (route.name === 'settings') {
-    return t('settings.title')
-  }
-
-  if (route.name === 'memory-detail') {
-    return t('memory.detail')
-  }
-
-  return ''
-})
 const serviceLabel = computed(() => {
   if (backendStatus.isReady) return t('status.ready')
   if (backendStatus.isStarting) return t('status.starting')
@@ -220,18 +209,41 @@ onUnmounted(() => {
         @dblclick="handleToggleMaximize"
       ></div>
 
-      <div class="desktop-shell__brand" data-tauri-drag-region>
-        <slot name="brand">
-          <img
-            class="desktop-shell__logo"
-            :src="glimpseLogo"
-            alt=""
-            draggable="false"
-          />
-          <span class="desktop-shell__brand-name">Glimpse</span>
-          <span v-if="sectionTitle" class="desktop-shell__section-title">
-            {{ sectionTitle }}
-          </span>
+      <div class="desktop-shell__leading">
+        <div class="desktop-shell__brand" data-tauri-drag-region>
+          <slot name="brand">
+            <img
+              class="desktop-shell__logo"
+              :src="glimpseLogo"
+              alt=""
+              draggable="false"
+            />
+            <span class="desktop-shell__brand-name">Glimpse</span>
+          </slot>
+        </div>
+
+        <span class="desktop-shell__leading-divider" aria-hidden="true"></span>
+
+        <slot name="navigation">
+          <button
+            v-if="isHome"
+            type="button"
+            class="shell-icon-button desktop-shell__settings-button"
+            :title="t('action.settings')"
+            :aria-label="t('action.settings')"
+            @click="navigateSettings"
+          >
+            <Cog6ToothIcon class="h-[15px] w-[15px]" aria-hidden="true" />
+          </button>
+          <button
+            v-else
+            type="button"
+            class="shell-navigation-button"
+            @click="navigateHome"
+          >
+            <ArrowLeftIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <span>{{ t('action.back') }}</span>
+          </button>
         </slot>
       </div>
 
@@ -264,32 +276,7 @@ onUnmounted(() => {
           <span>{{ serviceLabel }}</span>
         </div>
 
-        <span class="desktop-shell__divider" aria-hidden="true"></span>
-
-        <slot name="navigation">
-          <button
-            v-if="isHome"
-            type="button"
-            class="shell-icon-button"
-            :title="t('action.settings')"
-            :aria-label="t('action.settings')"
-            @click="navigateSettings"
-          >
-            <Cog6ToothIcon class="h-5 w-5" aria-hidden="true" />
-          </button>
-          <button
-            v-else
-            type="button"
-            class="shell-navigation-button"
-            @click="navigateHome"
-          >
-            <ArrowLeftIcon class="h-4 w-4" aria-hidden="true" />
-            <span>{{ t('action.back') }}</span>
-          </button>
-        </slot>
-
-        <template v-if="isDesktop">
-          <span class="desktop-shell__divider" aria-hidden="true"></span>
+        <div v-if="isDesktop" class="desktop-shell__window-controls">
           <button
             type="button"
             class="window-control"
@@ -297,7 +284,7 @@ onUnmounted(() => {
             :aria-label="t('action.minimize')"
             @click="minimizeDesktopWindow"
           >
-            <MinusIcon class="h-5 w-5" aria-hidden="true" />
+            <MinusIcon class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -306,14 +293,14 @@ onUnmounted(() => {
             :aria-label="isWindowMaximized ? t('action.restore') : t('action.maximize')"
             @click="handleToggleMaximize"
           >
-            <ArrowsPointingInIcon
+            <Square2StackIcon
               v-if="isWindowMaximized"
-              class="h-4 w-4"
+              class="h-[13px] w-[13px]"
               aria-hidden="true"
             />
-            <ArrowsPointingOutIcon
+            <StopIcon
               v-else
-              class="h-4 w-4"
+              class="h-[13px] w-[13px]"
               aria-hidden="true"
             />
           </button>
@@ -324,9 +311,9 @@ onUnmounted(() => {
             :aria-label="t('action.close')"
             @click="requestWindowClose"
           >
-            <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+            <XMarkIcon class="h-[15px] w-[15px]" aria-hidden="true" />
           </button>
-        </template>
+        </div>
       </div>
     </header>
 

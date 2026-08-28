@@ -122,7 +122,7 @@ const preventOutsideDismiss = (event: Event) => {
             <DialogTitle class="text-base font-semibold text-[var(--shell-ink)]">
               {{ t('addMemory.title') }}
             </DialogTitle>
-            <DialogDescription class="mt-1 text-sm leading-6 text-[var(--shell-muted)]">
+            <DialogDescription class="mt-1 text-sm text-[var(--shell-muted)]">
               {{ t('addMemory.description') }}
             </DialogDescription>
           </div>
@@ -146,7 +146,7 @@ const preventOutsideDismiss = (event: Event) => {
               id="text-memory-content"
               ref="editor"
               v-model="content"
-              class="mt-2 block min-h-48 w-full resize-none rounded-lg border bg-[var(--shell-control-bg)] px-3.5 py-3 text-sm leading-7 text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)]"
+              class="mt-2 block min-h-48 w-full resize-none rounded-lg border bg-[var(--shell-control-bg)] px-3.5 py-3 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)]"
               :class="visibleError ? 'border-red-400 focus:border-red-500' : 'border-[var(--shell-line)] focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-soft)]'"
               :placeholder="t('addMemory.placeholder')"
               :readonly="busy"
@@ -164,7 +164,7 @@ const preventOutsideDismiss = (event: Event) => {
                 {{ content.length }} / 4000
               </span>
             </div>
-            <p id="text-memory-help" class="mt-1 text-xs leading-5 text-[var(--shell-muted)]">
+            <p id="text-memory-help" class="mt-1 text-xs text-[var(--shell-muted)]">
               {{ t('addMemory.shortcut') }}
             </p>
           </div>

@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import Settings from '@/views/Settings.vue'
+
+const appStyles = readFileSync(resolve(process.cwd(), 'src/styles/main.css'), 'utf8')
 
 const apiMocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
@@ -91,6 +95,17 @@ describe('Settings', () => {
     expect(wrapper.text()).toContain('RapidOCR 3.9.2')
     expect(wrapper.text()).toContain('ONNX Runtime CPU')
     expect(wrapper.find('input[value="BAAI/bge-small-zh-v1.5"]').exists()).toBe(false)
+  })
+
+  it('keeps an unchanged save button disabled without presenting it as busy', async () => {
+    const wrapper = await mountSettings()
+    const saveButton = wrapper.get<HTMLButtonElement>('footer .btn-primary')
+
+    expect(saveButton.element.disabled).toBe(true)
+    expect(saveButton.attributes('aria-busy')).toBe('false')
+    expect(saveButton.find('.animate-spin').exists()).toBe(false)
+    expect(appStyles).toContain(".btn-primary[aria-busy='true']")
+    expect(appStyles).toMatch(/\.btn-primary:disabled\s*\{[^}]*cursor:\s*default;/s)
   })
 
   it('sends an explicit empty API key when the credential is cleared', async () => {

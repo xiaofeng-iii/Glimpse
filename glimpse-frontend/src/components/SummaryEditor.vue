@@ -227,7 +227,7 @@ defineExpose({
       <button
         v-if="!editing"
         type="button"
-        class="summary-editor__edit-action inline-flex h-10 w-28 flex-none items-center justify-center gap-0.5 whitespace-nowrap rounded-md border border-[var(--shell-line)] px-1 text-sm font-semibold leading-5 text-[var(--color-primary)] transition hover:bg-[var(--color-primary-soft)]"
+        class="summary-editor__edit-action inline-flex h-10 w-28 flex-none items-center justify-center gap-0.5 whitespace-nowrap rounded-md border border-[var(--shell-line)] px-1 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary-soft)]"
         @click="startEditing"
       >
         <PencilSquareIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
@@ -236,7 +236,7 @@ defineExpose({
       <div v-else class="summary-editor__edit-actions flex flex-none items-center gap-2">
         <button
           type="button"
-          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center whitespace-nowrap rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 text-sm font-semibold leading-5 text-[var(--color-primary)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center whitespace-nowrap rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="saving"
           @click="cancelEditing"
         >
@@ -244,7 +244,7 @@ defineExpose({
         </button>
         <button
           type="button"
-          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)] px-2 text-sm font-semibold leading-5 text-white transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)] px-2 text-sm font-semibold text-white transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!canSave"
           @click="save"
         >
@@ -270,7 +270,7 @@ defineExpose({
       <textarea
         ref="compactEditor"
         v-model="draft"
-        class="summary-editor__compact-control relative z-10 block h-full w-full resize-none border-0 bg-transparent px-3 py-2 pb-7 text-sm leading-7 text-[var(--shell-ink)] outline-none"
+        class="summary-editor__compact-control relative z-10 block h-full w-full resize-none border-0 bg-transparent px-3 py-2 pb-7 text-sm text-[var(--shell-ink)] outline-none"
         :class="compactOverflowing ? 'overflow-y-auto' : 'overflow-y-hidden'"
         :readonly="!editing"
         :tabindex="editing || compactOverflowing ? 0 : -1"
@@ -300,7 +300,7 @@ defineExpose({
       <textarea
         v-if="editing"
         v-model="draft"
-        class="min-h-32 w-full resize-none rounded-lg border bg-[var(--shell-control-bg)] px-3.5 py-2.5 text-sm leading-6 text-[var(--shell-ink)] outline-none transition"
+        class="min-h-32 w-full resize-none rounded-lg border bg-[var(--shell-control-bg)] px-3.5 py-2.5 text-sm text-[var(--shell-ink)] outline-none transition"
         :class="validationMessage ? 'border-red-400' : 'border-[var(--shell-line)]'"
         :aria-invalid="Boolean(validationMessage)"
         aria-describedby="summary-editor-feedback summary-editor-shortcut"
@@ -309,7 +309,7 @@ defineExpose({
         :aria-label="contentLabel"
         @keydown="handleEditorKeydown"
       />
-      <p v-else class="whitespace-pre-wrap text-sm leading-7 text-[var(--shell-ink)]">
+      <p v-else class="whitespace-pre-wrap text-sm text-[var(--shell-ink)]">
         {{ memory.ai_summary }}
       </p>
 

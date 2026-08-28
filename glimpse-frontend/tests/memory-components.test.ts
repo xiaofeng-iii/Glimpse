@@ -12,6 +12,8 @@ import SearchToolbar from '@/components/SearchToolbar.vue'
 import SummaryEditor from '@/components/SummaryEditor.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import OcrText from '@/components/OcrText.vue'
+import MemoryAnalysisState from '@/components/MemoryAnalysisState.vue'
+import memoryAnalysisStateSource from '@/components/MemoryAnalysisState.vue?raw'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
@@ -111,8 +113,62 @@ describe('memory components', () => {
     expect(buttons).toHaveLength(3)
     expect(buttons.map((button) => button.attributes('aria-pressed'))).toEqual(['true', 'false', 'false'])
     for (const button of buttons) {
-      expect(button.classes()).toEqual(expect.arrayContaining(['h-7', 'min-h-0']))
+      expect(button.classes()).toEqual(expect.arrayContaining(['h-6', 'min-h-0']))
     }
+  })
+
+  it('keeps a processing screenshot card clickable and exposes the same wait state in details', async () => {
+    const processingMemory = createMemory({
+      ai_summary: '',
+      text_content: '',
+      analysis_status: 'PROCESSING',
+    })
+    const card = mount(MemoryCard, {
+      props: { memory: processingMemory },
+    })
+
+    expect(card.get('.memory-card').attributes('aria-busy')).toBe('true')
+    expect(card.text()).toContain('正在生成记忆摘要')
+    expect(card.text()).toContain('等待AI摘要和OCR识别')
+    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(true)
+
+    await card.get('.memory-card').trigger('click')
+    await card.get('.memory-card').trigger('keydown', { key: 'Enter' })
+    expect(card.emitted('select')?.[0]?.[0]).toEqual(processingMemory)
+    expect(card.emitted('open')?.[0]?.[0]).toEqual(processingMemory)
+
+    const inspector = mount(MemoryInspector, {
+      props: { memory: processingMemory },
+    })
+    expect(inspector.findComponent(MediaGallery).exists()).toBe(true)
+    expect(inspector.findComponent(MemoryAnalysisState).exists()).toBe(true)
+    expect(inspector.findComponent(SummaryEditor).exists()).toBe(false)
+    expect(inspector.text()).toContain('查看详情')
+    expect(inspector.text()).not.toContain('删除')
+  })
+
+  it('shows every image while a submitted cluster memory is still processing', () => {
+    const inspector = mount(MemoryInspector, {
+      props: {
+        memory: createMemory({
+          ai_summary: '',
+          text_content: '',
+          image_path: 'C:\\captures\\first.png',
+          extra_images: JSON.stringify(['C:\\captures\\second.png']),
+          analysis_status: 'PROCESSING',
+        }),
+      },
+    })
+
+    expect(inspector.findComponent(MemoryAnalysisState).exists()).toBe(true)
+    expect(inspector.text()).toContain('1 / 2')
+    expect(inspector.findAll('.media-gallery__thumbnail')).toHaveLength(2)
+  })
+
+  it('drives every analysis progress bar from the shared wall-clock phase', () => {
+    expect(memoryAnalysisStateSource).toContain('startSynchronizedProgress')
+    expect(memoryAnalysisStateSource).toContain('ref="progressBar"')
+    expect(memoryAnalysisStateSource).not.toMatch(/\.memory-analysis-state__bar\s*\{[^}]*animation:/s)
   })
 
   it('presents the compact search modes as one group before separated actions', () => {
@@ -149,7 +205,7 @@ describe('memory components', () => {
     expect(wrapper.text()).not.toContain('手动添加')
     expect(wrapper.get('.memory-card').classes()).toContain('memory-card--text')
     expect(wrapper.get('.memory-card__text-body').classes()).toContain('bg-[var(--color-primary-soft)]')
-    expect(wrapper.get('.memory-card__text-content').classes()).toContain('line-clamp-6')
+    expect(wrapper.get('.memory-card__text-content').classes()).toContain('memory-card__text-content')
     expect(wrapper.get('.memory-card__tag-area').text()).toBe('')
     expect(wrapper.get('.memory-card__text-footer time').text()).toBeTruthy()
     expect(wrapper.find('img').exists()).toBe(false)
@@ -226,6 +282,33 @@ describe('memory components', () => {
     expect(emptyCapture.attributes('aria-busy')).toBe('false')
     expect(emptyCapture.element.disabled).toBe(true)
     expect(emptyCapture.text()).toContain('截图')
+  })
+
+  it('compacts the filter as soon as the memory wall scrolls upward', async () => {
+    const pane = document.createElement('div')
+    pane.className = 'home-memory-pane'
+    const toolbar = document.createElement('div')
+    toolbar.className = 'search-toolbar'
+    const host = document.createElement('div')
+    pane.append(toolbar, host)
+    document.body.append(pane)
+
+    const wrapper = mount(MemoryWall, {
+      props: { memories: [], total: 0 },
+      attachTo: host,
+    })
+    await wrapper.vm.$nextTick()
+    const header = wrapper.get('.memory-wall__header').element
+    vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ height: 80 }))
+    vi.spyOn(pane, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ height: 600 }))
+    vi.spyOn(header, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ y: 160, height: 32 }))
+
+    pane.scrollTop = 24
+    pane.dispatchEvent(new Event('scroll'))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('.memory-wall__header').classes()).toContain('memory-wall__header--compact')
+    expect(wrapper.get('.memory-filters').classes()).toContain('memory-filters--compact')
   })
 
   it('applies a date preset through the extensible memory filter panel', async () => {
@@ -409,7 +492,7 @@ describe('memory components', () => {
     })
 
     const editButton = wrapper.get('.summary-editor__edit-action')
-    expect(editButton.classes()).toEqual(expect.arrayContaining(['h-10', 'w-28', 'text-sm', 'font-semibold', 'leading-5']))
+    expect(editButton.classes()).toEqual(expect.arrayContaining(['h-10', 'w-28', 'text-sm', 'font-semibold']))
 
     await editButton.trigger('click')
     await flushPromises()
@@ -418,7 +501,7 @@ describe('memory components', () => {
     expect(frame.attributes('style')).toContain('height: 220px')
     expect(document.activeElement).toBe(originalControl)
     for (const button of wrapper.findAll('.summary-editor__edit-action')) {
-      expect(button.classes()).toEqual(expect.arrayContaining(['h-10', 'w-28', 'text-sm', 'font-semibold', 'leading-5']))
+      expect(button.classes()).toEqual(expect.arrayContaining(['h-10', 'w-28', 'text-sm', 'font-semibold']))
     }
 
     measuredHeight = 600

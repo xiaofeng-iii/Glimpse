@@ -428,7 +428,7 @@ onUnmounted(() => {
         <section class="settings-content min-h-0">
           <header class="flex-none border-b border-[var(--shell-line)] px-5 py-3.5 sm:px-6">
             <h2 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t(currentSection.labelKey) }}</h2>
-            <p class="mt-1.5 text-sm leading-6 text-[var(--shell-muted)]">{{ t(currentSection.descriptionKey) }}</p>
+            <p class="mt-1.5 text-sm text-[var(--shell-muted)]">{{ t(currentSection.descriptionKey) }}</p>
           </header>
 
           <div class="settings-content__body min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
@@ -696,7 +696,13 @@ onUnmounted(() => {
             </button>
             <div class="flex gap-2.5">
               <button type="button" class="btn-secondary min-h-10 px-4" @click="router.push('/')">{{ t('action.cancel') }}</button>
-              <button type="button" class="btn-primary min-h-10 px-4" :disabled="saving || !dirty" @click="handleSave">
+              <button
+                type="button"
+                class="btn-primary min-h-10 px-4"
+                :disabled="saving || !dirty"
+                :aria-busy="saving"
+                @click="handleSave"
+              >
                 <ArrowPathIcon v-if="saving" class="h-5 w-5 flex-none animate-spin" aria-hidden="true" />
                 {{ saving ? t('settings.saving') : t('settings.saveChanges') }}
               </button>
@@ -781,6 +787,7 @@ onUnmounted(() => {
   display: block;
   font-size: .875rem;
   font-weight: 600;
+  line-height: var(--line-height-14);
   color: var(--shell-ink);
 }
 
@@ -788,7 +795,7 @@ onUnmounted(() => {
   display: block;
   margin-top: .25rem;
   font-size: .75rem;
-  line-height: 1.125rem;
+  line-height: var(--line-height-12);
   color: var(--shell-muted);
 }
 

@@ -6,6 +6,15 @@ export default {
   ],
   theme: {
     extend: {
+      fontSize: {
+        xs: ['12px', { lineHeight: 'var(--line-height-12)' }],
+        sm: ['14px', { lineHeight: 'var(--line-height-14)' }],
+        base: ['16px', { lineHeight: 'var(--line-height-16)' }],
+        xl: ['20px', { lineHeight: 'var(--line-height-20)' }],
+        '2xl': ['24px', { lineHeight: 'var(--line-height-24)' }],
+        '3xl': ['30px', { lineHeight: 'var(--line-height-30)' }],
+        display: ['38px', { lineHeight: 'var(--line-height-38)' }],
+      },
       colors: {
         primary: {
           50: '#eef2ff',

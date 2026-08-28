@@ -221,7 +221,7 @@ defineExpose({ focus, clear })
         </div>
 
         <div
-          class="search-toolbar__control search-toolbar__source-switcher inline-grid h-9 grid-flow-col auto-cols-fr items-center border border-[var(--shell-line)] bg-[var(--shell-control-bg)]"
+          class="search-toolbar__control search-toolbar__source-switcher inline-grid h-8 grid-flow-col auto-cols-fr items-center border border-[var(--shell-line)] bg-[var(--shell-control-bg)]"
           role="group"
           :aria-label="t('search.sourceLabel')"
         >
@@ -229,7 +229,7 @@ defineExpose({ focus, clear })
             v-for="item in sources"
             :key="item.value"
             type="button"
-            class="search-toolbar__source-button h-7 min-h-0 px-3 text-sm font-medium transition"
+            class="search-toolbar__source-button h-6 min-h-0 px-2.5 text-[13px] font-medium transition"
             :class="source === item.value
               ? 'bg-[var(--color-primary)] text-white shadow-sm'
               : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
@@ -243,12 +243,12 @@ defineExpose({ focus, clear })
         <div class="search-toolbar__actions flex shrink-0 items-center gap-2.5">
           <button
             type="button"
-            class="search-toolbar__control inline-flex h-9 min-h-0 w-9 items-center justify-center border border-[var(--shell-line)] bg-[var(--shell-control-bg)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:opacity-50"
+            class="search-toolbar__control inline-flex h-8 min-h-0 w-8 items-center justify-center border border-[var(--shell-line)] bg-[var(--shell-control-bg)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:opacity-50"
             :aria-label="t('action.refresh')"
             :disabled="refreshing"
             @click="emit('refresh')"
           >
-            <ArrowPathIcon class="h-5 w-5" :class="{ 'animate-spin': refreshing }" aria-hidden="true" />
+            <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': refreshing }" aria-hidden="true" />
           </button>
 
         <details
@@ -263,7 +263,7 @@ defineExpose({ focus, clear })
             :aria-label="t('search.debugTitle')"
           >
             <AdjustmentsHorizontalIcon class="h-4 w-4 flex-none" aria-hidden="true" />
-            <span class="text-[10px] font-bold tracking-wide">DEV</span>
+            <span class="search-toolbar__dev-label text-[10px] font-bold tracking-wide">DEV</span>
           </summary>
           <div
             class="search-toolbar__debug-panel absolute right-0 top-[calc(100%+.5rem)] w-[min(440px,calc(100vw-2.5rem))] rounded-lg border border-amber-200/80 bg-[var(--shell-card)] p-4 text-left shadow-2xl"
@@ -309,6 +309,8 @@ defineExpose({ focus, clear })
           </div>
         </details>
 
+        <span class="search-toolbar__actions-divider" aria-hidden="true"></span>
+
         <CaptureButton
           class="search-toolbar__capture"
           :capturing="capturing"
@@ -332,6 +334,10 @@ defineExpose({ focus, clear })
 </template>
 
 <style scoped>
+.search-toolbar__dev-label {
+  font-family: var(--font-ui);
+}
+
 .search-toolbar {
   --search-toolbar-surface-radius: var(--radius-xl);
   --search-toolbar-surface-inset: 0.75rem;
@@ -361,7 +367,7 @@ defineExpose({ focus, clear })
   pointer-events: none;
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--shell-window-bg) 78%, transparent) 0%,
+    color-mix(in srgb, var(--shell-window-bg) 60%, transparent) 0%,
     color-mix(in srgb, var(--shell-window-bg) 28%, transparent) 62%,
     transparent 100%
   );
@@ -393,13 +399,13 @@ defineExpose({ focus, clear })
 
 .search-toolbar__layout {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 13.5rem auto;
+  grid-template-columns: minmax(260px, 1fr) 12.25rem auto;
   align-items: center;
   gap: 0.625rem;
 }
 
 .search-toolbar__source-switcher {
-  width: 13.5rem;
+  width: 12.25rem;
   gap: var(--search-toolbar-segment-inset);
   padding: var(--search-toolbar-segment-inset);
 }
@@ -418,9 +424,12 @@ defineExpose({ focus, clear })
   border-radius: var(--search-toolbar-detail-radius);
 }
 
-.search-toolbar__actions {
-  padding-left: 0.75rem;
-  border-left: 1px solid var(--shell-line);
+.search-toolbar__actions-divider {
+  width: 1px;
+  height: 1.25rem;
+  flex: 0 0 1px;
+  margin-inline: -0.125rem;
+  background: var(--shell-line);
 }
 
 .search-toolbar__debug-panel {
@@ -447,14 +456,13 @@ defineExpose({ focus, clear })
 
   .search-toolbar__source-switcher {
     grid-column: 1;
-    width: 12rem;
+    width: 11rem;
   }
 
   .search-toolbar__actions {
     grid-column: 2;
     grid-row: 2;
     justify-self: end;
-    padding-left: 0.625rem;
   }
 }
 
@@ -476,8 +484,6 @@ defineExpose({ focus, clear })
     grid-column: 1;
     grid-row: 3;
     justify-self: end;
-    padding-left: 0;
-    border-left: 0;
   }
 }
 </style>
