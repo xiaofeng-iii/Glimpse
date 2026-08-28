@@ -52,6 +52,7 @@ def _emit_from_thread(
 async def _create_memory_in_background(
     image_path: str,
     source: str,
+    memory_id: str,
 ) -> None:
     memory_service = get_memory_service()
 
@@ -60,6 +61,7 @@ async def _create_memory_in_background(
             memory_service.create_memory,
             image_path,
             "unknown",
+            memory_id=memory_id,
         )
         if not memory_id:
             await broadcast_event(
@@ -104,66 +106,109 @@ def setup_cluster_processing(loop: asyncio.AbstractEventLoop) -> None:
         if not image_paths:
             return
 
-        memory_service = get_memory_service()
-        primary_image = image_paths[0]
+        async def start_cluster_processing():
+            memory_service = get_memory_service()
+            primary_image = image_paths[0]
 
-        def on_complete(memory_id):
-            if not memory_id:
-                _emit_from_thread(
-                    loop,
+            try:
+                pending_memory = memory_service.prepare_cluster_memory(
+                    image_paths,
+                    app_name="unknown",
+                )
+            except Exception as exc:
+                await broadcast_event(
                     "error_occurred",
                     {
-                        "message": "Cluster memory creation failed",
+                        "message": str(exc),
                         "image_path": primary_image,
+                        "images": image_paths,
                         "source": "cluster",
                     },
                 )
                 return
 
-            _emit_from_thread(
-                loop,
-                "memory_saved",
+            # Await this broadcast before a worker can complete so a stale
+            # PROCESSING event can never arrive after the terminal update.
+            await broadcast_event(
+                "memory_processing_started",
                 {
-                    "memory_id": memory_id,
-                    "image_path": primary_image,
-                    "images": image_paths,
+                    "memory": pending_memory.to_dict(),
                     "source": "cluster",
                 },
             )
 
-        def on_error(message: str):
-            _emit_from_thread(
-                loop,
-                "error_occurred",
-                {
-                    "message": message,
-                    "image_path": primary_image,
-                    "images": image_paths,
-                    "source": "cluster",
-                },
-            )
+            def on_complete(memory_id):
+                if not memory_id:
+                    _emit_from_thread(
+                        loop,
+                        "error_occurred",
+                        {
+                            "message": "Cluster memory creation failed",
+                            "image_path": primary_image,
+                            "source": "cluster",
+                        },
+                    )
+                    return
+
+                _emit_from_thread(
+                    loop,
+                    "memory_saved",
+                    {
+                        "memory_id": memory_id,
+                        "image_path": primary_image,
+                        "images": image_paths,
+                        "source": "cluster",
+                    },
+                )
+
+            def on_error(message: str):
+                _emit_from_thread(
+                    loop,
+                    "error_occurred",
+                    {
+                        "message": message,
+                        "image_path": primary_image,
+                        "images": image_paths,
+                        "source": "cluster",
+                    },
+                )
+
+            try:
+                memory_service.create_cluster_memory_async(
+                    image_paths,
+                    app_name="unknown",
+                    on_complete=on_complete,
+                    on_error=on_error,
+                    memory_id=pending_memory.id,
+                )
+            except Exception as exc:
+                async def create_cluster_in_background():
+                    try:
+                        memory_id = await asyncio.to_thread(
+                            memory_service.create_cluster_memory,
+                            image_paths,
+                            "unknown",
+                            memory_id=pending_memory.id,
+                        )
+                        on_complete(memory_id)
+                    except Exception as background_exc:
+                        on_error(str(background_exc))
+
+                logger.warning(
+                    "Cluster async queue unavailable, falling back to thread: %s",
+                    exc,
+                )
+                asyncio.create_task(create_cluster_in_background())
 
         try:
-            memory_service.create_cluster_memory_async(
-                image_paths,
-                app_name="unknown",
-                on_complete=on_complete,
-                on_error=on_error,
-            )
-        except Exception as exc:
-            async def create_cluster_in_background():
-                try:
-                    memory_id = await asyncio.to_thread(
-                        memory_service.create_cluster_memory,
-                        image_paths,
-                        "unknown",
-                    )
-                    on_complete(memory_id)
-                except Exception as background_exc:
-                    on_error(str(background_exc))
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
 
-            logger.warning("Cluster async queue unavailable, falling back to thread: %s", exc)
-            asyncio.run_coroutine_threadsafe(create_cluster_in_background(), loop)
+        if running_loop is loop:
+            loop.create_task(start_cluster_processing())
+        else:
+            asyncio.run_coroutine_threadsafe(start_cluster_processing(), loop)
 
     cluster_buffer.flushed.connect(on_cluster_flushed)
 
@@ -219,6 +264,17 @@ async def capture_and_analyze(*, force: bool = False, source: str = "api") -> Di
 
         memory_service = get_memory_service()
         loop = asyncio.get_running_loop()
+        pending_memory = memory_service.prepare_screenshot_memory(
+            image_path,
+            app_name="unknown",
+        )
+        await broadcast_event(
+            "memory_processing_started",
+            {
+                "memory": pending_memory.to_dict(),
+                "source": source,
+            },
+        )
 
         def on_complete(memory_id):
             if not memory_id:
@@ -260,14 +316,23 @@ async def capture_and_analyze(*, force: bool = False, source: str = "api") -> Di
                 app_name="unknown",
                 on_complete=on_complete,
                 on_error=on_error,
+                memory_id=pending_memory.id,
             )
         except Exception:
-            asyncio.create_task(_create_memory_in_background(image_path, source))
+            asyncio.create_task(
+                _create_memory_in_background(
+                    image_path,
+                    source,
+                    pending_memory.id,
+                )
+            )
 
         return {
             "success": True,
             "accepted": True,
             "message": "Screenshot captured and analysis started",
+            "memory_id": pending_memory.id,
+            "memory": pending_memory.to_dict(),
             "image_path": image_path,
             "source": source,
         }

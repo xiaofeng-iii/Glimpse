@@ -6,6 +6,7 @@ import { getMemoryImageUrls } from '@/utils/memory-images'
 import { getMatchSourceKinds } from '@/utils/match-sources'
 import { isTextMemory } from '@/utils/memory-types'
 import { t } from '@/utils/i18n'
+import MemoryAnalysisState from './MemoryAnalysisState.vue'
 
 const props = defineProps<{
   memory: Memory
@@ -24,6 +25,9 @@ const isDev = import.meta.env.DEV
 const imageUrl = computed(() => getMemoryImageUrls(props.memory)[0] ?? '')
 const textMemory = computed(() => isTextMemory(props.memory))
 const matchSourceKinds = computed(() => getMatchSourceKinds(props.memory.match_sources))
+const analysisStatus = computed(() => props.memory.analysis_status ?? 'COMPLETED')
+const analyzing = computed(() => analysisStatus.value === 'PROCESSING')
+const analysisUnavailable = computed(() => analysisStatus.value === 'FAILED')
 
 const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -51,6 +55,7 @@ const handleKeydown = (event: KeyboardEvent) => {
     role="button"
     tabindex="0"
     :aria-pressed="selected"
+    :aria-busy="analyzing"
     @click="emit('select', memory)"
     @dblclick.stop="emit('open', memory)"
     @keydown="handleKeydown"
@@ -59,16 +64,16 @@ const handleKeydown = (event: KeyboardEvent) => {
       v-if="textMemory"
       class="memory-card__text-body relative bg-[var(--color-primary-soft)] p-4"
     >
-      <p class="memory-card__text-content line-clamp-6 whitespace-pre-wrap text-sm leading-6 text-[var(--shell-ink)]">
+      <p class="memory-card__text-content whitespace-pre-wrap text-sm text-[var(--shell-ink)]">
         {{ memory.ai_summary || t('memory.noContent') }}
       </p>
     </div>
 
-    <div v-else class="relative flex aspect-[1.4/1] items-center justify-center overflow-hidden bg-slate-100/70">
+    <div v-else class="memory-card__media relative flex items-center justify-center overflow-hidden bg-slate-100/70">
       <img
         v-if="imageUrl && !imageFailed"
         :src="imageUrl"
-        :alt="memory.ai_summary"
+        :alt="memory.ai_summary || t('memory.analysisProcessing')"
         class="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
         loading="lazy"
         @error="imageFailed = true"
@@ -78,14 +83,19 @@ const handleKeydown = (event: KeyboardEvent) => {
 
     <div
       class="flex flex-col"
-      :class="textMemory ? 'memory-card__text-footer' : 'flex-1 p-3.5'"
+      :class="textMemory ? 'memory-card__text-footer' : 'flex-1 p-2'"
     >
-      <p v-if="!textMemory" class="line-clamp-2 min-h-10 text-[13px] leading-5 text-[var(--shell-ink)]">
+      <MemoryAnalysisState
+        v-if="!textMemory && (analyzing || analysisUnavailable)"
+        :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"
+        compact
+      />
+      <p v-else-if="!textMemory" class="line-clamp-4 min-h-20 text-[13px] leading-5 text-[var(--shell-ink)]">
         {{ memory.ai_summary || t('memory.noContent') }}
       </p>
       <div
         class="memory-card__metadata-row mt-auto flex min-h-6 items-center gap-2"
-        :class="{ 'pt-2.5': !textMemory }"
+        :class="{ 'pt-[5px]': !textMemory }"
       >
         <div class="memory-card__tag-area">
           <template v-if="searching">
@@ -122,17 +132,32 @@ const handleKeydown = (event: KeyboardEvent) => {
 </template>
 
 <style scoped>
+.memory-card {
+  inline-size: var(--memory-card-width, 239px);
+  block-size: 270px;
+}
+
+.memory-card__media {
+  flex: 0 0 148px;
+}
+
 .memory-card__text-body {
+  flex: 1 1 0;
+  min-height: 0;
   border-bottom: 1px solid var(--shell-line);
 }
 
 .memory-card__text-content {
-  height: 9rem;
+  display: -webkit-box;
+  height: 100%;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
 }
 
 .memory-card__text-footer {
-  min-height: 3.5rem;
-  padding: 0.75rem 0.875rem;
+  flex: 0 0 3.5rem;
+  padding: 8px;
   background: var(--shell-card);
 }
 

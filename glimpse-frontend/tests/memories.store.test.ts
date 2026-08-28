@@ -137,6 +137,26 @@ describe('memories store', () => {
     expect(store.memories[0].search_debug).toBeNull()
   })
 
+  it('shows a newly processing screenshot immediately even while search is active', async () => {
+    apiMocks.search.mockResolvedValue({
+      memories: [memory('search-result')],
+      query: 'payment',
+      source: 'all',
+    })
+
+    const store = useMemoriesStore()
+    await store.search('payment')
+    store.upsert({
+      ...memory('processing', ''),
+      image_path: 'capture.png',
+      analysis_status: 'PROCESSING',
+      sync_status: 'PENDING',
+    })
+
+    expect(store.memories.map((item) => item.id)).toEqual(['processing', 'search-result'])
+    expect(store.memories[0].analysis_status).toBe('PROCESSING')
+  })
+
   it('applies the same date and content filters to browse and search requests', async () => {
     apiMocks.list.mockResolvedValue({ memories: [memory('1')], total: 1 })
     apiMocks.search.mockResolvedValue({

@@ -21,6 +21,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import MediaGallery from '@/components/MediaGallery.vue'
 import OcrText from '@/components/OcrText.vue'
 import SummaryEditor from '@/components/SummaryEditor.vue'
+import MemoryAnalysisState from '@/components/MemoryAnalysisState.vue'
 
 type SummaryEditorExpose = {
   canLeave: () => Promise<boolean>
@@ -40,6 +41,9 @@ const deleting = ref(false)
 const memoryId = computed(() => String(route.params.id ?? ''))
 const memory = computed(() => memoriesStore.entities[memoryId.value] ?? null)
 const textMemory = computed(() => Boolean(memory.value && isTextMemory(memory.value)))
+const analysisStatus = computed(() => memory.value?.analysis_status ?? 'COMPLETED')
+const analyzing = computed(() => analysisStatus.value === 'PROCESSING')
+const analysisUnavailable = computed(() => analysisStatus.value === 'FAILED')
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleString([], {
@@ -109,7 +113,7 @@ const confirmDelete = async () => {
         </div>
 
         <button
-          v-if="memory"
+          v-if="memory && !analyzing"
           type="button"
           class="inline-flex min-h-10 items-center gap-2 rounded-md border border-red-200 px-3.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
           @click="deleteDialogOpen = true"
@@ -141,14 +145,18 @@ const confirmDelete = async () => {
         </section>
 
         <section class="min-w-0 space-y-5">
-          <SummaryEditor ref="summaryEditor" :memory="memory" />
+          <MemoryAnalysisState
+            v-if="analyzing || analysisUnavailable"
+            :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"
+          />
+          <SummaryEditor v-else ref="summaryEditor" :memory="memory" />
 
-          <button type="button" class="btn-secondary min-h-10" @click="copySummary">
+          <button v-if="!analyzing && !analysisUnavailable" type="button" class="btn-secondary min-h-10" @click="copySummary">
             <ClipboardDocumentIcon class="h-5 w-5 flex-none" aria-hidden="true" />
             {{ t(textMemory ? 'action.copyContent' : 'action.copySummary') }}
           </button>
 
-          <div v-if="!textMemory" class="border-t border-[var(--shell-line)] pt-5">
+          <div v-if="!textMemory && !analyzing && !analysisUnavailable" class="border-t border-[var(--shell-line)] pt-5">
             <OcrText :text="memory.text_content" />
           </div>
 

@@ -67,9 +67,11 @@ FastAPI / Python
 → Vue 检查后端状态并最小化窗口
 → POST /api/screenshot/analyze
 → CaptureManager 保存截图
+→ SQLite 立即写入 analysis_status=PROCESSING 的可读取记录
+→ Vue 立即显示可点击的记忆卡片和分析进度
 → MemoryService 在后台执行本地 OCR（失败可降级）
 → 已配置 AI 时调用多模态模型，否则使用 OCR 文本生成基础摘要
-→ SQLite 以 PENDING 状态保存事实记录
+→ SQLite 原位写回摘要与 OCR，并将 analysis_status 更新为 COMPLETED
 → EmbeddingClient 对摘要与 OCR 文本生成本地中文向量
 → ChromaDB 写入派生向量索引
 → SQLite 将 sync_status 更新为 SYNCED 或 FAILED
@@ -113,8 +115,10 @@ FastAPI / Python
 
 集群模式将多张连续截图合并为一条记忆。达到图片数量上限时总会提交；等待
 超时后仅在 `cluster_auto_submit` 开启时自动提交，否则继续等待用户手动提交。
-提交后，`MemoryService.create_cluster_memory*()` 先识别全部图片文字，再按配置
-调用多图 AI；第一张图作为主图，其余图片记录在 `extra_images`。
+提交后立即写入并广播一条 `analysis_status=PROCESSING` 的真实记忆，卡片、全部图片
+和详情此时即可查看；`MemoryService.create_cluster_memory*()` 随后识别全部图片文字，
+再按配置调用多图 AI，并在同一 ID 上原位更新结果。第一张图作为主图，其余图片记录在
+`extra_images`。自动提交、达到数量上限和手动提交共用这一条处理链路。
 
 ### 3.4 搜索
 
@@ -184,8 +188,9 @@ loopback 端口，并为每次启动生成鉴权令牌；REST 请求使用
 - 集群状态事件
 
 截图分析接口返回 `accepted` 表示后台任务已接收，不表示 OCR、AI 与存储已经
-完成；最终结果以 WebSocket 事件为准。`memory_updated` 也用于通知摘要编辑或
-重建后的同步状态变化。
+完成。响应中的 `memory` 和 `memory_processing_started` 事件提供同一条可读取的
+分析中记录；最终结果以 WebSocket 事件为准。`memory_updated` 也用于通知分析结果、
+摘要编辑或重建后的同步状态变化。
 
 ## 6. 数据与配置
 

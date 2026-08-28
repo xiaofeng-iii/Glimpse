@@ -34,6 +34,7 @@ def memory_to_response(memory) -> dict:
         "text_content": memory.text_content,
         "extra_images": memory.extra_images,
         "sync_status": getattr(memory, "sync_status", "PENDING"),
+        "analysis_status": getattr(memory, "analysis_status", "COMPLETED"),
         "memory_type": getattr(memory, "memory_type", "screenshot"),
         "match_sources": getattr(memory, "match_sources", []),
     }

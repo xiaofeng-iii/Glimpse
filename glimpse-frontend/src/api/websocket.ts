@@ -76,6 +76,14 @@ export function useWebSocket() {
     const notificationStore = useNotificationStore()
 
     switch (event.type) {
+      case 'memory_processing_started': {
+        const memory = event.data.memory as import('@/api/client').Memory | undefined
+        if (memory?.id) {
+          memoriesStore.upsert(memory)
+        }
+        break
+      }
+
       case 'memory_saved':
         void memoriesStore.refresh().then(() => {
           const memoryId = event.data.memory_id

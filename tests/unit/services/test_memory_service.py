@@ -51,6 +51,30 @@ def mock_services():
         record.sync_status = sync_status
         return True
 
+    def update_analysis(
+        memory_id,
+        ai_summary,
+        text_content,
+        *,
+        analysis_status="COMPLETED",
+        sync_status="PENDING",
+    ):
+        record = records.get(memory_id)
+        if record is None:
+            return False
+        record.ai_summary = ai_summary
+        record.text_content = text_content
+        record.analysis_status = analysis_status
+        record.sync_status = sync_status
+        return True
+
+    def update_analysis_status(memory_id, analysis_status):
+        record = records.get(memory_id)
+        if record is None:
+            return False
+        record.analysis_status = analysis_status
+        return True
+
     def compare_status(
         memory_id,
         *,
@@ -78,6 +102,8 @@ def mock_services():
     sqlite_mgr.update_memory_summary.side_effect = update_summary
     sqlite_mgr.update_memory_text_content.side_effect = update_text
     sqlite_mgr.update_memory_sync_status.side_effect = update_status
+    sqlite_mgr.update_memory_analysis.side_effect = update_analysis
+    sqlite_mgr.update_memory_analysis_status.side_effect = update_analysis_status
     sqlite_mgr.compare_and_set_memory_sync_status.side_effect = compare_status
     sqlite_mgr.get_all_memories.side_effect = get_all
     sqlite_mgr.get_memories_count.side_effect = lambda: len(records)
@@ -149,6 +175,26 @@ def add_record(mock_services, **overrides):
 
 
 class TestMemoryServiceCreate:
+    def test_prepare_screenshot_memory_is_immediately_readable(self, mock_services):
+        service = make_service(mock_services)
+
+        record = service.prepare_screenshot_memory("capture.png")
+
+        assert record.id in mock_services["sqlite_manager"]._records
+        assert record.analysis_status == "PROCESSING"
+        assert record.ai_summary == ""
+        assert record.image_path == "capture.png"
+
+    def test_prepare_cluster_memory_is_immediately_readable(self, mock_services):
+        service = make_service(mock_services)
+
+        record = service.prepare_cluster_memory(["first.png", "second.png"])
+
+        assert record.id in mock_services["sqlite_manager"]._records
+        assert record.analysis_status == "PROCESSING"
+        assert record.image_path == "first.png"
+        assert json.loads(record.extra_images) == ["second.png"]
+
     def test_single_capture_runs_ocr_before_persisting(self, mock_services):
         service = make_service(mock_services)
 
@@ -156,6 +202,7 @@ class TestMemoryServiceCreate:
 
         record = mock_services["sqlite_manager"]._records[memory_id]
         assert record.text_content == "extracted text"
+        assert record.analysis_status == "COMPLETED"
         assert record.sync_status == "SYNCED"
         mock_services["ocr_engine"].extract_text.assert_called_once_with("capture.png")
         kwargs = mock_services["chroma_manager"].upsert_memory.call_args.kwargs
@@ -204,6 +251,21 @@ class TestMemoryServiceCreate:
         assert json.loads(record.extra_images) == ["2.png", "3.png"]
         mock_services["ai_client"].analyze_images.assert_called_once()
 
+    def test_cluster_processing_updates_the_prepared_record_in_place(self, mock_services):
+        service = make_service(mock_services)
+        pending = service.prepare_cluster_memory(["first.png", "second.png"])
+
+        memory_id = service.create_cluster_memory(
+            ["first.png", "second.png"],
+            memory_id=pending.id,
+        )
+
+        assert memory_id == pending.id
+        assert list(mock_services["sqlite_manager"]._records) == [pending.id]
+        record = mock_services["sqlite_manager"]._records[pending.id]
+        assert record.analysis_status == "COMPLETED"
+        assert record.ai_summary == "Cluster summary"
+
     def test_empty_cluster_is_rejected(self, mock_services):
         service = make_service(mock_services)
         with pytest.raises(ValueError, match="at least one image"):
@@ -236,11 +298,24 @@ class TestMemoryServiceAsync:
 
     def test_create_memory_async_submits_unique_task(self, mock_services):
         service = make_service(mock_services, with_queue=True)
-        service.create_memory_async("capture.png")
+        memory_id = service.create_memory_async("capture.png")
 
         args = mock_services["task_queue"].submit.call_args.args
         assert args[0].startswith("memory_creation_")
         assert callable(args[1])
+        assert mock_services["sqlite_manager"]._records[memory_id].analysis_status == "PROCESSING"
+
+    def test_create_cluster_memory_async_returns_processing_record(self, mock_services):
+        service = make_service(mock_services, with_queue=True)
+
+        memory_id = service.create_cluster_memory_async(["first.png", "second.png"])
+
+        args = mock_services["task_queue"].submit.call_args.args
+        assert args[0].startswith("cluster_memory_")
+        assert callable(args[1])
+        record = mock_services["sqlite_manager"]._records[memory_id]
+        assert record.analysis_status == "PROCESSING"
+        assert json.loads(record.extra_images) == ["second.png"]
 
 
 class TestMemorySummaryUpdate:

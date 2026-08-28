@@ -26,6 +26,7 @@ class MemoryRecord:
     text_content: Optional[str] = None
     extra_images: Optional[str] = None
     sync_status: str = "PENDING"
+    analysis_status: str = "COMPLETED"
     memory_type: str = "screenshot"
     match_sources: List[str] = field(default_factory=list)
 
@@ -45,6 +46,11 @@ class MemoryRecord:
                 text_content=row["text_content"] if "text_content" in row.keys() else None,
                 extra_images=row["extra_images"] if "extra_images" in row.keys() else None,
                 sync_status=row["sync_status"] if "sync_status" in row.keys() else "PENDING",
+                analysis_status=(
+                    row["analysis_status"]
+                    if "analysis_status" in row.keys() and row["analysis_status"]
+                    else "COMPLETED"
+                ),
                 memory_type=(
                     row["memory_type"]
                     if "memory_type" in row.keys() and row["memory_type"]
@@ -63,6 +69,7 @@ class MemoryRecord:
                 extra_images=row[6],
                 sync_status=row[7],
                 memory_type=row[8] if len(row) > 8 and row[8] else "screenshot",
+                analysis_status=row[9] if len(row) > 9 and row[9] else "COMPLETED",
             )
         return cls(
             id=row[0],
@@ -105,7 +112,8 @@ class SQLiteManager:
                 text_content TEXT,
                 extra_images TEXT,
                 sync_status TEXT DEFAULT 'PENDING',
-                memory_type TEXT NOT NULL DEFAULT 'screenshot'
+                memory_type TEXT NOT NULL DEFAULT 'screenshot',
+                analysis_status TEXT NOT NULL DEFAULT 'COMPLETED'
             )
         """)
 
@@ -156,6 +164,11 @@ class SQLiteManager:
                 "ALTER TABLE memories ADD COLUMN memory_type TEXT NOT NULL "
                 "DEFAULT 'screenshot'"
             )
+        if "analysis_status" not in columns:
+            cursor.execute(
+                "ALTER TABLE memories ADD COLUMN analysis_status TEXT NOT NULL "
+                "DEFAULT 'COMPLETED'"
+            )
         cursor.execute(
             """
             UPDATE memories
@@ -168,6 +181,13 @@ class SQLiteManager:
             UPDATE memories
             SET memory_type = 'screenshot'
             WHERE memory_type IS NULL OR TRIM(memory_type) = ''
+            """
+        )
+        cursor.execute(
+            """
+            UPDATE memories
+            SET analysis_status = 'COMPLETED'
+            WHERE analysis_status IS NULL OR TRIM(analysis_status) = ''
             """
         )
         cursor.execute(
@@ -185,8 +205,8 @@ class SQLiteManager:
                 cursor = self._conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO memories (id, created_at, image_path, ai_summary, app_name, text_content, extra_images, sync_status, memory_type)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO memories (id, created_at, image_path, ai_summary, app_name, text_content, extra_images, sync_status, memory_type, analysis_status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         record.id,
@@ -198,6 +218,7 @@ class SQLiteManager:
                         record.extra_images,
                         record.sync_status,
                         record.memory_type,
+                        record.analysis_status,
                     ),
                 )
                 self._conn.commit()
@@ -363,6 +384,58 @@ class SQLiteManager:
                 return cursor.rowcount > 0
             except Exception as e:
                 logger.error("Update memory OCR text error: %s", e)
+                return False
+
+    def update_memory_analysis(
+        self,
+        memory_id: str,
+        ai_summary: str,
+        text_content: str,
+        *,
+        analysis_status: str = "COMPLETED",
+        sync_status: str = "PENDING",
+    ) -> bool:
+        """Commit OCR and summary output together so observers see one stable state."""
+        with self._write_lock:
+            try:
+                cursor = self._conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE memories
+                    SET ai_summary = ?, text_content = ?,
+                        analysis_status = ?, sync_status = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        ai_summary,
+                        text_content,
+                        analysis_status,
+                        sync_status,
+                        memory_id,
+                    ),
+                )
+                self._conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                logger.error("Update memory analysis error: %s", e)
+                return False
+
+    def update_memory_analysis_status(
+        self,
+        memory_id: str,
+        analysis_status: str,
+    ) -> bool:
+        with self._write_lock:
+            try:
+                cursor = self._conn.cursor()
+                cursor.execute(
+                    "UPDATE memories SET analysis_status = ? WHERE id = ?",
+                    (analysis_status, memory_id),
+                )
+                self._conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                logger.error("Update memory analysis status error: %s", e)
                 return False
 
     def update_memory_sync_status(self, memory_id: str, sync_status: str) -> bool:

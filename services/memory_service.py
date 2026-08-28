@@ -279,7 +279,12 @@ class MemoryService:
         image_path: str,
         app_name: str = "unknown",
         stream_callback: Optional[Callable[[str], None]] = None,
+        *,
+        memory_id: Optional[str] = None,
     ) -> Optional[str]:
+        if memory_id is None:
+            memory_id = self.prepare_screenshot_memory(image_path, app_name).id
+
         acquired = self._semaphore.acquire(timeout=30)
         if not acquired:
             raise RuntimeError("Too many memory creation tasks in progress")
@@ -287,7 +292,13 @@ class MemoryService:
         try:
             with self._active_lock:
                 self._active_count += 1
-            return self._create_memory_impl(image_path, app_name, stream_callback)
+            return self._create_memory_impl(memory_id, image_path, stream_callback)
+        except Exception:
+            self._sqlite_manager.update_memory_analysis_status(memory_id, "FAILED")
+            self._emit_memory_updated(
+                self._sqlite_manager.get_memory_by_id(memory_id)
+            )
+            raise
         finally:
             with self._active_lock:
                 self._active_count -= 1
@@ -295,13 +306,10 @@ class MemoryService:
 
     def _create_memory_impl(
         self,
+        memory_id: str,
         image_path: str,
-        app_name: str,
         stream_callback: Optional[Callable[[str], None]] = None,
     ) -> Optional[str]:
-        memory_id = str(uuid.uuid4())
-        created_at = time.strftime("%Y-%m-%d %H:%M:%S")
-
         self._report_progress("正在识别文字...")
         text_content, _ = self._extract_ocr_text([image_path])
 
@@ -324,20 +332,16 @@ class MemoryService:
             ai_summary = self._fallback_summary(text_content)
 
         self._report_progress("正在存储记忆...")
-        from db.sqlite_manager import MemoryRecord
+        if not self._sqlite_manager.update_memory_analysis(
+            memory_id,
+            ai_summary,
+            text_content,
+        ):
+            raise RuntimeError(f"Failed to update memory {memory_id} in SQLite")
 
-        record = MemoryRecord(
-            id=memory_id,
-            created_at=created_at,
-            image_path=str(image_path),
-            ai_summary=ai_summary,
-            app_name=app_name,
-            text_content=text_content,
-            sync_status="PENDING",
-            memory_type="screenshot",
-        )
-        if not self._sqlite_manager.insert_memory(record):
-            raise RuntimeError(f"Failed to insert memory {memory_id} to SQLite")
+        # Analysis and indexing are separate states. Expose OCR/summary output
+        # now while the vector index continues under sync_status.
+        self._emit_memory_updated(self._sqlite_manager.get_memory_by_id(memory_id))
 
         # Creation already runs in a background worker. Complete the first index
         # attempt there so memory_saved observers see a final sync status.
@@ -394,21 +398,76 @@ class MemoryService:
                 self._active_count -= 1
             self._semaphore.release()
 
+    def prepare_screenshot_memory(
+        self,
+        image_path: str,
+        app_name: str = "unknown",
+    ) -> "MemoryRecord":
+        return self._prepare_image_memory([image_path], app_name)
+
+    def prepare_cluster_memory(
+        self,
+        image_paths: List[str],
+        app_name: str = "unknown",
+    ) -> "MemoryRecord":
+        if not image_paths:
+            raise ValueError("Cluster memory requires at least one image")
+        return self._prepare_image_memory(image_paths, app_name)
+
+    def _prepare_image_memory(
+        self,
+        image_paths: List[str],
+        app_name: str,
+    ) -> "MemoryRecord":
+        """Persist a readable image-memory shell before OCR/AI work starts."""
+        from db.sqlite_manager import MemoryRecord
+
+        primary_image = image_paths[0]
+        extra_images = image_paths[1:]
+        record = MemoryRecord(
+            id=str(uuid.uuid4()),
+            created_at=time.strftime("%Y-%m-%d %H:%M:%S"),
+            image_path=str(primary_image),
+            ai_summary="",
+            app_name=app_name,
+            text_content="",
+            extra_images=(
+                json.dumps(extra_images, ensure_ascii=False)
+                if extra_images
+                else None
+            ),
+            sync_status="PENDING",
+            analysis_status="PROCESSING",
+            memory_type="screenshot",
+        )
+        if not self._sqlite_manager.insert_memory(record):
+            raise RuntimeError(f"Failed to insert memory {record.id} to SQLite")
+        return record
+
     def create_memory_async(
         self,
         image_path: str,
         app_name: str = "unknown",
         on_complete: Optional[Callable[[Optional[str]], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
-    ) -> None:
+        *,
+        memory_id: Optional[str] = None,
+    ) -> str:
         if not self._task_queue:
             raise RuntimeError("Task queue not configured for async operations")
 
+        if memory_id is None:
+            memory_id = self.prepare_screenshot_memory(image_path, app_name).id
+
         def task():
             try:
-                memory_id = self.create_memory(image_path, app_name)
+                completed_memory_id = self.create_memory(
+                    image_path,
+                    app_name,
+                    memory_id=memory_id,
+                )
                 if on_complete:
-                    on_complete(memory_id)
+                    on_complete(completed_memory_id)
             except Exception as exc:
                 logger.error("Memory creation error: %s", exc)
                 if on_error:
@@ -416,15 +475,20 @@ class MemoryService:
 
         task_id = f"memory_creation_{uuid.uuid4().hex[:8]}"
         self._task_queue.submit(task_id, task)
+        return memory_id
 
     def create_cluster_memory(
         self,
         image_paths: List[str],
         app_name: str = "unknown",
         stream_callback: Optional[Callable[[str], None]] = None,
+        *,
+        memory_id: Optional[str] = None,
     ) -> Optional[str]:
         if not image_paths:
             raise ValueError("Cluster memory requires at least one image")
+        if memory_id is None:
+            memory_id = self.prepare_cluster_memory(image_paths, app_name).id
 
         acquired = self._semaphore.acquire(timeout=30)
         if not acquired:
@@ -434,10 +498,16 @@ class MemoryService:
             with self._active_lock:
                 self._active_count += 1
             return self._create_cluster_memory_impl(
+                memory_id,
                 image_paths,
-                app_name,
                 stream_callback,
             )
+        except Exception:
+            self._sqlite_manager.update_memory_analysis_status(memory_id, "FAILED")
+            self._emit_memory_updated(
+                self._sqlite_manager.get_memory_by_id(memory_id)
+            )
+            raise
         finally:
             with self._active_lock:
                 self._active_count -= 1
@@ -445,15 +515,10 @@ class MemoryService:
 
     def _create_cluster_memory_impl(
         self,
+        memory_id: str,
         image_paths: List[str],
-        app_name: str,
         stream_callback: Optional[Callable[[str], None]] = None,
     ) -> Optional[str]:
-        memory_id = str(uuid.uuid4())
-        created_at = time.strftime("%Y-%m-%d %H:%M:%S")
-        primary_image = image_paths[0]
-        extra_images = image_paths[1:]
-
         self._report_progress("正在识别文字...")
         text_content, _ = self._extract_ocr_text(image_paths)
 
@@ -476,21 +541,14 @@ class MemoryService:
             ai_summary = self._fallback_summary(text_content)
 
         self._report_progress("正在存储记忆...")
-        from db.sqlite_manager import MemoryRecord
+        if not self._sqlite_manager.update_memory_analysis(
+            memory_id,
+            ai_summary,
+            text_content,
+        ):
+            raise RuntimeError(f"Failed to update cluster memory {memory_id} in SQLite")
 
-        record = MemoryRecord(
-            id=memory_id,
-            created_at=created_at,
-            image_path=str(primary_image),
-            ai_summary=ai_summary,
-            app_name=app_name,
-            text_content=text_content,
-            extra_images=json.dumps(extra_images, ensure_ascii=False) if extra_images else None,
-            sync_status="PENDING",
-            memory_type="screenshot",
-        )
-        if not self._sqlite_manager.insert_memory(record):
-            raise RuntimeError(f"Failed to insert cluster memory {memory_id} to SQLite")
+        self._emit_memory_updated(self._sqlite_manager.get_memory_by_id(memory_id))
 
         self._reindex_memory(memory_id, emit_update=False)
         self._report_progress("集群记忆已保存")
@@ -502,15 +560,23 @@ class MemoryService:
         app_name: str = "unknown",
         on_complete: Optional[Callable[[Optional[str]], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
-    ) -> None:
+        *,
+        memory_id: Optional[str] = None,
+    ) -> str:
         if not self._task_queue:
             raise RuntimeError("Task queue not configured for async operations")
+        if memory_id is None:
+            memory_id = self.prepare_cluster_memory(image_paths, app_name).id
 
         def task():
             try:
-                memory_id = self.create_cluster_memory(image_paths, app_name)
+                completed_memory_id = self.create_cluster_memory(
+                    image_paths,
+                    app_name,
+                    memory_id=memory_id,
+                )
                 if on_complete:
-                    on_complete(memory_id)
+                    on_complete(completed_memory_id)
             except Exception as exc:
                 logger.error("Cluster memory creation error: %s", exc)
                 if on_error:
@@ -518,6 +584,7 @@ class MemoryService:
 
         task_id = f"cluster_memory_{uuid.uuid4().hex[:8]}"
         self._task_queue.submit(task_id, task)
+        return memory_id
 
     def update_memory_summary(
         self,

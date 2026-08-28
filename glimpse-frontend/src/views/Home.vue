@@ -169,6 +169,9 @@ const handleScreenshot = async (initiatedByHotkey = false) => {
     if (!result.success) {
       notifications.show(result.message || t('message.captureFailed'), 'error', 4200)
     } else if (!result.clustered && !clusterModeEnabled.value) {
+      if (result.memory) {
+        memoriesStore.upsert(result.memory)
+      }
       notifications.show(result.message || t('message.captureSubmitted'), 'success', 2200)
     }
   } catch (error) {

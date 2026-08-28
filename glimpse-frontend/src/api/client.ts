@@ -54,6 +54,7 @@ export interface Memory {
   text_content?: string
   extra_images?: string
   sync_status: string
+  analysis_status?: 'PROCESSING' | 'COMPLETED' | 'FAILED'
   memory_type?: 'screenshot' | 'text'
   match_sources: string[]
   search_debug?: SearchDebugInfo | null
@@ -199,6 +200,7 @@ export const screenshotApi = {
     success: boolean
     accepted?: boolean
     memory_id?: string
+    memory?: Memory
     message?: string
     image_path?: string
     source?: string

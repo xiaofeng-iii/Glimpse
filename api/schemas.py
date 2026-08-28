@@ -28,6 +28,7 @@ class MemoryResponse(BaseModel):
     text_content: Optional[str] = None
     extra_images: Optional[str] = None
     sync_status: str = "PENDING"
+    analysis_status: Literal["PROCESSING", "COMPLETED", "FAILED"] = "COMPLETED"
     memory_type: MemoryType = "screenshot"
     match_sources: List[str] = Field(default_factory=list)
     search_debug: Optional[SearchDebugInfo] = None

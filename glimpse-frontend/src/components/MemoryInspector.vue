@@ -15,6 +15,7 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import MediaGallery from './MediaGallery.vue'
 import OcrText from './OcrText.vue'
 import SummaryEditor from './SummaryEditor.vue'
+import MemoryAnalysisState from './MemoryAnalysisState.vue'
 
 const props = defineProps<{
   memory: Memory
@@ -31,6 +32,9 @@ const summaryEditor = ref<InstanceType<typeof SummaryEditor> | null>(null)
 const deleteDialogOpen = ref(false)
 const deleting = ref(false)
 const textMemory = computed(() => isTextMemory(props.memory))
+const analysisStatus = computed(() => props.memory.analysis_status ?? 'COMPLETED')
+const analyzing = computed(() => analysisStatus.value === 'PROCESSING')
+const analysisUnavailable = computed(() => analysisStatus.value === 'FAILED')
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleString([], {
@@ -92,15 +96,22 @@ defineExpose({ canLeave })
 
       <div
         v-if="memoriesStore.selectedOutsideSearch"
-        class="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm leading-6 text-amber-800"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-800"
       >
         {{ t('memory.savedOutsideSearch') }}
       </div>
 
-      <SummaryEditor ref="summaryEditor" :memory="memory" compact />
+      <MemoryAnalysisState
+        v-if="analyzing || analysisUnavailable"
+        :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"
+      />
+      <SummaryEditor v-else ref="summaryEditor" :memory="memory" compact />
 
-      <div class="memory-inspector__summary-actions grid grid-cols-2 gap-2.5">
-        <button type="button" class="btn-secondary min-h-10 justify-center" @click="copySummary">
+      <div
+        class="memory-inspector__summary-actions grid gap-2.5"
+        :class="analyzing || analysisUnavailable ? 'grid-cols-1' : 'grid-cols-2'"
+      >
+        <button v-if="!analyzing && !analysisUnavailable" type="button" class="btn-secondary min-h-10 justify-center" @click="copySummary">
           <ClipboardDocumentIcon class="h-5 w-5 flex-none" aria-hidden="true" />
           {{ t(textMemory ? 'action.copyContent' : 'action.copySummary') }}
         </button>
@@ -110,9 +121,10 @@ defineExpose({ canLeave })
         </button>
       </div>
 
-      <OcrText v-if="!textMemory" :text="memory.text_content" />
+      <OcrText v-if="!textMemory && !analyzing && !analysisUnavailable" :text="memory.text_content" />
 
       <button
+        v-if="!analyzing"
         type="button"
         class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md text-sm font-medium text-red-600 transition hover:bg-red-50"
         @click="deleteDialogOpen = true"

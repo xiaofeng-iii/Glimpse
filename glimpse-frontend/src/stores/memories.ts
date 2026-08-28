@@ -160,9 +160,10 @@ export const useMemoriesStore = defineStore('memories', () => {
 
   const upsert = (memory: Memory) => {
     const merged = mergeMemory(memory)
-    if (!searchQuery.value) {
-      const included = resultIds.value.includes(memory.id)
-      const matchesFilters = memoryMatchesFilters(merged, activeFilters.value)
+    const included = resultIds.value.includes(memory.id)
+    const matchesFilters = memoryMatchesFilters(merged, activeFilters.value)
+    const shouldShowProcessing = memory.analysis_status === 'PROCESSING' && matchesFilters
+    if (!searchQuery.value || shouldShowProcessing) {
       if (matchesFilters && !included) {
         resultIds.value = [memory.id, ...resultIds.value]
         total.value += 1
