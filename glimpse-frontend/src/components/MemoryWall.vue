@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { CameraIcon, FunnelIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { languagePreference, t } from '@/utils/i18n'
@@ -41,6 +41,38 @@ type MemoryGroup = { key: string; label: string; memories: Memory[] }
 const searching = computed(() => Boolean(props.query?.trim()))
 const filters = computed(() => props.filters ?? createEmptyMemoryFilters())
 const filtering = computed(() => hasActiveMemoryFilters(filters.value))
+const wall = ref<HTMLElement | null>(null)
+const compactFilter = ref(false)
+let scrollContainer: HTMLElement | null = null
+let toolbarResizeObserver: ResizeObserver | null = null
+
+const updateStickyFilter = () => {
+  if (!scrollContainer || !wall.value) return
+  const toolbar = scrollContainer.querySelector<HTMLElement>('.search-toolbar')
+  if (!toolbar) return
+
+  const stickyTop = toolbar.getBoundingClientRect().height
+  wall.value.style.setProperty('--memory-wall-sticky-top', `${stickyTop}px`)
+  compactFilter.value = scrollContainer.scrollTop > 0
+}
+
+onMounted(() => {
+  scrollContainer = wall.value?.closest<HTMLElement>('.home-memory-pane') ?? null
+  if (!scrollContainer) return
+
+  scrollContainer.addEventListener('scroll', updateStickyFilter, { passive: true })
+  const toolbar = scrollContainer.querySelector<HTMLElement>('.search-toolbar')
+  if (toolbar && 'ResizeObserver' in window) {
+    toolbarResizeObserver = new ResizeObserver(updateStickyFilter)
+    toolbarResizeObserver.observe(toolbar)
+  }
+  void nextTick(updateStickyFilter)
+})
+
+onUnmounted(() => {
+  scrollContainer?.removeEventListener('scroll', updateStickyFilter)
+  toolbarResizeObserver?.disconnect()
+})
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 
 const groups = computed<MemoryGroup[]>(() => {
@@ -84,8 +116,11 @@ const groups = computed<MemoryGroup[]>(() => {
 </script>
 
 <template>
-  <section class="memory-wall">
-    <header class="memory-wall__header">
+  <section ref="wall" class="memory-wall">
+    <header
+      class="memory-wall__header"
+      :class="{ 'memory-wall__header--compact': compactFilter }"
+    >
       <h1 class="text-base font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">
         {{
           searching
@@ -96,6 +131,7 @@ const groups = computed<MemoryGroup[]>(() => {
       <MemoryFiltersControl
         :model-value="filters"
         :loading="loading"
+        :compact="compactFilter"
         @apply="emit('apply-filters', $event)"
       />
     </header>
@@ -122,7 +158,7 @@ const groups = computed<MemoryGroup[]>(() => {
             ? t('memory.noFilterResults')
             : searching ? t('memory.noSearchResults') : t('memory.emptyTitle') }}
         </h2>
-        <p class="mt-1.5 max-w-sm text-sm leading-6 text-[var(--shell-muted)]">
+        <p class="mt-1.5 max-w-sm text-sm text-[var(--shell-muted)]">
           {{ filtering
             ? t('memory.noFilterResultsHint')
             : searching ? t('memory.noSearchResultsHint') : t('memory.emptyHint') }}
@@ -175,6 +211,8 @@ const groups = computed<MemoryGroup[]>(() => {
 <style scoped>
 .memory-wall {
   --memory-wall-inline-inset: 1rem;
+  --memory-wall-sticky-top: 5rem;
+  --memory-card-width: 239px;
 
   position: relative;
   display: flex;
@@ -183,8 +221,9 @@ const groups = computed<MemoryGroup[]>(() => {
 }
 
 .memory-wall__header {
-  position: relative;
+  position: sticky;
   z-index: 2;
+  top: var(--memory-wall-sticky-top);
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -192,6 +231,20 @@ const groups = computed<MemoryGroup[]>(() => {
   gap: 1rem;
   padding: 0.375rem var(--memory-wall-inline-inset) 0.25rem;
   background: var(--shell-window-bg);
+}
+
+.memory-wall__header h1 {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.memory-wall__header--compact {
+  background: transparent;
+}
+
+.memory-wall__header--compact h1 {
+  transform: translateY(-0.25rem);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .memory-wall__header::after {
@@ -202,6 +255,11 @@ const groups = computed<MemoryGroup[]>(() => {
   left: var(--memory-wall-inline-inset);
   height: 1px;
   background: color-mix(in srgb, var(--shell-line) 72%, transparent);
+  transition: opacity 160ms ease;
+}
+
+.memory-wall__header--compact::after {
+  opacity: 0;
 }
 
 .memory-wall-scroll {
@@ -216,24 +274,10 @@ const groups = computed<MemoryGroup[]>(() => {
 
 .memory-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, var(--memory-card-width));
   align-items: start;
+  justify-content: start;
   gap: 0.75rem;
-}
-
-/* 列数由网格容器的实际可用宽度决定，桌面端与网页端保持一致。
-   两条规则用显式区间互斥，避免同时命中时后写规则覆盖列数；
-   容器查询不生效的旧引擎会自动回退到上面的 auto-fill 网格。 */
-@container (min-width: 480px) and (max-width: 759px) {
-  .memory-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@container (min-width: 760px) {
-  .memory-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @container memory-pane (max-width: 960px) {
@@ -251,6 +295,13 @@ const groups = computed<MemoryGroup[]>(() => {
 @container (max-width: 560px) {
   .memory-wall__header {
     align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .memory-wall__header h1,
+  .memory-wall__header::after {
+    transition: none;
   }
 }
 </style>

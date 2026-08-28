@@ -16,6 +16,7 @@ import {
 const props = defineProps<{
   modelValue: MemoryFilters
   loading?: boolean
+  compact?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -156,7 +157,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="root" class="memory-filters relative">
+  <div
+    ref="root"
+    class="memory-filters relative"
+    :class="{ 'memory-filters--compact': compact }"
+  >
     <button
       ref="trigger"
       type="button"
@@ -164,12 +169,13 @@ onUnmounted(() => {
       :class="{ 'memory-filters__trigger--active': active }"
       :aria-expanded="open"
       :aria-controls="panelId"
+      :aria-label="t('filter.open')"
       :disabled="loading"
       @click="toggle"
     >
       <FunnelSolidIcon v-if="active" class="memory-filters__trigger-icon" aria-hidden="true" />
       <FunnelOutlineIcon v-else class="memory-filters__trigger-icon" aria-hidden="true" />
-      <span>{{ t('filter.open') }}</span>
+      <span class="memory-filters__trigger-label">{{ t('filter.open') }}</span>
       <span v-if="active" class="sr-only">{{ t('filter.active') }}</span>
     </button>
 
@@ -296,12 +302,50 @@ onUnmounted(() => {
   cursor: pointer;
   font-size: 0.8125rem;
   font-weight: 600;
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  transition:
+    gap 160ms ease,
+    padding 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.memory-filters__trigger-label {
+  display: inline-block;
+  max-width: 4rem;
+  flex: 0 1 auto;
+  overflow: hidden;
+  opacity: 1;
+  white-space: nowrap;
+  transform: translateX(0);
+  transition: max-width 160ms ease, opacity 120ms ease, transform 160ms ease;
+}
+
+.memory-filters--compact .memory-filters__trigger {
+  gap: 0;
+  padding-inline: 0.5rem;
+  border-color: color-mix(in srgb, var(--shell-line) 70%, transparent);
+  background: color-mix(in srgb, var(--shell-window-bg) 70%, transparent);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.memory-filters--compact .memory-filters__trigger-label {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(0.25rem);
 }
 
 .memory-filters__trigger:hover {
   border-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
   background: var(--color-primary-soft);
+}
+
+.memory-filters--compact .memory-filters__trigger:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 24%, transparent);
+  background: color-mix(in srgb, var(--shell-window-bg) 70%, transparent);
 }
 
 .memory-filters__trigger-icon {
@@ -353,6 +397,7 @@ onUnmounted(() => {
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.01em;
+  line-height: var(--line-height-16);
 }
 
 .memory-filters__close {
@@ -427,7 +472,7 @@ onUnmounted(() => {
   color: var(--color-text);
   cursor: pointer;
   font-size: 0.875rem;
-  line-height: 1rem;
+  line-height: var(--line-height-14);
 }
 
 .memory-filters__preset,
@@ -523,6 +568,7 @@ onUnmounted(() => {
   color: var(--color-text);
   background: var(--color-surface);
   font-size: 0.75rem;
+  line-height: var(--line-height-12);
 }
 
 .memory-filters__dates input:focus-visible {
@@ -541,6 +587,7 @@ onUnmounted(() => {
   margin: 0.625rem 0 0;
   color: var(--color-danger);
   font-size: 0.75rem;
+  line-height: var(--line-height-12);
 }
 
 .memory-filters__actions {
@@ -593,6 +640,13 @@ onUnmounted(() => {
     left: 0.75rem;
     width: auto;
     max-height: calc(100vh - 5.25rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .memory-filters__trigger,
+  .memory-filters__trigger-label {
+    transition: none;
   }
 }
 </style>
