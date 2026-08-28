@@ -95,9 +95,17 @@ try {
     }
 
     $currentVersionText = Get-NativeOutput $PythonCommand @($versionTool, "--current")
-    $currentVersion = [System.Version]::Parse($currentVersionText)
+    if ($currentVersionText -notmatch '^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)(?<prerelease>-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
+        throw "Current version $currentVersionText is not valid SemVer."
+    }
+    $currentVersion = [System.Version]::new(
+        [int]$Matches.major,
+        [int]$Matches.minor,
+        [int]$Matches.patch
+    )
     $targetVersion = [System.Version]::Parse($Version)
-    if ($targetVersion -le $currentVersion) {
+    $currentIsPrerelease = -not [string]::IsNullOrEmpty($Matches.prerelease)
+    if ($targetVersion -lt $currentVersion -or ($targetVersion -eq $currentVersion -and -not $currentIsPrerelease)) {
         throw "Release version $Version must be greater than current version $currentVersionText."
     }
 
