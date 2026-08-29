@@ -2,7 +2,8 @@
 
 本文档是 Glimpse 当前产品、架构与业务流程的事实入口。运行方式以根目录
 `README.md` 为准；可执行接口以 FastAPI 的 `/docs` 为准；测试命令见
-[`TESTING.md`](./TESTING.md)。
+[`TESTING.md`](./TESTING.md)；发布流程与版本管理见
+[`RELEASE.md`](./RELEASE.md)。
 
 供 AI 长期复用的扩展上下文位于 [`agents/`](./agents/README.md)；通用工作
 规则仍以根目录 `AGENTS.md` 为准。
@@ -227,6 +228,6 @@ SQLite 是事实来源，保存 UUID、时间、图片路径、AI 摘要、来�
 - 产品、架构、流程或稳定边界变化时更新本文档。
 - 测试命令与测试分层只在 `TESTING.md` 维护。
 - 启动、安装和打包命令只在根 `README.md` 维护。
-- 正式发布及 Release 正文验收流程以根 `README.md` 的“发布版说明”为准。
+- 发布流程、版本号与 Release 正文验收只在 `RELEASE.md` 维护。
 - 旧实现文档进入 `docs/archive/`，不得继续作为当前事实来源。
 - 临时分析、AI 草稿和工具输出不得放入 `docs/`。

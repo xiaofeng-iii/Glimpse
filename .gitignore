@@ -58,6 +58,10 @@ screenshots/
 !assets/**/*.jpeg
 !assets/**/*.gif
 !assets/**/*.ico
+!docs/images/**/*.png
+!docs/images/**/*.jpg
+!docs/images/**/*.jpeg
+!docs/images/**/*.gif
 
 # Environment files (sensitive)
 .env

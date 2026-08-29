@@ -138,8 +138,8 @@ When touching Qt UI, also run the app manually in the `glimpse` environment and 
 ## Release Completion
 
 - A formal release is not complete when the tag, Workflow, or installer build merely succeeds.
-- After the GitHub Release exists, follow the post-release procedure in `README.md` and replace the generated notes via `gh release edit vX.Y.Z --notes-file ...`.
-- Build the notes from `git log vPrevious..vCurrent`. Keep only user-visible results, use the three Chinese sections, keep each item to one sentence of at most 30 Chinese characters, and include the compare link.
+- After the GitHub Release exists, follow the post-release procedure in `docs/RELEASE.md` and replace the generated notes via `gh release edit vX.Y.Z --notes-file ...`.
+- For a formal release, build the notes from the previous formal tag through the current formal tag; intervening preview releases may be used as reference, but do not change that range. For a preview release, use the nearest preceding formal or preview tag through the current preview tag. Keep only user-visible results, use the three Chinese sections, keep each item to one sentence of at most 30 Chinese characters, and include the compare link.
 - Read the Release back from GitHub and verify its body, release status, installer, and checksum before reporting the release complete.
 
 
