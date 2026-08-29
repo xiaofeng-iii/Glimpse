@@ -114,26 +114,26 @@ const preventOutsideDismiss = (event: Event) => {
         @escape-key-down="preventDismissWhileBusy"
         @pointer-down-outside="preventOutsideDismiss"
       >
-        <header class="flex flex-none items-start gap-3.5 border-b border-[var(--shell-line)] px-5 py-4">
-          <div class="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
-            <DocumentTextIcon class="h-5 w-5" aria-hidden="true" />
+        <header class="flex flex-none items-center gap-3 border-b border-[var(--shell-line)] px-5 py-2.5">
+          <div class="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
+            <DocumentTextIcon class="h-4 w-4" aria-hidden="true" />
           </div>
           <div class="min-w-0 flex-1">
             <DialogTitle class="text-base font-semibold text-[var(--shell-ink)]">
               {{ t('addMemory.title') }}
             </DialogTitle>
-            <DialogDescription class="mt-1 text-sm text-[var(--shell-muted)]">
+            <DialogDescription class="sr-only">
               {{ t('addMemory.description') }}
             </DialogDescription>
           </div>
           <button
             type="button"
-            class="inline-flex h-9 w-9 flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             :aria-label="t('action.close')"
             :disabled="busy"
             @click="requestCancel"
           >
-            <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+            <XMarkIcon class="h-4 w-4" aria-hidden="true" />
           </button>
         </header>
 
@@ -156,23 +156,28 @@ const preventOutsideDismiss = (event: Event) => {
               @input="handleContentInput"
               @keydown="handleEditorKeydown"
             />
-            <div class="mt-2 flex min-h-5 items-start justify-between gap-4 text-xs">
-              <p id="text-memory-feedback" class="text-red-600" :role="visibleError ? 'alert' : undefined">
+            <div class="mt-2 flex min-h-5 items-center justify-between gap-4 text-xs">
+              <p
+                v-if="visibleError"
+                id="text-memory-feedback"
+                class="text-red-600"
+                role="alert"
+              >
                 {{ visibleError }}
+              </p>
+              <p v-else id="text-memory-help" class="text-[var(--shell-muted)]">
+                {{ t('addMemory.shortcut') }}
               </p>
               <span class="flex-none tabular-nums text-[var(--shell-muted)]">
                 {{ content.length }} / 4000
               </span>
             </div>
-            <p id="text-memory-help" class="mt-1 text-xs text-[var(--shell-muted)]">
-              {{ t('addMemory.shortcut') }}
-            </p>
           </div>
 
-          <footer class="flex flex-none justify-end gap-2.5 border-t border-[var(--shell-line)] bg-[var(--color-surface-subtle)] px-5 py-3.5">
+          <footer class="flex flex-none justify-end gap-2.5 border-t border-[var(--shell-line)] px-5 py-2.5">
             <button
               type="button"
-              class="btn-secondary min-h-10 min-w-24 px-4 disabled:cursor-not-allowed disabled:opacity-60"
+              class="btn-secondary px-4 disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="busy"
               @click="requestCancel"
             >
@@ -180,11 +185,11 @@ const preventOutsideDismiss = (event: Event) => {
             </button>
             <button
               type="submit"
-              class="btn-primary min-h-10 min-w-32 px-4"
+              class="btn-primary px-4"
               :disabled="busy"
               :aria-busy="busy"
             >
-              <ArrowPathIcon v-if="busy" class="h-5 w-5 animate-spin" aria-hidden="true" />
+              <ArrowPathIcon v-if="busy" class="h-4 w-4 animate-spin" aria-hidden="true" />
               <span>{{ t('action.addMemory') }}</span>
             </button>
           </footer>

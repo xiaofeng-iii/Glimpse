@@ -198,7 +198,7 @@ defineExpose({ focus, clear })
             ref="searchInput"
             v-model="query"
             type="search"
-            class="search-toolbar__control h-9 w-full border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[display:none]"
+            class="search-toolbar__control h-8 w-full border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[display:none]"
             :placeholder="t('search.placeholder')"
             @keydown.esc.stop.prevent="clear"
             @compositionstart="handleCompositionStart"
@@ -259,7 +259,7 @@ defineExpose({ focus, clear })
           @toggle="handleDebugToggle"
         >
           <summary
-            class="search-toolbar__control flex h-9 cursor-pointer list-none items-center gap-1.5 border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
+            class="search-toolbar__control flex h-8 cursor-pointer list-none items-center gap-1.5 border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
             :aria-label="t('search.debugTitle')"
           >
             <AdjustmentsHorizontalIcon class="h-4 w-4 flex-none" aria-hidden="true" />
@@ -340,7 +340,7 @@ defineExpose({ focus, clear })
 
 .search-toolbar {
   --search-toolbar-surface-radius: var(--radius-xl);
-  --search-toolbar-surface-inset: 0.75rem;
+  --search-toolbar-surface-inset: 0.625rem;
   --search-toolbar-control-radius: var(--radius-sm);
   --search-toolbar-segment-inset: 3px;
   --search-toolbar-segment-radius: max(
@@ -356,7 +356,7 @@ defineExpose({ focus, clear })
   z-index: var(--z-sticky);
   top: 0;
   isolation: isolate;
-  padding: 0.625rem 1.25rem 0.5rem;
+  padding: 0.5rem 1.25rem 0.375rem;
   background: transparent;
 }
 

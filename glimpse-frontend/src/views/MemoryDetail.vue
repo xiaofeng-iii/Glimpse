@@ -115,10 +115,10 @@ const confirmDelete = async () => {
         <button
           v-if="memory && !analyzing"
           type="button"
-          class="inline-flex min-h-10 items-center gap-2 rounded-md border border-red-200 px-3.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+          class="btn-ghost-danger"
           @click="deleteDialogOpen = true"
         >
-          <TrashIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+          <TrashIcon class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t('action.delete') }}
         </button>
       </header>
@@ -133,8 +133,8 @@ const confirmDelete = async () => {
       >
         <h2 class="text-lg font-semibold text-[var(--shell-ink)]">{{ t('memory.missing') }}</h2>
         <p class="mt-2 text-sm text-[var(--shell-muted)]">{{ t('memory.loadFailedHint') }}</p>
-        <button type="button" class="btn-primary mt-4 min-h-10" @click="loadMemory">
-          <ArrowPathIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+        <button type="button" class="btn-primary mt-4" @click="loadMemory">
+          <ArrowPathIcon class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t('action.retry') }}
         </button>
       </div>
@@ -151,8 +151,8 @@ const confirmDelete = async () => {
           />
           <SummaryEditor v-else ref="summaryEditor" :memory="memory" />
 
-          <button v-if="!analyzing && !analysisUnavailable" type="button" class="btn-secondary min-h-10" @click="copySummary">
-            <ClipboardDocumentIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+          <button v-if="!analyzing && !analysisUnavailable" type="button" class="btn-secondary" @click="copySummary">
+            <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />
             {{ t(textMemory ? 'action.copyContent' : 'action.copySummary') }}
           </button>
 

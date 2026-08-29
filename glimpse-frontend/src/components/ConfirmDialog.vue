@@ -124,7 +124,7 @@ onBeforeUnmount(() => {
       >
         <div class="flex items-start gap-3.5">
           <div
-            class="flex h-10 w-10 flex-none items-center justify-center rounded-lg"
+            class="flex h-9 w-9 flex-none items-center justify-center rounded-lg"
             :class="destructive ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'"
           >
             <ExclamationTriangleIcon class="h-5 w-5" aria-hidden="true" />
@@ -142,23 +142,23 @@ onBeforeUnmount(() => {
           </div>
           <button
             type="button"
-            class="rounded-md p-1.5 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+            class="inline-flex h-8 w-8 min-h-0 items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
             :aria-label="cancelLabel"
             :disabled="busy"
             @click="cancel"
           >
-            <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+            <XMarkIcon class="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
         <div class="mt-5 flex justify-end gap-2.5">
-          <button ref="cancelButton" type="button" class="btn-secondary min-h-10 px-4" :disabled="busy" @click="cancel">
+          <button ref="cancelButton" type="button" class="btn-secondary px-4" :disabled="busy" @click="cancel">
             {{ cancelLabel }}
           </button>
           <button
             type="button"
-            class="min-h-10 rounded-md px-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
-            :class="destructive ? 'bg-red-600 hover:bg-red-700' : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]'"
+            class="px-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+            :class="[destructive ? 'btn-danger' : 'btn-primary']"
             :disabled="busy"
             @click="emit('confirm')"
           >

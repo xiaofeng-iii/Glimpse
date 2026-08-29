@@ -83,11 +83,11 @@ defineExpose({ canLeave })
       </div>
       <button
         type="button"
-        class="rounded-md p-1.5 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+        class="inline-flex h-8 w-8 min-h-0 items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
         :aria-label="t('action.close')"
         @click="emit('close')"
       >
-        <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+        <XMarkIcon class="h-4 w-4" aria-hidden="true" />
       </button>
     </header>
 
@@ -111,12 +111,12 @@ defineExpose({ canLeave })
         class="memory-inspector__summary-actions grid gap-2.5"
         :class="analyzing || analysisUnavailable ? 'grid-cols-1' : 'grid-cols-2'"
       >
-        <button v-if="!analyzing && !analysisUnavailable" type="button" class="btn-secondary min-h-10 justify-center" @click="copySummary">
-          <ClipboardDocumentIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+        <button v-if="!analyzing && !analysisUnavailable" type="button" class="btn-secondary justify-center" @click="copySummary">
+          <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t(textMemory ? 'action.copyContent' : 'action.copySummary') }}
         </button>
-        <button type="button" class="btn-secondary min-h-10 justify-center" @click="emit('open', memory.id)">
-          <ArrowTopRightOnSquareIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+        <button type="button" class="btn-secondary justify-center" @click="emit('open', memory.id)">
+          <ArrowTopRightOnSquareIcon class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t('action.viewDetail') }}
         </button>
       </div>
@@ -126,10 +126,10 @@ defineExpose({ canLeave })
       <button
         v-if="!analyzing"
         type="button"
-        class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md text-sm font-medium text-red-600 transition hover:bg-red-50"
+        class="btn-ghost-danger w-full"
         @click="deleteDialogOpen = true"
       >
-        <TrashIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+        <TrashIcon class="h-4 w-4 flex-none" aria-hidden="true" />
         {{ t('action.delete') }}
       </button>
     </div>

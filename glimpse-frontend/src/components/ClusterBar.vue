@@ -33,16 +33,10 @@ const countdownText = computed(() => {
 
       <!-- Actions -->
       <div class="flex gap-2">
-        <button
-          @click="$emit('submit')"
-          class="rounded-md bg-[var(--color-primary)] px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-hover)]"
-        >
+        <button @click="$emit('submit')" class="btn-primary">
           {{ t('cluster.submit') }}
         </button>
-        <button
-          @click="$emit('cancel')"
-          class="px-3.5 py-1.5 rounded-md bg-white text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors"
-        >
+        <button @click="$emit('cancel')" class="btn-secondary">
           {{ t('action.cancel') }}
         </button>
       </div>

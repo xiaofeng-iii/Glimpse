@@ -222,12 +222,12 @@ defineExpose({
 
 <template>
   <section class="summary-editor" :aria-label="contentLabel">
-    <div class="summary-editor__header mb-2.5 flex min-h-10 items-center justify-between gap-3">
+    <div class="summary-editor__header mb-2.5 flex min-h-8 items-center justify-between gap-3">
       <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ contentLabel }}</h3>
       <button
         v-if="!editing"
         type="button"
-        class="summary-editor__edit-action inline-flex h-10 w-28 flex-none items-center justify-center gap-0.5 whitespace-nowrap rounded-md border border-[var(--shell-line)] px-1 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary-soft)]"
+        class="summary-editor__edit-action inline-flex h-8 w-28 flex-none items-center justify-center gap-0.5 whitespace-nowrap rounded-md border border-[var(--shell-line)] px-1 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary-soft)]"
         @click="startEditing"
       >
         <PencilSquareIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
@@ -236,7 +236,7 @@ defineExpose({
       <div v-else class="summary-editor__edit-actions flex flex-none items-center gap-2">
         <button
           type="button"
-          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center whitespace-nowrap rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="summary-editor__edit-action inline-flex h-8 w-28 items-center justify-center whitespace-nowrap rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="saving"
           @click="cancelEditing"
         >
@@ -244,7 +244,7 @@ defineExpose({
         </button>
         <button
           type="button"
-          class="summary-editor__edit-action inline-flex h-10 w-28 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)] px-2 text-sm font-semibold text-white transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="summary-editor__edit-action inline-flex h-8 w-28 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)] px-2 text-sm font-semibold text-white transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!canSave"
           @click="save"
         >

@@ -21,7 +21,7 @@ const emit = defineEmits<{
   <button
     type="button"
     class="btn-primary add-memory-button min-w-[7.25rem] shrink-0 gap-2 whitespace-nowrap px-4 text-sm"
-    :class="density === 'toolbar' ? 'h-9 min-h-0' : 'h-11'"
+    :class="density === 'toolbar' ? 'h-8' : 'h-10'"
     :disabled="busy || disabled"
     :aria-busy="busy"
     :aria-label="busy ? t('action.addMemoryProcessing') : undefined"

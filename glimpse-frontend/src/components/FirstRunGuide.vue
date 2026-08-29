@@ -225,7 +225,7 @@ onBeforeUnmount(() => {
               ref="completeButton"
               data-testid="first-run-complete"
               type="button"
-              class="btn-primary inline-flex min-h-11 items-center gap-2 px-5"
+              class="btn-primary inline-flex h-10 items-center gap-2 px-5"
               @click="finish"
             >
               {{ t('onboarding.start') }}
