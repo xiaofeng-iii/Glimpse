@@ -1137,6 +1137,11 @@ kbd {
   background: var(--color-surface-subtle);
 }
 
+/* 单图预览没有缩略图行兜底，stage 需要自带的底边距。 */
+.image-preview-stage:last-child {
+  margin-bottom: 1.25rem;
+}
+
 .image-preview-stage__image {
   display: block;
   width: 100%;
