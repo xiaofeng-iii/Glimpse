@@ -26,6 +26,7 @@ import {
   minimizeDesktopWindow,
   toggleDesktopMaximize,
 } from '@/platform/desktop'
+import { popupDesktopWindowMenu } from '@/platform/window-menu'
 import { useBackendStatusStore } from '@/stores/backendStatus'
 import { useNotificationStore } from '@/stores/notification'
 import { useSettingsStore } from '@/stores/settings'
@@ -115,6 +116,12 @@ const requestWindowClose = async () => {
   }
 }
 
+const handleTitlebarContextMenu = (event: MouseEvent) => {
+  if (!isDesktop) return
+  event.preventDefault()
+  void popupDesktopWindowMenu({ onCloseRequested: () => void requestWindowClose() })
+}
+
 const handleCloseDialogChoice = async (payload: {
   action: 'minimize' | 'exit'
   remember: boolean
@@ -201,7 +208,10 @@ onUnmounted(() => {
 
 <template>
   <div class="desktop-shell">
-    <header class="desktop-shell__titlebar">
+    <header
+      class="desktop-shell__titlebar"
+      @contextmenu="handleTitlebarContextMenu"
+    >
       <div
         class="desktop-shell__drag-layer"
         aria-hidden="true"

@@ -12,6 +12,7 @@ import {
   shouldShowOnboarding,
 } from '@/utils/onboarding'
 import DesktopShell from '@/components/DesktopShell.vue'
+import EditTextContextMenu from '@/components/EditTextContextMenu.vue'
 import FirstRunGuide from '@/components/FirstRunGuide.vue'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 import NotificationToast from '@/components/NotificationToast.vue'
@@ -20,6 +21,11 @@ const websocket = useWebSocket()
 const settingsStore = useSettingsStore()
 const firstRunGuideOpen = ref(shouldShowOnboarding())
 let stopWatchingSystemTheme: (() => void) | null = null
+const editTextMenu = ref<{
+  x: number
+  y: number
+  target: HTMLInputElement | HTMLTextAreaElement | null
+}>({ x: 0, y: 0, target: null })
 
 const finishOnboarding = () => {
   completeOnboarding()
@@ -36,8 +42,37 @@ const applySavedTheme = async () => {
   setLanguagePreference(settingsStore.settings?.ui?.language)
 }
 
+// 应用内一律不显示 WebView 原生右键菜单（图二那种）。三处例外各有专属菜单：
+// 记忆卡片 → MemoryContextMenu；标题栏 → 系统窗口菜单；输入框 → 自定义文本编辑菜单；
+// 其余区域右键无任何反应。
+const handleDocumentContextMenu = (event: MouseEvent) => {
+  const target = event.target
+  if (!(target instanceof Element)) {
+    event.preventDefault()
+    return
+  }
+
+  const editable = target.closest<HTMLInputElement | HTMLTextAreaElement>('input, textarea')
+  if (editable && !editable.disabled) {
+    event.preventDefault()
+    editTextMenu.value = { x: event.clientX, y: event.clientY, target: editable }
+    return
+  }
+
+  if (target.closest('[contenteditable="true"], [contenteditable=""]')) {
+    return
+  }
+
+  event.preventDefault()
+}
+
+const closeEditTextMenu = () => {
+  editTextMenu.value = { x: 0, y: 0, target: null }
+}
+
 // Connect WebSocket on app mount
 onMounted(async () => {
+  document.addEventListener('contextmenu', handleDocumentContextMenu, true)
   window.addEventListener(ONBOARDING_REQUEST_EVENT, showOnboarding)
   await whenBackendRuntimeReady()
   await applySavedTheme()
@@ -49,6 +84,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('contextmenu', handleDocumentContextMenu, true)
   window.removeEventListener(ONBOARDING_REQUEST_EVENT, showOnboarding)
   stopWatchingSystemTheme?.()
   stopWatchingSystemTheme = null
@@ -61,6 +97,12 @@ onUnmounted(() => {
       <RouterView />
     </DesktopShell>
     <FirstRunGuide :open="firstRunGuideOpen" @complete="finishOnboarding" />
+    <EditTextContextMenu
+      :x="editTextMenu.x"
+      :y="editTextMenu.y"
+      :target="editTextMenu.target"
+      @close="closeEditTextMenu"
+    />
     <ImagePreviewModal />
     <NotificationToast />
   </div>
