@@ -18,6 +18,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'select', memory: Memory): void
   (event: 'open', memory: Memory): void
+  (event: 'contextmenu', payload: { memory: Memory; x: number; y: number }): void
 }>()
 
 const imageFailed = ref(false)
@@ -54,10 +55,13 @@ const handleKeydown = (event: KeyboardEvent) => {
     ]"
     role="button"
     tabindex="0"
+    :data-memory-id="memory.id"
+    aria-haspopup="menu"
     :aria-pressed="selected"
     :aria-busy="analyzing"
     @click="emit('select', memory)"
     @dblclick.stop="emit('open', memory)"
+    @contextmenu.prevent="emit('contextmenu', { memory, x: $event.clientX, y: $event.clientY })"
     @keydown="handleKeydown"
   >
     <div

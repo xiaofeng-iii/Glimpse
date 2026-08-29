@@ -15,9 +15,12 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { createLogger } from '@/utils/logger'
 import { memoryMatchesFilters, type MemoryFilters } from '@/utils/memory-filters'
+import { getMemoryImageUrls } from '@/utils/memory-images'
 import { t } from '@/utils/i18n'
 import AddTextMemoryDialog from '@/components/AddTextMemoryDialog.vue'
 import ClusterBar from '@/components/ClusterBar.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import MemoryContextMenu from '@/components/MemoryContextMenu.vue'
 import MemoryInspector from '@/components/MemoryInspector.vue'
 import MemoryWall from '@/components/MemoryWall.vue'
 import SearchToolbar from '@/components/SearchToolbar.vue'
@@ -46,6 +49,10 @@ const isRefreshing = ref(false)
 const textMemoryDialogOpen = ref(false)
 const isAddingTextMemory = ref(false)
 const textMemoryError = ref('')
+const contextMenu = ref<{ x: number; y: number; memory: Memory | null }>({ x: 0, y: 0, memory: null })
+const deleteDialogOpen = ref(false)
+const deleteTarget = ref<Memory | null>(null)
+const deletingMemory = ref(false)
 const showSearchDebug = ref(false)
 const clusterModeEnabled = ref(false)
 const screenshotShortcutLabel = ref('Ctrl+Shift+G')
@@ -269,6 +276,81 @@ const handleApplyFilters = async (filters: MemoryFilters) => {
   memoriesStore.select(wideLayout.value ? results[0] ?? null : null)
 }
 
+const openContextMenu = (payload: { memory: Memory; x: number; y: number }) => {
+  contextMenu.value = payload
+}
+
+const closeContextMenu = () => {
+  contextMenu.value = { x: 0, y: 0, memory: null }
+}
+
+const handleMenuOpen = (memory: Memory) => {
+  closeContextMenu()
+  void handleOpenMemory(memory)
+}
+
+const handleMenuCopy = async (memory: Memory) => {
+  closeContextMenu()
+  try {
+    await navigator.clipboard.writeText(memory.ai_summary)
+    notifications.show(t('message.copied'), 'success', 1800)
+  } catch {
+    notifications.show(t('message.copyFailed'), 'error', 2800)
+  }
+}
+
+const handleMenuCopyImage = async (memory: Memory) => {
+  closeContextMenu()
+  const url = getMemoryImageUrls(memory)[0]
+  if (!url) return
+  try {
+    let blob = await (await fetch(url)).blob()
+    if (blob.type !== 'image/png') {
+      const bitmap = await createImageBitmap(blob)
+      const canvas = document.createElement('canvas')
+      canvas.width = bitmap.width
+      canvas.height = bitmap.height
+      canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+      const converted = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/png'),
+      )
+      bitmap.close()
+      if (!converted) throw new Error('canvas toBlob returned null')
+      blob = converted
+    }
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+    notifications.show(t('message.copied'), 'success', 1800)
+  } catch (error) {
+    logger.warn('Copy image to clipboard failed: %s', error)
+    notifications.show(t('message.copyImageFailed'), 'error', 2800)
+  }
+}
+
+const handleMenuDelete = (memory: Memory) => {
+  closeContextMenu()
+  deleteTarget.value = memory
+  deleteDialogOpen.value = true
+}
+
+const confirmContextDelete = async () => {
+  const target = deleteTarget.value
+  if (!target || deletingMemory.value) return
+  deletingMemory.value = true
+  try {
+    await memoriesStore.remove(target.id)
+    notifications.show(t('message.deleted'), 'success', 1800)
+    deleteDialogOpen.value = false
+    if (memoriesStore.selectedId === target.id) {
+      memoriesStore.select(null)
+    }
+  } catch (error) {
+    logger.error('Delete memory failed: %s', error)
+    notifications.show(t('message.deleteFailed'), 'error', 2800)
+  } finally {
+    deletingMemory.value = false
+  }
+}
+
 const handleResize = () => {
   const wasWide = wideLayout.value
   wideLayout.value = window.innerWidth >= 1180
@@ -369,6 +451,7 @@ onUnmounted(() => {
           :filters="memoriesStore.activeFilters"
           @select="handleSelectMemory"
           @open="handleOpenMemory"
+          @contextmenu="openContextMenu"
           @capture="handleScreenshot()"
           @add-memory="openTextMemoryDialog"
           @apply-filters="handleApplyFilters"
@@ -396,6 +479,30 @@ onUnmounted(() => {
       :error-message="textMemoryError"
       @cancel="closeTextMemoryDialog"
       @submit="handleAddTextMemory"
+    />
+
+    <MemoryContextMenu
+      :x="contextMenu.x"
+      :y="contextMenu.y"
+      :memory="contextMenu.memory"
+      @close="closeContextMenu"
+      @open="handleMenuOpen"
+      @copy="handleMenuCopy"
+      @copy-image="handleMenuCopyImage"
+      @delete="handleMenuDelete"
+    />
+
+    <ConfirmDialog
+      id="wall-delete-memory"
+      :open="deleteDialogOpen"
+      :title="t('delete.title')"
+      :description="t('message.deleteConfirmIrreversible')"
+      :confirm-label="t('action.delete')"
+      :cancel-label="t('action.cancel')"
+      :busy="deletingMemory"
+      destructive
+      @confirm="confirmContextDelete"
+      @cancel="deleteDialogOpen = false"
     />
   </main>
 </template>

@@ -31,6 +31,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'select', memory: Memory): void
   (event: 'open', memory: Memory): void
+  (event: 'contextmenu', payload: { memory: Memory; x: number; y: number }): void
   (event: 'capture'): void
   (event: 'add-memory'): void
   (event: 'apply-filters', filters: MemoryFilters): void
@@ -200,6 +201,7 @@ const groups = computed<MemoryGroup[]>(() => {
               :show-debug="showSearchDebug"
               @select="emit('select', $event)"
               @open="emit('open', $event)"
+              @contextmenu="emit('contextmenu', $event)"
             />
           </div>
         </section>
