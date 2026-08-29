@@ -103,7 +103,7 @@ These are intentionally ignored or should remain untracked:
 
 - `.omo/`
 - `docs/superpowers/`
-- `.codex/`, `.opencode/`, `.cursor/`, `.windsurf/`, `.claude/`
+- `.codex/`, `.opencode/`, `.cursor/`, `.windsurf/`
 - prompt scratch files and one-off AI helper scripts
 - `.tmp/` and tool indexes such as `.codegraph/`
 - runtime data under `GlimpseData/`
