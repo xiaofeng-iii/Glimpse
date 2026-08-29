@@ -547,8 +547,71 @@ fn load_app_icon() -> Option<Image<'static>> {
     Image::from_bytes(APP_ICON_PNG).ok().map(Image::to_owned)
 }
 
+/// 引擎级关闭 WebView2 默认 UI：桌面应用不暴露浏览器右键菜单（图二）与
+/// 权限/脚本类原生弹窗，右键与提醒交互全部由前端自建菜单与 toast 负责。
+/// 引擎开关是兜底，前端另有应用层拦截。
+#[cfg(windows)]
+fn harden_webview2_default_ui(window: &tauri::WebviewWindow) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        COREWEBVIEW2_PERMISSION_STATE_DENY, ICoreWebView2,
+        ICoreWebView2PermissionRequestedEventArgs,
+    };
+    use webview2_com::PermissionRequestedEventHandler;
+
+    let result = window.with_webview(|webview| {
+        // SAFETY: COM 调用在 with_webview 派发的 UI 线程上执行，接口指针由控制器持有。
+        let outcome = unsafe {
+            (|| -> Result<(), String> {
+                let core = webview
+                    .controller()
+                    .CoreWebView2()
+                    .map_err(|error| format!("core webview: {error:?}"))?;
+
+                let settings = core
+                    .Settings()
+                    .map_err(|error| format!("settings: {error:?}"))?;
+                settings
+                    .SetAreDefaultContextMenusEnabled(false)
+                    .map_err(|error| format!("disable context menus: {error:?}"))?;
+                settings
+                    .SetAreDefaultScriptDialogsEnabled(false)
+                    .map_err(|error| format!("disable script dialogs: {error:?}"))?;
+
+                // 权限请求一律静默拒绝：未来任何代码触发权限（剪贴板/麦克风/定位…）
+                // 都不会弹出 WebView2 原生询问，最坏结果是该功能静默不工作。
+                let handler = PermissionRequestedEventHandler::create(Box::new(
+                    |_core: Option<ICoreWebView2>,
+                     args: Option<ICoreWebView2PermissionRequestedEventArgs>| {
+                        let args = args.ok_or_else(|| {
+                            windows::core::Error::from_hresult(windows::core::HRESULT(
+                                0x8000_4005u32 as i32,
+                            ))
+                        })?;
+                        args.SetState(COREWEBVIEW2_PERMISSION_STATE_DENY)?;
+                        Ok(())
+                    },
+                ));
+                let mut token = 0i64;
+                core.add_PermissionRequested(&handler, &mut token)
+                    .map_err(|error| format!("register permission handler: {error:?}"))?;
+
+                Ok(())
+            })()
+        };
+
+        if let Err(error) = outcome {
+            eprintln!("Failed to harden WebView2 default UI: {error}");
+        }
+    });
+
+    if let Err(error) = result {
+        eprintln!("Failed to access platform webview: {error}");
+    }
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             quit_app,
@@ -563,6 +626,11 @@ fn main() {
         .setup(|app| {
             let runtime = backend_runtime_for_launch();
             store_backend_runtime(app.handle(), runtime.clone());
+
+            if let Some(window) = app.get_webview_window("main") {
+                #[cfg(windows)]
+                harden_webview2_default_ui(&window);
+            }
 
             let app_icon = load_app_icon();
             if let (Some(window), Some(icon)) = (app.get_webview_window("main"), app_icon.clone()) {
