@@ -74,7 +74,7 @@ const messages = {
     'search.rrfK': 'RRF k',
     'search.showScores': '在结果卡片显示搜索分与排名',
     'search.showOnboarding': '显示操作指引',
-    'search.semanticDistance': '语义距',
+    'search.semanticDistance': '语义距离',
     'search.searching': '搜索中…',
     'search.distanceHint': 'Chroma 原始距离，越小越相关',
     'search.textRank': '精确',
