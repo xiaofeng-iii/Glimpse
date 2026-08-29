@@ -123,19 +123,26 @@ describe('memory components', () => {
       text_content: '',
       analysis_status: 'PROCESSING',
     })
-    const card = mount(MemoryCard, {
-      props: { memory: processingMemory },
-    })
+    vi.useFakeTimers()
+    try {
+      const card = mount(MemoryCard, {
+        props: { memory: processingMemory },
+      })
 
-    expect(card.get('.memory-card').attributes('aria-busy')).toBe('true')
-    expect(card.text()).toContain('正在生成记忆摘要')
-    expect(card.text()).toContain('等待AI摘要和OCR识别')
-    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(true)
+      expect(card.get('.memory-card').attributes('aria-busy')).toBe('true')
+      expect(card.text()).toContain('正在生成记忆摘要')
+      expect(card.text()).toContain('等待AI摘要和OCR识别')
+      expect(card.findComponent(MemoryAnalysisState).exists()).toBe(true)
 
-    await card.get('.memory-card').trigger('click')
-    await card.get('.memory-card').trigger('keydown', { key: 'Enter' })
-    expect(card.emitted('select')?.[0]?.[0]).toEqual(processingMemory)
-    expect(card.emitted('open')?.[0]?.[0]).toEqual(processingMemory)
+      await card.get('.memory-card').trigger('click')
+      expect(card.emitted('select')).toBeUndefined()
+      await vi.advanceTimersByTimeAsync(250)
+      await card.get('.memory-card').trigger('keydown', { key: 'Enter' })
+      expect(card.emitted('select')?.[0]?.[0]).toEqual(processingMemory)
+      expect(card.emitted('open')?.[0]?.[0]).toEqual(processingMemory)
+    } finally {
+      vi.useRealTimers()
+    }
 
     const inspector = mount(MemoryInspector, {
       props: { memory: processingMemory },
@@ -252,7 +259,7 @@ describe('memory components', () => {
     expect(toolbarCapture.attributes('aria-label')).toBe('截图，处理中...')
     expect(toolbarCapture.element.disabled).toBe(true)
     expect(toolbarCapture.find('.animate-spin').exists()).toBe(true)
-    expect(toolbarCapture.classes()).toEqual(expect.arrayContaining(['h-9', 'min-h-0']))
+    expect(toolbarCapture.classes()).toEqual(expect.arrayContaining(['h-8']))
     expect(busyToolbarText).toContain('截图')
 
     await toolbar.setProps({ capturing: false })
@@ -276,7 +283,7 @@ describe('memory components', () => {
     expect(emptyCapture.attributes('aria-label')).toBe('截图，处理中...')
     expect(emptyCapture.element.disabled).toBe(true)
     expect(emptyCapture.find('.animate-spin').exists()).toBe(true)
-    expect(emptyCapture.classes()).toContain('h-11')
+    expect(emptyCapture.classes()).toContain('h-10')
 
     await wall.setProps({ capturing: false, captureDisabled: true })
     expect(emptyCapture.attributes('aria-busy')).toBe('false')
@@ -492,7 +499,7 @@ describe('memory components', () => {
     })
 
     const editButton = wrapper.get('.summary-editor__edit-action')
-    expect(editButton.classes()).toEqual(expect.arrayContaining(['h-10', 'w-28', 'text-sm', 'font-semibold']))
+    expect(editButton.classes()).toEqual(expect.arrayContaining(['h-8', 'w-28', 'text-sm', 'font-semibold']))
 
     await editButton.trigger('click')
     await flushPromises()
@@ -501,7 +508,7 @@ describe('memory components', () => {
     expect(frame.attributes('style')).toContain('height: 220px')
     expect(document.activeElement).toBe(originalControl)
     for (const button of wrapper.findAll('.summary-editor__edit-action')) {
-      expect(button.classes()).toEqual(expect.arrayContaining(['h-10', 'w-28', 'text-sm', 'font-semibold']))
+      expect(button.classes()).toEqual(expect.arrayContaining(['h-8', 'w-28', 'text-sm', 'font-semibold']))
     }
 
     measuredHeight = 600

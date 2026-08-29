@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { PhotoIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
@@ -30,6 +30,30 @@ const analysisStatus = computed(() => props.memory.analysis_status ?? 'COMPLETED
 const analyzing = computed(() => analysisStatus.value === 'PROCESSING')
 const analysisUnavailable = computed(() => analysisStatus.value === 'FAILED')
 
+// 单击选中延迟确认：双击进入详情时取消侧栏弹出，避免“先弹预览再跳页”的闪动。
+const SELECT_INTENT_DELAY_MS = 250
+let selectIntentTimer: number | null = null
+
+const cancelSelectIntent = () => {
+  if (selectIntentTimer !== null) {
+    window.clearTimeout(selectIntentTimer)
+    selectIntentTimer = null
+  }
+}
+
+const handleCardClick = () => {
+  if (selectIntentTimer !== null) return
+  selectIntentTimer = window.setTimeout(() => {
+    selectIntentTimer = null
+    emit('select', props.memory)
+  }, SELECT_INTENT_DELAY_MS)
+}
+
+const handleCardDoubleClick = () => {
+  cancelSelectIntent()
+  emit('open', props.memory)
+}
+
 const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
@@ -42,6 +66,8 @@ const handleKeydown = (event: KeyboardEvent) => {
     emit('select', props.memory)
   }
 }
+
+onBeforeUnmount(cancelSelectIntent)
 </script>
 
 <template>
@@ -59,8 +85,8 @@ const handleKeydown = (event: KeyboardEvent) => {
     aria-haspopup="menu"
     :aria-pressed="selected"
     :aria-busy="analyzing"
-    @click="emit('select', memory)"
-    @dblclick.stop="emit('open', memory)"
+    @click="handleCardClick"
+    @dblclick.stop="handleCardDoubleClick"
     @contextmenu.prevent="emit('contextmenu', { memory, x: $event.clientX, y: $event.clientY })"
     @keydown="handleKeydown"
   >
