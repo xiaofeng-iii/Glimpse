@@ -15,7 +15,8 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { createLogger } from '@/utils/logger'
 import { memoryMatchesFilters, type MemoryFilters } from '@/utils/memory-filters'
-import { getMemoryImageUrls } from '@/utils/memory-images'
+import { getMemoryImagePaths } from '@/utils/memory-images'
+import { copyImageFileToClipboard } from '@/platform/clipboard'
 import { t } from '@/utils/i18n'
 import AddTextMemoryDialog from '@/components/AddTextMemoryDialog.vue'
 import ClusterBar from '@/components/ClusterBar.vue'
@@ -301,28 +302,19 @@ const handleMenuCopy = async (memory: Memory) => {
 
 const handleMenuCopyImage = async (memory: Memory) => {
   closeContextMenu()
-  const url = getMemoryImageUrls(memory)[0]
-  if (!url) return
+  const path = getMemoryImagePaths(memory)[0]
+  if (!path) return
   try {
-    let blob = await (await fetch(url)).blob()
-    if (blob.type !== 'image/png') {
-      const bitmap = await createImageBitmap(blob)
-      const canvas = document.createElement('canvas')
-      canvas.width = bitmap.width
-      canvas.height = bitmap.height
-      canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
-      const converted = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, 'image/png'),
-      )
-      bitmap.close()
-      if (!converted) throw new Error('canvas toBlob returned null')
-      blob = converted
-    }
-    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+    await copyImageFileToClipboard(path)
     notifications.show(t('message.copied'), 'success', 1800)
   } catch (error) {
     logger.warn('Copy image to clipboard failed: %s', error)
-    notifications.show(t('message.copyImageFailed'), 'error', 2800)
+    const detail = error instanceof Error ? error.message : String(error)
+    notifications.show(
+      `${t('message.copyImageFailed')}（${detail.slice(0, 120)}）`,
+      'error',
+      4200,
+    )
   }
 }
 

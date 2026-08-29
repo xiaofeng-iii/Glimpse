@@ -12,6 +12,8 @@ const clampIndex = (index: number, imageCount: number) => {
 export const useImagePreviewStore = defineStore('image-preview', () => {
   const isOpen = ref(false)
   const images = ref<string[]>([])
+  // 与 images 对应的相对路径（可空）。桌面端“复制整组图片为文件”依赖它。
+  const paths = ref<string[]>([])
   const currentIndex = ref(0)
   const originElement = shallowRef<HTMLElement | null>(null)
 
@@ -22,6 +24,7 @@ export const useImagePreviewStore = defineStore('image-preview', () => {
     nextImages: string[],
     index = 0,
     origin?: HTMLElement | null,
+    nextPaths: string[] = [],
   ) => {
     const validImages = nextImages.filter(
       (image): image is string => typeof image === 'string' && image.length > 0,
@@ -32,6 +35,9 @@ export const useImagePreviewStore = defineStore('image-preview', () => {
     }
 
     images.value = validImages
+    paths.value = nextPaths.filter(
+      (path): path is string => typeof path === 'string' && path.length > 0,
+    )
     currentIndex.value = clampIndex(index, validImages.length)
     originElement.value = origin === undefined
       ? document.activeElement instanceof HTMLElement
@@ -70,6 +76,7 @@ export const useImagePreviewStore = defineStore('image-preview', () => {
   return {
     isOpen,
     images,
+    paths,
     currentIndex,
     currentImage,
     hasMultiple,

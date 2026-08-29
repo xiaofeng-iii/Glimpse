@@ -543,6 +543,65 @@ fn is_window_maximized(window: tauri::WebviewWindow) -> Result<bool, String> {
     window.is_maximized().map_err(|error| error.to_string())
 }
 
+/// 单张复制与整组同逻辑（CF_HDROP 文件列表，单元素）：
+/// 微信/资源管理器粘贴时直接得到图片本身，且天然支持异步线程不卡 UI。
+#[tauri::command]
+async fn copy_image_file_to_clipboard(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    copy_image_files_to_clipboard(app, vec![path]).await
+}
+
+/// 把整组图片以文件列表（CF_HDROP）形式写入剪贴板，粘贴到资源管理器/聊天工具
+/// 即可得到独立图片文件。路径为相对后端数据根目录的相对路径，与 /api/images
+/// 的解析规则一致（canonicalize 后必须仍位于数据根目录内）。
+#[tauri::command]
+async fn copy_image_files_to_clipboard(
+    app: tauri::AppHandle,
+    paths: Vec<String>,
+) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use clipboard_win::Clipboard;
+
+        let data_root = backend_data_root(&app).ok_or("backend data root unavailable")?;
+        let root_canonical = data_root
+            .canonicalize()
+            .map_err(|error| format!("resolve data root: {error}"))?;
+
+        let mut files = Vec::with_capacity(paths.len());
+        for relative in &paths {
+            let resolved = data_root
+                .join(relative)
+                .canonicalize()
+                .map_err(|error| format!("resolve image {relative}: {error}"))?;
+            if !resolved.starts_with(&root_canonical) {
+                return Err(format!("image path escapes data root: {relative}"));
+            }
+            if !resolved.is_file() {
+                return Err(format!("image file not found: {relative}"));
+            }
+            files.push(
+                resolved
+                    .to_string_lossy()
+                    .trim_start_matches(r"\\?\")
+                    .to_string(),
+            );
+        }
+
+        let clipboard =
+            Clipboard::new_attempts(10).map_err(|error| format!("open clipboard: {error:?}"))?;
+        let _clipboard = &clipboard;
+        clipboard_win::raw::set_file_list(&files)
+            .map_err(|error| format!("set file list: {error:?}"))?;
+        Ok(())
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = (app, paths);
+        Err("file list clipboard is only supported on Windows".to_string())
+    }
+}
+
 fn load_app_icon() -> Option<Image<'static>> {
     Image::from_bytes(APP_ICON_PNG).ok().map(Image::to_owned)
 }
@@ -621,7 +680,9 @@ fn main() {
             minimize_window,
             start_drag_window,
             toggle_maximize_window,
-            is_window_maximized
+            is_window_maximized,
+            copy_image_files_to_clipboard,
+            copy_image_file_to_clipboard
         ])
         .setup(|app| {
             let runtime = backend_runtime_for_launch();

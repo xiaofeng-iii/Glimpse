@@ -3,8 +3,9 @@ import { computed, ref, watch } from 'vue'
 import { PhotoIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { useImagePreviewStore } from '@/stores/imagePreview'
-import { getMemoryImageUrls } from '@/utils/memory-images'
+import { getMemoryImagePaths, getMemoryImageUrls } from '@/utils/memory-images'
 import { t } from '@/utils/i18n'
+import ImageContextMenu from './ImageContextMenu.vue'
 
 const props = withDefaults(defineProps<{
   memory: Memory
@@ -17,7 +18,9 @@ const imagePreview = useImagePreviewStore()
 const failedImages = ref<Record<string, boolean>>({})
 const activeIndex = ref(0)
 const images = computed(() => getMemoryImageUrls(props.memory))
+const imagePaths = computed(() => getMemoryImagePaths(props.memory))
 const activeImage = computed(() => images.value[activeIndex.value] ?? '')
+const imageMenu = ref({ x: 0, y: 0, index: 0, token: 0 })
 
 watch(
   () => props.memory.id,
@@ -29,7 +32,16 @@ watch(
 
 const openPreview = (origin?: HTMLElement | null) => {
   if (!images.value.length) return
-  imagePreview.open(images.value, activeIndex.value, origin)
+  imagePreview.open(images.value, activeIndex.value, origin, imagePaths.value)
+}
+
+const openImageMenu = (event: MouseEvent, index: number) => {
+  if (!images.value.length) return
+  imageMenu.value = { x: event.clientX, y: event.clientY, index, token: imageMenu.value.token + 1 }
+}
+
+const closeImageMenu = () => {
+  imageMenu.value = { ...imageMenu.value, token: 0 }
 }
 
 const handleImageKeydown = (event: KeyboardEvent) => {
@@ -52,6 +64,7 @@ const markImageError = (url: string) => {
       tabindex="0"
       :aria-label="t('preview.hint')"
       @dblclick="openPreview($event.currentTarget as HTMLElement)"
+      @contextmenu.prevent="openImageMenu($event, activeIndex)"
       @keydown="handleImageKeydown"
     >
       <img
@@ -91,6 +104,7 @@ const markImageError = (url: string) => {
           :class="activeIndex === index ? 'border-[var(--color-primary)] ring-1 ring-inset ring-[var(--color-primary)]' : 'border-[var(--shell-line)]'"
           :aria-label="t('preview.thumbnail', { index: index + 1 })"
           @click="activeIndex = index"
+          @contextmenu.prevent.stop="openImageMenu($event, index)"
         >
           <img
             v-if="!failedImages[image]"
@@ -104,5 +118,16 @@ const markImageError = (url: string) => {
         </button>
       </div>
     </div>
+
+    <ImageContextMenu
+      :x="imageMenu.x"
+      :y="imageMenu.y"
+      :open-token="imageMenu.token"
+      :index="imageMenu.index"
+      :paths="imagePaths"
+      :urls="images"
+      show-open
+      @close="closeImageMenu"
+    />
   </section>
 </template>

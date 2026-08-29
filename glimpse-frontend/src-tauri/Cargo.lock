@@ -1199,6 +1199,7 @@ dependencies = [
 name = "glimpse"
 version = "0.3.1"
 dependencies = [
+ "clipboard-win",
  "getrandom 0.3.4",
  "serde",
  "serde_json",

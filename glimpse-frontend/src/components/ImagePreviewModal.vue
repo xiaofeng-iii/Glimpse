@@ -9,6 +9,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { t } from '@/utils/i18n'
+import ImageContextMenu from './ImageContextMenu.vue'
 
 const FOCUSABLE_SELECTOR = [
   'button:not([disabled])',
@@ -32,8 +33,18 @@ const {
 const dialogPanel = ref<HTMLElement | null>(null)
 const closeButton = ref<HTMLButtonElement | null>(null)
 const failedImages = ref<Record<string, boolean>>({})
+const imageMenu = ref({ x: 0, y: 0, token: 0 })
 let previousBodyOverflow = ''
 let previousHtmlOverflow = ''
+
+const openImageMenu = (event: MouseEvent) => {
+  if (!currentImage.value) return
+  imageMenu.value = { x: event.clientX, y: event.clientY, token: imageMenu.value.token + 1 }
+}
+
+const closeImageMenu = () => {
+  imageMenu.value = { ...imageMenu.value, token: 0 }
+}
 
 const lockDocumentScroll = () => {
   previousBodyOverflow = document.body.style.overflow
@@ -221,7 +232,7 @@ onUnmounted(() => {
           </button>
         </header>
 
-        <div class="image-preview-stage">
+        <div class="image-preview-stage" @contextmenu.prevent="openImageMenu">
           <button
             v-if="hasMultiple"
             type="button"
@@ -287,5 +298,15 @@ onUnmounted(() => {
 
       </section>
     </div>
+
+    <ImageContextMenu
+      :x="imageMenu.x"
+      :y="imageMenu.y"
+      :open-token="imageMenu.token"
+      :index="currentIndex"
+      :paths="previewStore.paths"
+      :urls="images"
+      @close="closeImageMenu"
+    />
   </Teleport>
 </template>

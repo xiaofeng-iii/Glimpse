@@ -19,6 +19,7 @@ getrandom = "0.3"
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38.2"
 windows = "0.61.3"
+clipboard-win = "5.4.1"
 
 [features]
 default = ["custom-protocol"]
