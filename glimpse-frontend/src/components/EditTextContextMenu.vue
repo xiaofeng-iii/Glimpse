@@ -25,7 +25,6 @@ const emit = defineEmits<{
   (event: 'close'): void
 }>()
 
-const notifications = useNotificationStore()
 const menuElement = ref<HTMLElement | null>(null)
 const current = ref<EditableElement | null>(null)
 const ready = ref(false)
@@ -96,7 +95,7 @@ const runPaste = async () => {
     close({ restoreFocus: false })
   } catch (error) {
     console.error('Paste from clipboard failed:', error)
-    notifications.show(t('message.pasteFailed'), 'error', 3200)
+    useNotificationStore().show(t('message.pasteFailed'), 'error', 3200)
     close({ restoreFocus: false })
   }
 }
