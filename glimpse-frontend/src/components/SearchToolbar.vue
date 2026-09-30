@@ -214,7 +214,7 @@ defineExpose({ focus, clear })
             >
               <XMarkIcon class="h-3 w-3" aria-hidden="true" />
             </button>
-            <kbd class="search-toolbar__detail-control border border-[var(--shell-line)] px-1.5 py-0.5 text-xs text-[var(--shell-muted)]">
+            <kbd class="search-toolbar__detail-control border border-[var(--shell-line)] px-1.5 text-[11px] leading-[16px] text-[var(--shell-muted)]">
               {{ shortcutLabel }}
             </kbd>
           </div>
@@ -289,7 +289,7 @@ defineExpose({ focus, clear })
                   :min="field.min"
                   :max="field.max"
                   :step="field.step"
-                  class="w-full rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 py-1.5 text-sm text-[var(--shell-ink)] outline-none focus:border-amber-400"
+                  class="w-full rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 py-1.5 text-sm text-[var(--shell-ink)] outline-none focus:border-[color-mix(in_srgb,var(--color-primary)_55%,var(--shell-line))]"
                 />
               </label>
             </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { CameraIcon, FunnelIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { languagePreference, t } from '@/utils/i18n'
@@ -12,7 +12,6 @@ import CaptureButton from './CaptureButton.vue'
 import AddMemoryButton from './AddMemoryButton.vue'
 import MemoryCard from './MemoryCard.vue'
 import MemoryFiltersControl from './MemoryFilters.vue'
-import LoadingSpinner from './LoadingSpinner.vue'
 
 const props = defineProps<{
   memories: Memory[]
@@ -39,9 +38,63 @@ const emit = defineEmits<{
 
 type MemoryGroup = { key: string; label: string; memories: Memory[] }
 
+// 搜索反馈分治：搜索期间锁住上一轮已渲染的数据与布局，直到新结果就绪才
+// 一帧内整体替换——杜绝“新布局×旧数据”的中间态（未分组全量闪现的根源）。
+// 超过 200ms 才淡入骨架屏；快路径全程只有轻微降透明，无任何布局跳动。
+const SKELETON_SHOW_DELAY_MS = 200
+
 const searching = computed(() => Boolean(props.query?.trim()))
 const filters = computed(() => props.filters ?? createEmptyMemoryFilters())
 const filtering = computed(() => hasActiveMemoryFilters(filters.value))
+const deferredSearchingLoad = ref(false)
+let skeletonDelayTimer: number | null = null
+
+// 已渲染数据快照：仅在新一轮数据实际到达（loading 结束）时更新布局标志与数据，
+// 保证“布局切换”与“数据替换”严格同帧——查询框已变、结果未变的窗口内，
+// 记忆墙继续以上一轮布局渲染上一轮数据，任何中间态都不会被画出来。
+const renderedMemories = ref<Memory[]>([...props.memories])
+const renderedTotal = ref(props.total)
+const renderedSearching = ref(searching.value)
+watch(
+  () => [props.loading, props.memories, props.total, props.query] as const,
+  ([loading, memories, total]) => {
+    if (loading) return
+    renderedMemories.value = [...memories]
+    renderedTotal.value = total
+    renderedSearching.value = searching.value
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.loading && searching.value,
+  (active) => {
+    if (skeletonDelayTimer !== null) {
+      window.clearTimeout(skeletonDelayTimer)
+      skeletonDelayTimer = null
+    }
+    if (active) {
+      skeletonDelayTimer = window.setTimeout(() => {
+        skeletonDelayTimer = null
+        deferredSearchingLoad.value = true
+      }, SKELETON_SHOW_DELAY_MS)
+    } else {
+      deferredSearchingLoad.value = false
+    }
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  if (skeletonDelayTimer !== null) window.clearTimeout(skeletonDelayTimer)
+})
+
+// 数据换血（新结果替换旧内容）时重建结果容器，触发挂载淡入，
+// 避免 transition 因 DOM 复用不生效导致结果“硬切闪现”。
+const resultsRenderKey = computed(() =>
+  `${renderedSearching.value ? 's' : 'b'}:${renderedMemories.value.map((memory) => memory.id).join(',')}`,
+)
+
 const wall = ref<HTMLElement | null>(null)
 const compactFilter = ref(false)
 let scrollContainer: HTMLElement | null = null
@@ -78,8 +131,8 @@ const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(),
 
 const groups = computed<MemoryGroup[]>(() => {
   void languagePreference.value
-  if (searching.value) {
-    return [{ key: 'search', label: '', memories: props.memories }]
+  if (renderedSearching.value) {
+    return [{ key: 'search', label: '', memories: renderedMemories.value }]
   }
 
   const now = new Date()
@@ -87,7 +140,7 @@ const groups = computed<MemoryGroup[]>(() => {
   const yesterday = today - 86_400_000
   const result = new Map<string, MemoryGroup>()
 
-  for (const memory of props.memories) {
+  for (const memory of renderedMemories.value) {
     const date = new Date(memory.created_at)
     const day = startOfDay(date)
     let key: string
@@ -124,11 +177,9 @@ const groups = computed<MemoryGroup[]>(() => {
     >
       <h1 class="text-base font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">
         {{
-          loading && searching
-            ? t('search.searching')
-            : searching
-              ? t('memory.searchCount', { count: memories.length })
-              : t('memory.count', { count: total })
+          renderedSearching
+            ? t('memory.searchCount', { count: renderedMemories.length })
+            : t('memory.count', { count: renderedTotal })
         }}
       </h1>
       <MemoryFiltersControl
@@ -139,45 +190,44 @@ const groups = computed<MemoryGroup[]>(() => {
       />
     </header>
 
-    <div class="memory-wall-scroll pb-6 pt-4" aria-live="polite">
+    <div class="memory-wall-scroll pb-6 pt-4" aria-live="polite" :aria-busy="loading || undefined">
 
-      <div v-if="loading">
-        <div v-if="searching" class="memory-grid" aria-hidden="true">
-          <div v-for="i in 8" :key="i" class="memory-card-skeleton">
-            <div class="memory-card-skeleton__media"></div>
-            <div class="memory-card-skeleton__body">
-              <div class="memory-card-skeleton__line"></div>
-              <div class="memory-card-skeleton__line"></div>
-              <div class="memory-card-skeleton__line memory-card-skeleton__line--short"></div>
-              <div class="memory-card-skeleton__time"></div>
-            </div>
+      <div
+        v-if="searching && deferredSearchingLoad"
+        class="memory-grid memory-wall__skeleton-grid"
+        aria-hidden="true"
+      >
+        <div v-for="i in 8" :key="i" class="memory-card-skeleton">
+          <div class="memory-card-skeleton__media"></div>
+          <div class="memory-card-skeleton__body">
+            <div class="memory-card-skeleton__line"></div>
+            <div class="memory-card-skeleton__line"></div>
+            <div class="memory-card-skeleton__line memory-card-skeleton__line--short"></div>
+            <div class="memory-card-skeleton__time"></div>
           </div>
-        </div>
-        <div v-else class="flex min-h-64 items-center justify-center">
-          <LoadingSpinner />
         </div>
       </div>
 
-      <div v-else-if="!memories.length" class="flex min-h-[52vh] flex-col items-center justify-center text-center">
+      <div v-else-if="!renderedMemories.length" class="flex min-h-[52vh] flex-col items-center justify-center text-center">
         <div
           class="flex h-14 w-14 items-center justify-center rounded-xl"
-          :class="searching || filtering
+          :class="renderedSearching || filtering
             ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
             : 'memory-wall__capture-icon'"
         >
           <FunnelIcon v-if="filtering" class="h-7 w-7" aria-hidden="true" />
-          <MagnifyingGlassIcon v-else-if="searching" class="h-7 w-7" aria-hidden="true" />
+          <MagnifyingGlassIcon v-else-if="renderedSearching" class="h-7 w-7" aria-hidden="true" />
           <CameraIcon v-else class="h-7 w-7" aria-hidden="true" />
         </div>
         <h2 class="mt-4 text-base font-semibold text-[var(--shell-ink)]">
           {{ filtering
             ? t('memory.noFilterResults')
-            : searching ? t('memory.noSearchResults') : t('memory.emptyTitle') }}
+            : renderedSearching ? t('memory.noSearchResults') : t('memory.emptyTitle') }}
         </h2>
         <p class="mt-1.5 max-w-sm text-sm text-[var(--shell-muted)]">
           {{ filtering
             ? t('memory.noFilterResultsHint')
-            : searching ? t('memory.noSearchResultsHint') : t('memory.emptyHint') }}
+            : renderedSearching ? t('memory.noSearchResultsHint') : t('memory.emptyHint') }}
         </p>
         <button
           v-if="filtering"
@@ -187,7 +237,7 @@ const groups = computed<MemoryGroup[]>(() => {
         >
           {{ t('filter.clear') }}
         </button>
-        <div v-else-if="!searching" class="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+        <div v-else-if="!renderedSearching" class="mt-4 flex flex-wrap items-center justify-center gap-2.5">
           <CaptureButton
             :capturing="capturing"
             :disabled="captureDisabled"
@@ -201,7 +251,12 @@ const groups = computed<MemoryGroup[]>(() => {
         </div>
       </div>
 
-      <div v-else class="space-y-5">
+      <div
+        v-else
+        :key="resultsRenderKey"
+        class="memory-wall__results space-y-5"
+        :class="{ 'memory-wall__results--stale': loading }"
+      >
         <section v-for="group in groups" :key="group.key">
           <h2 v-if="group.label" class="mb-2.5 text-xs font-semibold tracking-wide text-[var(--shell-muted)]">
             {{ group.label }}
@@ -282,6 +337,35 @@ const groups = computed<MemoryGroup[]>(() => {
 .memory-wall-scroll {
   position: relative;
   padding-inline: var(--memory-wall-inline-inset);
+}
+
+/* 搜索加载期：旧内容降透明提示“检索中”，布局保持稳定不跳动；
+   新结果挂载时整体淡入（容器按结果集重建以触发动画）。 */
+.memory-wall__results {
+  animation: memory-results-in 160ms ease-out;
+  transition: opacity 160ms ease;
+}
+
+@keyframes memory-results-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.memory-wall__results--stale {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* 延迟骨架：超过阈值才淡入，快路径搜索完全不可见。 */
+.memory-wall__skeleton-grid {
+  animation: memory-skeleton-in 160ms ease-out;
+}
+
+@keyframes memory-skeleton-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .memory-wall__capture-icon {
@@ -382,6 +466,18 @@ const groups = computed<MemoryGroup[]>(() => {
   .memory-wall__header h1,
   .memory-wall__header::after {
     transition: none;
+  }
+
+  .memory-wall__results,
+  .memory-wall__skeleton-grid {
+    transition: none;
+    animation: none;
+  }
+
+  @keyframes memory-results-in {
+    from {
+      opacity: 1;
+    }
   }
 
   .memory-card-skeleton__media,
