@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { memoriesApi, searchApi, type Memory, type SearchOptions } from '@/api/client'
+import { useNotificationStore } from '@/stores/notification'
+import { t } from '@/utils/i18n'
 import { createLogger } from '@/utils/logger'
 import {
   cloneMemoryFilters,
@@ -121,8 +123,20 @@ export const useMemoriesStore = defineStore('memories', () => {
     searchOptions.value = { ...options }
 
     try {
+      // 开发模式的延迟/失败模拟：纯前端戏剧道具，剥掉后再请求后端。
+      const { devDelayMs = 0, devFailSearch = false, ...backendOptions } = options
+      if (import.meta.env.DEV && (devDelayMs > 0 || devFailSearch)) {
+        if (devDelayMs > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, devDelayMs))
+          if (requestId !== latestRequest) return []
+        }
+        if (devFailSearch) {
+          throw new Error('Simulated search failure (dev mode)')
+        }
+      }
+
       const result = await searchApi.search(normalizedQuery, source, {
-        ...options,
+        ...backendOptions,
         ...toMemoryFilterQuery(activeFilters.value),
       })
       if (requestId !== latestRequest) return []
@@ -136,6 +150,7 @@ export const useMemoriesStore = defineStore('memories', () => {
       return result.memories
     } catch (error) {
       logger.error('Search failed: %s', error)
+      useNotificationStore().show(t('message.searchFailed'), 'error', 3200)
       return []
     } finally {
       if (requestId === latestRequest) {

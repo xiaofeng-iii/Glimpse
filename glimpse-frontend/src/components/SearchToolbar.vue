@@ -55,6 +55,8 @@ const devOptions = ref({
   candidateMultiplier: memoriesStore.searchOptions.candidateMultiplier ?? 2,
   rrfK: memoriesStore.searchOptions.rrfK ?? 60,
   debug: memoriesStore.searchOptions.debug ?? true,
+  devDelayMs: 0,
+  devFailSearch: false,
 })
 
 const sources = [
@@ -80,6 +82,8 @@ const currentOptions = (): SearchOptions => {
     candidateMultiplier: clampNumber(devOptions.value.candidateMultiplier, 2, 1, 10),
     rrfK: clampNumber(devOptions.value.rrfK, 60, 1, 200),
     debug: devOptions.value.debug,
+    devDelayMs: clampNumber(devOptions.value.devDelayMs, 0, 0, 60_000),
+    devFailSearch: devOptions.value.devFailSearch,
   }
 }
 
@@ -111,6 +115,25 @@ const handleDebugToggle = (event: Event) => {
   if (debugPanelOpen.value === open) return
   debugPanelOpen.value = open
   emit('debug-panel-change', open)
+}
+
+// 失焦自动关闭：焦点移到文档内面板之外（点击外部/Tab 走出）即收起。
+// relatedTarget 为空表示整个窗口失焦（Alt+Tab 等），不视为面板失焦。
+const handleDebugPanelFocusout = (event: FocusEvent) => {
+  if (!debugPanelOpen.value) return
+  const panel = debugPanelElement.value
+  if (!panel) return
+  if (!(event.relatedTarget instanceof Node)) return
+  if (panel.contains(event.relatedTarget)) return
+  panel.open = false
+}
+
+// Esc 自动关闭：阻断冒泡，避免同时触发全局“Esc 清空搜索”。
+const handleDebugPanelKeydown = (event: KeyboardEvent) => {
+  if (event.key !== 'Escape' || !debugPanelOpen.value) return
+  event.stopPropagation()
+  const panel = debugPanelElement.value
+  if (panel) panel.open = false
 }
 
 const handleShowOnboarding = () => {
@@ -257,6 +280,8 @@ defineExpose({ focus, clear })
           class="relative"
           :open="debugPanelOpen"
           @toggle="handleDebugToggle"
+          @focusout="handleDebugPanelFocusout"
+          @keydown="handleDebugPanelKeydown"
         >
           <summary
             class="search-toolbar__control flex h-8 cursor-pointer list-none items-center gap-1.5 border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
@@ -291,6 +316,22 @@ defineExpose({ focus, clear })
                   :step="field.step"
                   class="w-full rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 py-1.5 text-sm text-[var(--shell-ink)] outline-none focus:border-[color-mix(in_srgb,var(--color-primary)_55%,var(--shell-line))]"
                 />
+              </label>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <label class="text-xs text-[var(--shell-muted)]">
+                <span class="mb-1 block">{{ t('search.devDelayMs') }}</span>
+                <input
+                  v-model.number="devOptions.devDelayMs"
+                  type="number"
+                  :min="0"
+                  :step="100"
+                  class="w-full rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 py-1.5 text-sm text-[var(--shell-ink)] outline-none focus:border-[color-mix(in_srgb,var(--color-primary)_55%,var(--shell-line))]"
+                />
+              </label>
+              <label class="flex cursor-pointer items-end gap-2 pb-1.5 text-xs text-amber-800">
+                <input v-model="devOptions.devFailSearch" type="checkbox" class="h-4 w-4 accent-amber-600" />
+                {{ t('search.devFailSearch') }}
               </label>
             </div>
             <label class="mt-3 flex cursor-pointer items-center gap-2 text-xs text-amber-800">

@@ -35,6 +35,10 @@ export interface SearchOptions {
   dateFrom?: string
   dateTo?: string
   memoryType?: 'screenshot' | 'text'
+  /** 仅开发模式：人为延迟搜索返回（毫秒），用于观察加载态；不会发给后端。 */
+  devDelayMs?: number
+  /** 仅开发模式：模拟搜索请求失败；不会发给后端。 */
+  devFailSearch?: boolean
 }
 
 export interface MemoryListOptions {
