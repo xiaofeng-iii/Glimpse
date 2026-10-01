@@ -55,6 +55,7 @@ let skeletonDelayTimer: number | null = null
 const renderedMemories = ref<Memory[]>([...props.memories])
 const renderedTotal = ref(props.total)
 const renderedSearching = ref(searching.value)
+const wall = ref<HTMLElement | null>(null)
 watch(
   () => [props.loading, props.memories, props.total, props.query] as const,
   ([loading, memories, total]) => {
@@ -95,7 +96,6 @@ const resultsRenderKey = computed(() =>
   `${renderedSearching.value ? 's' : 'b'}:${renderedMemories.value.map((memory) => memory.id).join(',')}`,
 )
 
-const wall = ref<HTMLElement | null>(null)
 const compactFilter = ref(false)
 let scrollContainer: HTMLElement | null = null
 let toolbarResizeObserver: ResizeObserver | null = null
@@ -192,11 +192,13 @@ const groups = computed<MemoryGroup[]>(() => {
 
     <div class="memory-wall-scroll pb-6 pt-4" aria-live="polite" :aria-busy="loading || undefined">
 
-      <div
-        v-if="searching && deferredSearchingLoad"
-        class="memory-grid memory-wall__skeleton-grid"
-        aria-hidden="true"
-      >
+      <Transition name="wall-cross">
+        <div
+          v-if="searching && deferredSearchingLoad"
+          key="skeleton"
+          class="memory-grid memory-wall__skeleton-grid"
+          aria-hidden="true"
+        >
         <div v-for="i in 8" :key="i" class="memory-card-skeleton">
           <div class="memory-card-skeleton__media"></div>
           <div class="memory-card-skeleton__body">
@@ -208,7 +210,7 @@ const groups = computed<MemoryGroup[]>(() => {
         </div>
       </div>
 
-      <div v-else-if="!renderedMemories.length" class="flex min-h-[52vh] flex-col items-center justify-center text-center">
+      <div v-else-if="!renderedMemories.length" key="empty" class="flex min-h-[52vh] flex-col items-center justify-center text-center">
         <div
           class="flex h-14 w-14 items-center justify-center rounded-xl"
           :class="renderedSearching || filtering
@@ -276,6 +278,7 @@ const groups = computed<MemoryGroup[]>(() => {
           </div>
         </section>
       </div>
+      </Transition>
     </div>
   </section>
 </template>
@@ -339,27 +342,33 @@ const groups = computed<MemoryGroup[]>(() => {
   padding-inline: var(--memory-wall-inline-inset);
 }
 
-/* 搜索加载期：旧内容降透明提示“检索中”，布局保持稳定不跳动；
-   新结果挂载时整体淡入（容器按结果集重建以触发动画）。 */
-.memory-wall__results {
-  animation: memory-results-in 160ms ease-out;
-  transition: opacity 160ms ease;
-}
-
-@keyframes memory-results-in {
-  from {
-    opacity: 0;
-  }
-}
-
+/* 搜索加载期：旧内容降透明提示“检索中”，布局保持稳定不跳动。 */
 .memory-wall__results--stale {
   opacity: 0.55;
   pointer-events: none;
 }
 
-/* 延迟骨架：超过阈值才淡入，快路径搜索完全不可见。 */
+/* 换墙交叉淡化：旧墙淡出与新墙淡入交叠 120ms，内容不再一帧闪换。
+   离场墙临时绝对定位，水平锚定内容盒（对齐父容器 padding），垂直用静态位。 */
+.wall-cross-enter-active,
+.wall-cross-leave-active {
+  transition: opacity 120ms ease;
+}
+
+.wall-cross-enter-from,
+.wall-cross-leave-to {
+  opacity: 0;
+}
+
+.wall-cross-leave-active {
+  position: absolute;
+  left: var(--memory-wall-inline-inset);
+  right: var(--memory-wall-inline-inset);
+}
+
+/* 延迟骨架：超过阈值才淡入，快路径搜索完全不可见（进出场由 wall-cross 驱动）。 */
 .memory-wall__skeleton-grid {
-  animation: memory-skeleton-in 160ms ease-out;
+  align-content: start;
 }
 
 @keyframes memory-skeleton-in {
@@ -424,23 +433,31 @@ const groups = computed<MemoryGroup[]>(() => {
 .memory-card-skeleton__media,
 .memory-card-skeleton__line,
 .memory-card-skeleton__time {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface-subtle);
+}
+
+/* shimmer 用 transform 位移动画（合成器线程），替代逐帧重绘的 background-position */
+.memory-card-skeleton__media::after,
+.memory-card-skeleton__line::after,
+.memory-card-skeleton__time::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
   background: linear-gradient(
     90deg,
-    var(--color-surface-subtle) 25%,
-    var(--color-surface-hover) 45%,
-    var(--color-surface-subtle) 65%
+    transparent,
+    var(--color-surface-hover),
+    transparent
   );
-  background-size: 300% 100%;
   animation: memory-skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
 @keyframes memory-skeleton-shimmer {
-  from {
-    background-position: 150% 0;
-  }
-
   to {
-    background-position: -150% 0;
+    transform: translateX(100%);
   }
 }
 
@@ -469,7 +486,9 @@ const groups = computed<MemoryGroup[]>(() => {
   }
 
   .memory-wall__results,
-  .memory-wall__skeleton-grid {
+  .memory-wall__skeleton-grid,
+  .wall-cross-enter-active,
+  .wall-cross-leave-active {
     transition: none;
     animation: none;
   }
@@ -480,9 +499,9 @@ const groups = computed<MemoryGroup[]>(() => {
     }
   }
 
-  .memory-card-skeleton__media,
-  .memory-card-skeleton__line,
-  .memory-card-skeleton__time {
+  .memory-card-skeleton__media::after,
+  .memory-card-skeleton__line::after,
+  .memory-card-skeleton__time::after {
     animation: none;
   }
 }
