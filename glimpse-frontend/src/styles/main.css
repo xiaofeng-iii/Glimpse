@@ -233,11 +233,7 @@ button {
   position: absolute;
   inset: 0;
   z-index: 0;
-  cursor: grab;
-}
-
-.desktop-shell__drag-layer:active {
-  cursor: grabbing;
+  cursor: default;
 }
 
 .desktop-shell__leading,
