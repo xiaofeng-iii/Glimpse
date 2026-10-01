@@ -38,11 +38,12 @@ python scripts/set_version.py --check
 创建 GitHub Release。
 可先使用 `-DryRun` 预览，或在无人值守环境中明确传入 `-Yes`。
 
-## 正式版发布后的 Release 说明（必做）
+## Release 更新说明（正式版与公开预览版必做）
 
-正式版标签触发的 Workflow 使用 `--generate-notes` 创建 Release；自动正文只是
-提交列表或 compare 链接，不能作为最终发布说明。Workflow 成功且安装包上传后，
-必须补写面向用户的中文说明，完成正文验收后才能宣布发布完成。
+正式版与公开预览版标签触发的 Workflow 都只负责上传安装包与校验文件；若 Release
+尚不存在，会以 `--generate-notes` 兜底创建，自动正文只是提交列表或 compare 链接，
+不能作为最终发布说明。面向用户的中文更新说明必须人工撰写，完成正文验收后才能
+宣布发布完成。两个通道的写入流程完全一致，仅预览版在预创建命令上追加 `--prerelease`。
 
 发布说明的内容边界：
 
@@ -103,11 +104,17 @@ python scripts/set_version.py --check
    gh release edit $CurrentTag --notes-file $NotesFile
    ```
 
-标准流程是先由 Workflow 创建 Release，再使用上面的命令覆盖正文。若需要在长时间
-构建开始前就准备好正式文案，也可以在标签已推送且 Release 尚不存在时手动执行
-`gh release create $CurrentTag --verify-tag --notes-file $NotesFile`；随后 Workflow
-会检测到已有 Release，只上传安装包和 `SHA256SUMS.txt`，不会自动覆盖正文。无论采用
-哪种写入方式，都必须在最后回读正文、发布状态和资产。
+推荐流程：推送标签后立即用说明文件预创建 Release，Workflow 检测到已有 Release，
+只上传安装包和 `SHA256SUMS.txt`，不会覆盖正文：
+
+```powershell
+gh release create $CurrentTag --verify-tag --notes-file $NotesFile
+# 公开预览版追加 --prerelease：
+gh release create $CurrentTag --verify-tag --prerelease --notes-file $NotesFile
+```
+
+若 Release 已由 Workflow 兜底创建，则改用上面的 `gh release edit` 覆盖正文。无论
+采用哪种写入方式，都必须在最后回读正文、发布状态和资产。
 
 4. 重新读取 GitHub Release，确认正文、正式发布状态和链接都正确：
 
@@ -120,9 +127,10 @@ python scripts/set_version.py --check
 
 ## 公开预览版的 Release 说明
 
-发布公开预览版时同样应提供面向用户的中文说明。素材范围从最近一个正式版或公开
-预览版标签（取最近者）到当前预览版标签；后续正式版则仍以两个正式版标签之间的
-全部变化为范围，可参考这期间的预览版说明进行归纳。
+公开预览版的说明撰写与发布流程和正式版完全一致（见上节），差异仅有两点：预创建
+命令追加 `--prerelease`；素材范围为最近一个正式版或公开预览版标签（取最近者）到
+当前预览版标签。后续正式版仍以两个正式版标签之间的全部变化为范围，可参考这期间
+的预览版说明进行归纳。
 
 ## 版本命名规范
 

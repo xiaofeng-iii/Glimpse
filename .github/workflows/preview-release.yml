@@ -141,15 +141,14 @@ jobs:
           Set-Content -Path $checksumPath -Value $checksumLines -Encoding ascii
 
           $assets = @($installers.FullName) + @((Resolve-Path $checksumPath).Path)
-          $version = $env:GITHUB_REF_NAME.Substring(1)
-          $releaseTag = "v$version"
+          $releaseTag = $env:GITHUB_REF_NAME
           gh release view $releaseTag *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $releaseTag @assets --clobber
           } else {
             gh release create $releaseTag @assets `
+              --verify-tag `
               --prerelease `
-              --target "$env:GITHUB_SHA" `
               --generate-notes `
-              --title "Glimpse $releaseTag (preview)"
+              --title "Glimpse $releaseTag"
           }
