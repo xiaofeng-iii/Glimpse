@@ -45,6 +45,10 @@ python scripts/set_version.py --check
 不能作为最终发布说明。面向用户的中文更新说明必须人工撰写，完成正文验收后才能
 宣布发布完成。两个通道的写入流程完全一致，仅预览版在预创建命令上追加 `--prerelease`。
 
+Release 标题统一为 `Glimpse <标签名>`（如 `Glimpse v0.3.2`、
+`Glimpse v0.3.3-preview.20261001`）；Workflow 兜底创建的标题是裸标签名，验收发现
+不符时用 `gh release edit $CurrentTag --title "Glimpse $CurrentTag"` 修正。
+
 发布说明的内容边界：
 
 - **正式版**以最近一个正式版本标签到当前正式版标签之间的变化为范围。期间发布的
@@ -108,9 +112,9 @@ python scripts/set_version.py --check
 只上传安装包和 `SHA256SUMS.txt`，不会覆盖正文：
 
 ```powershell
-gh release create $CurrentTag --verify-tag --notes-file $NotesFile
+gh release create $CurrentTag --verify-tag --title "Glimpse $CurrentTag" --notes-file $NotesFile
 # 公开预览版追加 --prerelease：
-gh release create $CurrentTag --verify-tag --prerelease --notes-file $NotesFile
+gh release create $CurrentTag --verify-tag --prerelease --title "Glimpse $CurrentTag" --notes-file $NotesFile
 ```
 
 若 Release 已由 Workflow 兜底创建，则改用上面的 `gh release edit` 覆盖正文。无论
@@ -122,7 +126,8 @@ gh release create $CurrentTag --verify-tag --prerelease --notes-file $NotesFile
    gh release view $CurrentTag --json name,tagName,isDraft,isPrerelease,body,url
    ```
 
-   同时确认安装包和 `SHA256SUMS.txt` 已上传。验收完成后删除临时说明文件；
+   同时确认安装包和 `SHA256SUMS.txt` 已上传，标题（`name`）为
+`Glimpse <标签名>`。验收完成后删除临时说明文件；
    在此之前不得把发布报告为完成。`v0.2.1` 的发布说明是文案风格范本。
 
 ## 公开预览版的 Release 说明
