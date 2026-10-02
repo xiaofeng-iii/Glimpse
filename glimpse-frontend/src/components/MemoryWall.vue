@@ -12,6 +12,9 @@ import CaptureButton from './CaptureButton.vue'
 import AddMemoryButton from './AddMemoryButton.vue'
 import MemoryCard from './MemoryCard.vue'
 import MemoryFiltersControl from './MemoryFilters.vue'
+import WallLayoutSwitcher from './WallLayoutSwitcher.vue'
+import { groupMemories, type CardTimeDisplay, type MemoryGroup } from '@/utils/memory-grouping'
+import { wallLayoutMode } from '@/utils/wall-layout'
 
 const props = defineProps<{
   memories: Memory[]
@@ -35,8 +38,6 @@ const emit = defineEmits<{
   (event: 'add-memory'): void
   (event: 'apply-filters', filters: MemoryFilters): void
 }>()
-
-type MemoryGroup = { key: string; label: string; memories: Memory[] }
 
 // 搜索反馈分治：搜索期间锁住上一轮已渲染的数据与布局，直到新结果就绪才
 // 一帧内整体替换——杜绝“新布局×旧数据”的中间态（未分组全量闪现的根源）。
@@ -92,9 +93,18 @@ onUnmounted(() => {
 
 // 数据换血（新结果替换旧内容）时重建结果容器，触发挂载淡入，
 // 避免 transition 因 DOM 复用不生效导致结果“硬切闪现”。
+// 排版模式变化同样换 key：切换分组粒度时复用同一套交叉淡化换墙。
 const resultsRenderKey = computed(() =>
-  `${renderedSearching.value ? 's' : 'b'}:${renderedMemories.value.map((memory) => memory.id).join(',')}`,
+  `${renderedSearching.value ? 's' : wallLayoutMode.value}:${renderedMemories.value.map((memory) => memory.id).join(',')}`,
 )
+
+// 按日期墙卡片只显示时分；按月份墙组标题只有月份，卡片需补“几号”；
+// 全部墙没有日期上下文，卡片带完整日期时间。
+const cardTimeDisplay = computed<CardTimeDisplay>(() => {
+  if (wallLayoutMode.value === 'month') return 'dayTime'
+  if (wallLayoutMode.value === 'all') return 'full'
+  return 'time'
+})
 
 const compactFilter = ref(false)
 let scrollContainer: HTMLElement | null = null
@@ -127,45 +137,12 @@ onUnmounted(() => {
   scrollContainer?.removeEventListener('scroll', updateStickyFilter)
   toolbarResizeObserver?.disconnect()
 })
-const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-
 const groups = computed<MemoryGroup[]>(() => {
   void languagePreference.value
   if (renderedSearching.value) {
     return [{ key: 'search', label: '', memories: renderedMemories.value }]
   }
-
-  const now = new Date()
-  const today = startOfDay(now)
-  const yesterday = today - 86_400_000
-  const result = new Map<string, MemoryGroup>()
-
-  for (const memory of renderedMemories.value) {
-    const date = new Date(memory.created_at)
-    const day = startOfDay(date)
-    let key: string
-    let label: string
-    if (day === today) {
-      key = 'today'
-      label = t('memory.today')
-    } else if (day === yesterday) {
-      key = 'yesterday'
-      label = t('memory.yesterday')
-    } else {
-      key = date.toLocaleDateString(languagePreference.value, {
-        year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-      label = key
-    }
-
-    const group = result.get(key) ?? { key, label, memories: [] }
-    group.memories.push(memory)
-    result.set(key, group)
-  }
-
-  return [...result.values()]
+  return groupMemories(renderedMemories.value, wallLayoutMode.value, languagePreference.value)
 })
 </script>
 
@@ -182,12 +159,15 @@ const groups = computed<MemoryGroup[]>(() => {
             : t('memory.count', { count: renderedTotal })
         }}
       </h1>
-      <MemoryFiltersControl
-        :model-value="filters"
-        :loading="loading"
-        :compact="compactFilter"
-        @apply="emit('apply-filters', $event)"
-      />
+      <div class="memory-wall__controls">
+        <WallLayoutSwitcher :disabled="renderedSearching" :compact="compactFilter" />
+        <MemoryFiltersControl
+          :model-value="filters"
+          :loading="loading"
+          :compact="compactFilter"
+          @apply="emit('apply-filters', $event)"
+        />
+      </div>
     </header>
 
     <div class="memory-wall-scroll pb-6 pt-4" aria-live="polite" :aria-busy="loading || undefined">
@@ -271,6 +251,7 @@ const groups = computed<MemoryGroup[]>(() => {
               :selected="selectedId === memory.id"
               :searching="searching"
               :show-debug="showSearchDebug"
+              :time-display="cardTimeDisplay"
               @select="emit('select', $event)"
               @open="emit('open', $event)"
               @contextmenu="emit('contextmenu', $event)"
@@ -310,6 +291,13 @@ const groups = computed<MemoryGroup[]>(() => {
 
 .memory-wall__header h1 {
   transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.memory-wall__controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .memory-wall__header--compact {

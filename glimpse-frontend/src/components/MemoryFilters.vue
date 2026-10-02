@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { FunnelIcon as FunnelOutlineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
-import { FunnelIcon as FunnelSolidIcon } from '@heroicons/vue/24/solid'
-import { t } from '@/utils/i18n'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+import { CalendarDaysIcon, ChevronDownIcon, FunnelIcon as FunnelOutlineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { languagePreference, t } from '@/utils/i18n'
+import { describeMemoryPeriod, describeMemoryPeriodParts } from '@/utils/memory-grouping'
 import {
   cloneMemoryFilters,
   createEmptyMemoryFilters,
   hasActiveMemoryFilters,
-  resolveMemoryDatePreset,
   type MemoryContentType,
-  type MemoryDatePreset,
   type MemoryFilters,
 } from '@/utils/memory-filters'
+import MemoryCalendarPicker from './MemoryCalendarPicker.vue'
 
 const props = defineProps<{
   modelValue: MemoryFilters
@@ -26,17 +25,24 @@ const emit = defineEmits<{
 const root = ref<HTMLElement | null>(null)
 const trigger = ref<HTMLButtonElement | null>(null)
 const open = ref(false)
+const calendarOpen = ref(false)
 const draft = ref<MemoryFilters>(cloneMemoryFilters(props.modelValue))
-const error = ref('')
 const panelId = 'memory-filter-panel'
-
-const presets: Array<{ value: MemoryDatePreset; label: Parameters<typeof t>[0] }> = [
-  { value: 'today', label: 'filter.today' },
-  { value: 'last7Days', label: 'filter.last7Days' },
-  { value: 'last30Days', label: 'filter.last30Days' },
-  { value: 'all', label: 'filter.allTime' },
-  { value: 'custom', label: 'filter.custom' },
-]
+const calendarId = `${panelId}-calendar`
+const calendarReveal = ref<HTMLElement | null>(null)
+const calendarMounted = ref(false)
+const calendarHeight = ref(0)
+let calendarResizeObserver: ResizeObserver | null = null
+let cancelCalendarCollapse: (() => void) | null = null
+let calendarAnimation = 0
+const dateLabel = computed(() => draft.value.dateFrom || draft.value.dateTo
+  ? describeMemoryPeriod(draft.value.dateFrom, draft.value.dateTo, languagePreference.value)
+  : t('filter.anyTime'))
+const dateParts = computed(() => describeMemoryPeriodParts(
+  draft.value.dateFrom,
+  draft.value.dateTo,
+  languagePreference.value,
+))
 
 const contentTypeOptions: Array<{ value: MemoryContentType; label: Parameters<typeof t>[0] }> = [
   { value: 'screenshot', label: 'filter.screenshotMemory' },
@@ -47,13 +53,12 @@ const active = computed(() => hasActiveMemoryFilters(props.modelValue))
 
 const close = (restoreFocus = false) => {
   open.value = false
-  error.value = ''
   if (restoreFocus) void nextTick(() => trigger.value?.focus())
 }
 
 const show = () => {
   draft.value = cloneMemoryFilters(props.modelValue)
-  error.value = ''
+  calendarOpen.value = false
   open.value = true
 }
 
@@ -62,42 +67,78 @@ const toggle = () => {
   else show()
 }
 
-const draftValidationError = () => {
-  if (draft.value.datePreset === 'custom' && (!draft.value.dateFrom || !draft.value.dateTo)) {
-    return 'filter.dateRequired' as const
-  }
-  if (draft.value.dateFrom && draft.value.dateTo && draft.value.dateFrom > draft.value.dateTo) {
-    return 'filter.dateOrder' as const
-  }
-  return null
-}
-
 const emitDraft = () => {
   emit('apply', cloneMemoryFilters(draft.value))
 }
 
-const emitDraftIfValid = () => {
-  error.value = ''
-  if (draftValidationError()) return
+// 日历选中的时段实时生效：写回草稿并向上抛出
+const applyCalendar = (next: MemoryFilters) => {
+  draft.value = next
   emitDraft()
 }
 
-const choosePreset = (preset: MemoryDatePreset) => {
-  error.value = ''
-  if (preset === 'custom') {
-    draft.value = {
-      ...draft.value,
-      datePreset: preset,
-    }
-    emitDraftIfValid()
+const stopCalendarObservation = () => {
+  calendarResizeObserver?.disconnect()
+  calendarResizeObserver = null
+}
+
+const cancelCalendarAnimation = () => {
+  cancelCalendarCollapse?.()
+  cancelCalendarCollapse = null
+}
+
+// 展开收起由 watch 驱动而非 Vue Transition：收起完成前保持日历挂载，
+// 动画结束后才真正卸载，避免过渡被打断时节点残留或高度卡在中间值
+watch(calendarOpen, (isOpen) => {
+  const token = ++calendarAnimation
+  if (isOpen) {
+    cancelCalendarAnimation()
+    calendarMounted.value = true
+    void nextTick(() => {
+      if (token !== calendarAnimation) return
+      const picker = calendarReveal.value?.firstElementChild as HTMLElement | null
+      calendarHeight.value = picker?.offsetHeight ?? 0
+      if (!picker || !('ResizeObserver' in window)) return
+      stopCalendarObservation()
+      calendarResizeObserver = new ResizeObserver((entries) => {
+        const target = entries[0]?.target as HTMLElement | undefined
+        calendarHeight.value = target?.offsetHeight ?? calendarHeight.value
+      })
+      calendarResizeObserver.observe(picker)
+    })
     return
   }
-  draft.value = {
-    ...draft.value,
-    ...resolveMemoryDatePreset(preset),
+
+  stopCalendarObservation()
+  const wrapper = calendarReveal.value
+  const startHeight = wrapper?.offsetHeight ?? 0
+  if (!wrapper || startHeight < 1 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    calendarHeight.value = 0
+    calendarMounted.value = false
+    return
   }
-  emitDraft()
-}
+  calendarHeight.value = startHeight
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (token !== calendarAnimation) return
+    calendarHeight.value = 0
+    const finish = (event: TransitionEvent) => {
+      if (event.target !== wrapper || event.propertyName !== 'height') return
+      calendarMounted.value = false
+    }
+    wrapper.addEventListener('transitionend', finish)
+    const fallback = window.setTimeout(() => { calendarMounted.value = false }, 260)
+    cancelCalendarCollapse = () => {
+      wrapper.removeEventListener('transitionend', finish)
+      window.clearTimeout(fallback)
+      cancelCalendarCollapse = null
+    }
+  }))
+})
+
+onBeforeUnmount(() => {
+  cancelCalendarAnimation()
+  stopCalendarObservation()
+})
 
 const toggleContentType = (contentType: MemoryContentType) => {
   const selected = new Set(draft.value.contentTypes)
@@ -110,15 +151,10 @@ const toggleContentType = (contentType: MemoryContentType) => {
       .map((option) => option.value)
       .filter((value) => selected.has(value)),
   }
-  emitDraftIfValid()
+  emitDraft()
 }
 
 const apply = () => {
-  const validationError = draftValidationError()
-  if (validationError) {
-    error.value = t(validationError)
-    return
-  }
   emitDraft()
   close(true)
 }
@@ -173,8 +209,7 @@ onUnmounted(() => {
       :disabled="loading"
       @click="toggle"
     >
-      <FunnelSolidIcon v-if="active" class="memory-filters__trigger-icon" aria-hidden="true" />
-      <FunnelOutlineIcon v-else class="memory-filters__trigger-icon" aria-hidden="true" />
+      <FunnelOutlineIcon class="memory-filters__trigger-icon" aria-hidden="true" />
       <span class="memory-filters__trigger-label">{{ t('filter.open') }}</span>
       <span v-if="active" class="sr-only">{{ t('filter.active') }}</span>
     </button>
@@ -203,43 +238,36 @@ onUnmounted(() => {
         <div class="memory-filters__body">
           <fieldset class="memory-filters__group">
             <legend class="memory-filters__group-label">{{ t('filter.timeRange') }}</legend>
-            <div class="memory-filters__presets">
-              <label v-for="preset in presets" :key="preset.value" class="memory-filters__preset-row">
-                <input
-                  :checked="draft.datePreset === preset.value"
-                  :value="preset.value"
-                  class="memory-filters__preset"
-                  name="memory-date-preset"
-                  type="radio"
-                  @change="choosePreset(preset.value)"
-                />
-                <span class="memory-filters__preset-indicator" aria-hidden="true"></span>
-                <span>{{ t(preset.label) }}</span>
-              </label>
+            <button
+              type="button"
+              class="memory-filters__date-toggle"
+              :class="{ 'memory-filters__date-toggle--active': draft.dateFrom || draft.dateTo }"
+              :aria-expanded="calendarOpen"
+              :aria-controls="calendarId"
+              :title="dateLabel"
+              @click="calendarOpen = !calendarOpen"
+            >
+              <CalendarDaysIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span class="memory-filters__date-text" :title="dateLabel">
+                <template v-if="draft.dateFrom || draft.dateTo">
+                  <span class="memory-filters__date-seg">{{ dateParts.head }}</span><span v-if="dateParts.tail" class="memory-filters__date-seg memory-filters__date-seg--tail">{{ ` ${dateParts.tail}` }}</span>
+                </template>
+                <template v-else>{{ dateLabel }}</template>
+              </span>
+              <ChevronDownIcon
+                class="memory-filters__date-chevron h-4 w-4 shrink-0"
+                :class="{ 'memory-filters__date-chevron--open': calendarOpen }"
+                aria-hidden="true"
+              />
+            </button>
+            <div
+              :id="calendarId"
+              ref="calendarReveal"
+              class="memory-filters__calendar-reveal"
+              :style="{ height: `${calendarHeight}px` }"
+            >
+              <MemoryCalendarPicker v-if="calendarMounted" class="memory-filters__calendar" :filters="draft" @apply="applyCalendar" />
             </div>
-
-            <div v-if="draft.datePreset === 'custom'" class="memory-filters__dates">
-              <label>
-                <span>{{ t('filter.dateFrom') }}</span>
-                <input
-                  v-model="draft.dateFrom"
-                  type="date"
-                  :aria-invalid="Boolean(error)"
-                  @change="emitDraftIfValid"
-                />
-              </label>
-              <span class="memory-filters__date-separator" aria-hidden="true">{{ t('filter.dateSeparator') }}</span>
-              <label>
-                <span>{{ t('filter.dateTo') }}</span>
-                <input
-                  v-model="draft.dateTo"
-                  type="date"
-                  :aria-invalid="Boolean(error)"
-                  @change="emitDraftIfValid"
-                />
-              </label>
-            </div>
-            <p v-if="error" class="memory-filters__error" role="alert">{{ error }}</p>
           </fieldset>
 
           <fieldset class="memory-filters__group">
@@ -281,7 +309,7 @@ onUnmounted(() => {
 <style scoped>
 .memory-filters {
   --memory-filter-panel-width: 18.125rem;
-  --memory-filter-option-height: 1.375rem;
+  --memory-filter-option-height: 2rem;
 
   display: flex;
   align-items: center;
@@ -297,11 +325,11 @@ onUnmounted(() => {
   padding: 0 0.55rem;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  color: var(--color-primary);
+  color: var(--shell-ink);
   background: transparent;
   cursor: pointer;
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 400;
   transition:
     gap 160ms ease,
     padding 160ms ease,
@@ -354,8 +382,9 @@ onUnmounted(() => {
   flex: 0 0 0.9375rem;
 }
 
-.memory-filters__trigger--active .memory-filters__trigger-icon {
-  color: var(--color-primary-hover);
+.memory-filters__trigger--active {
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
 .memory-filters__trigger:disabled {
@@ -373,22 +402,35 @@ onUnmounted(() => {
   max-height: min(35rem, calc(100vh - 12rem));
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   color: var(--color-text);
-  background: var(--color-surface-subtle);
-  box-shadow: var(--shadow-card);
+  background: var(--color-surface-raised);
+  /* 浮层用分层中性投影（含 1px 描边环）承担边界与高度，替代实线边框和卡片级弱阴影 */
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 1px 1px -0.5px rgba(0, 0, 0, 0.06),
+    0 3px 3px -1.5px rgba(0, 0, 0, 0.06),
+    0 6px 6px -3px rgba(0, 0, 0, 0.06),
+    0 12px 12px -6px rgba(0, 0, 0, 0.06),
+    0 24px 24px -12px rgba(0, 0, 0, 0.06);
+}
+
+:global(:root[data-theme='dark']) .memory-filters__panel {
+  box-shadow:
+    0 0 0 1px rgba(226, 232, 240, 0.09),
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 8px 16px rgba(0, 0, 0, 0.28),
+    0 16px 40px rgba(0, 0, 0, 0.4);
 }
 
 .memory-filters__heading {
   display: flex;
-  min-height: 3.75rem;
+  min-height: 2.75rem;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.75rem 1rem 0.75rem 1.25rem;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-subtle);
+  padding: 0.375rem 0.5rem 0.125rem 0.875rem;
 }
 
 .memory-filters__heading h2 {
@@ -429,7 +471,8 @@ onUnmounted(() => {
 .memory-filters__body {
   min-height: 0;
   overflow-y: auto;
-  padding: 1rem 1.25rem 1.125rem;
+  padding: 0.25rem 0.875rem 0.75rem;
+  /* 内容超高出现滚动条时预留槽位，日历多一行也不会压缩内容宽度 */
   scrollbar-gutter: stable;
 }
 
@@ -441,12 +484,12 @@ onUnmounted(() => {
 }
 
 .memory-filters__group + .memory-filters__group {
-  margin-top: 1.125rem;
+  margin-top: 0.75rem;
 }
 
 .memory-filters__group-label {
   display: block;
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.25rem;
   padding: 0;
   color: var(--color-text-secondary);
   font-size: 0.8125rem;
@@ -454,9 +497,83 @@ onUnmounted(() => {
   line-height: 1.25rem;
 }
 
-.memory-filters__presets {
+.memory-filters__date-toggle {
   display: flex;
-  flex-direction: column;
+  width: 100%;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.375rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-subtle);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+.memory-filters__date-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-filters__date-seg {
+  white-space: nowrap;
+}
+
+.memory-filters__date-seg--tail {
+  display: inline-block;
+}
+
+.memory-filters__date-toggle--active {
+  color: var(--color-primary-hover);
+  background: var(--color-primary-soft);
+}
+
+.memory-filters__date-toggle:hover {
+  background: var(--color-surface-hover);
+}
+
+.memory-filters__date-toggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.memory-filters__date-chevron--open {
+  transform: rotate(180deg);
+}
+
+.memory-filters__calendar-reveal {
+  overflow: hidden;
+  transition: height 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.memory-filters__calendar-reveal > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.memory-filters__calendar {
+  padding-top: 0.5rem;
+}
+
+.memory-filters__calendar :deep(.memory-calendar__block) {
+  padding: 0.5rem;
+  border: 0;
+  background: var(--color-surface-subtle);
+}
+
+.memory-filters__calendar :deep(.memory-calendar__nav) {
+  margin-bottom: 0.25rem;
+}
+
+.memory-filters__presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
 }
 
@@ -466,16 +583,20 @@ onUnmounted(() => {
   min-height: var(--memory-filter-option-height);
   align-items: center;
   gap: 0.5rem;
-  margin: 0 -0.375rem;
-  padding: 0 0.375rem;
+  margin: 0;
+  padding: 0 0.5rem;
   border-radius: var(--radius-sm);
   color: var(--color-text);
   cursor: pointer;
   font-size: 0.875rem;
   line-height: var(--line-height-14);
+  transition: background-color 120ms ease;
 }
 
-.memory-filters__preset,
+.memory-filters__preset-row:hover {
+  background: var(--color-surface-subtle);
+}
+
 .memory-filters__content-type {
   position: absolute;
   width: 1rem;
@@ -483,31 +604,6 @@ onUnmounted(() => {
   margin: 0;
   opacity: 0;
   pointer-events: none;
-}
-
-.memory-filters__preset-indicator {
-  display: inline-flex;
-  width: 1rem;
-  height: 1rem;
-  flex: 0 0 1rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 50%;
-  background: transparent;
-}
-
-.memory-filters__preset:checked + .memory-filters__preset-indicator {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-}
-
-.memory-filters__preset:checked + .memory-filters__preset-indicator::after {
-  content: '';
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  background: var(--color-on-primary);
 }
 
 .memory-filters__checkbox-indicator {
@@ -536,72 +632,22 @@ onUnmounted(() => {
   transform: translateY(-0.0625rem) rotate(-45deg);
 }
 
-.memory-filters__preset-row:has(
-  .memory-filters__preset:focus-visible,
-  .memory-filters__content-type:focus-visible
-) {
+.memory-filters__preset-row:has(.memory-filters__content-type:focus-visible) {
   background: var(--color-primary-soft);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-focus) 26%, transparent);
-}
-
-.memory-filters__dates {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: end;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.memory-filters__dates label {
-  display: grid;
-  gap: 0.375rem;
-  color: var(--color-text-muted);
-  font-size: 0.6875rem;
-}
-
-.memory-filters__dates input {
-  min-width: 0;
-  height: 2.25rem;
-  padding: 0 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: var(--color-surface);
-  font-size: 0.75rem;
-  line-height: var(--line-height-12);
-}
-
-.memory-filters__dates input:focus-visible {
-  border-color: var(--color-focus);
-  outline: 2px solid color-mix(in srgb, var(--color-focus) 24%, transparent);
-  outline-offset: 1px;
-}
-
-.memory-filters__date-separator {
-  padding-bottom: 0.5rem;
-  color: var(--color-text-muted);
-  font-size: 0.625rem;
-}
-
-.memory-filters__error {
-  margin: 0.625rem 0 0;
-  color: var(--color-danger);
-  font-size: 0.75rem;
-  line-height: var(--line-height-12);
 }
 
 .memory-filters__actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface-subtle);
+  padding: 0 0.875rem 0.75rem;
+  flex-shrink: 0;
 }
 
 .memory-filters__actions button {
-  height: 2.25rem;
-  min-height: 2.25rem;
+  height: 2rem;
+  min-height: 2rem;
   padding: 0 0.75rem;
   border-radius: var(--radius-sm);
   font-size: 0.8125rem;
@@ -645,7 +691,11 @@ onUnmounted(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .memory-filters__trigger,
-  .memory-filters__trigger-label {
+  .memory-filters__trigger-label,
+  .memory-filters__preset-row,
+  .memory-filters__calendar-reveal,
+  .filter-popover-enter-active,
+  .filter-popover-leave-active {
     transition: none;
   }
 }

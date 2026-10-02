@@ -115,7 +115,7 @@ describe('memory components', () => {
     expect(buttons).toHaveLength(3)
     expect(buttons.map((button) => button.attributes('aria-pressed'))).toEqual(['true', 'false', 'false'])
     for (const button of buttons) {
-      expect(button.classes()).toEqual(expect.arrayContaining(['h-6', 'min-h-0']))
+      expect(button.classes()).toEqual(expect.arrayContaining(['h-7', 'min-h-0']))
     }
   })
 
@@ -213,7 +213,7 @@ describe('memory components', () => {
     expect(wrapper.text()).not.toContain('文本记忆')
     expect(wrapper.text()).not.toContain('手动添加')
     expect(wrapper.get('.memory-card').classes()).toContain('memory-card--text')
-    expect(wrapper.get('.memory-card__text-body').classes()).toContain('bg-[var(--color-primary-soft)]')
+    expect(wrapper.get('.memory-card__text-body').classes()).toContain('memory-card__text-body')
     expect(wrapper.get('.memory-card__text-content').classes()).toContain('memory-card__text-content')
     expect(wrapper.get('.memory-card__tag-area').text()).toBe('')
     expect(wrapper.get('.memory-card__text-footer time').text()).toBeTruthy()
@@ -320,28 +320,73 @@ describe('memory components', () => {
     expect(wrapper.get('.memory-filters').classes()).toContain('memory-filters--compact')
   })
 
-  it('applies a date preset through the extensible memory filter panel', async () => {
+  it('applies a calendar day through the extensible memory filter panel', async () => {
     const wrapper = mount(MemoryFilters, {
       props: { modelValue: createEmptyMemoryFilters() },
       attachTo: document.body,
     })
 
     await wrapper.get('.memory-filters__trigger').trigger('click')
-    await wrapper.get<HTMLInputElement>('.memory-filters__preset[value="last7Days"]').trigger('click')
+    expect(wrapper.find('.memory-calendar').exists()).toBe(false)
+    await wrapper.get('.memory-filters__date-toggle').trigger('click')
+    const now = new Date()
+    const pad = (value: number) => String(value).padStart(2, '0')
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+    await wrapper.get(`[data-date="${today}"]`).trigger('pointerdown')
+    window.dispatchEvent(new Event('pointerup'))
+    await flushPromises()
 
     const applied = wrapper.emitted('apply')?.[0]?.[0]
     expect(applied).toMatchObject({
-      datePreset: 'last7Days',
+      datePreset: 'custom',
+      dateFrom: today,
+      dateTo: today,
       sourceChannels: [],
       contentTypes: [],
     })
-    expect((applied as { dateFrom: string }).dateFrom).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    expect((applied as { dateTo: string }).dateTo).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
 
     await wrapper.get('.memory-filters__actions .btn-primary').trigger('click')
     expect(wrapper.emitted('apply')).toHaveLength(2)
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('collapses dates by default and preserves the selected period across reopening', async () => {
+    const filters = {
+      ...createEmptyMemoryFilters(),
+      datePreset: 'custom' as const,
+      dateFrom: '2026-09-10',
+      dateTo: '2026-09-12',
+    }
+    const wrapper = mount(MemoryFilters, {
+      props: { modelValue: filters },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('.memory-filters__trigger').trigger('click')
+    const toggle = wrapper.get('.memory-filters__date-toggle')
+    const summary = toggle.text()
+    expect(summary).toContain('2026')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('.memory-calendar').exists()).toBe(false)
+
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.get(`#${toggle.attributes('aria-controls')}`).isVisible()).toBe(true)
+    expect(wrapper.get('[data-date="2026-09-10"]').classes()).toContain('memory-calendar__day--endpoint')
+    await toggle.trigger('click')
+    expect(toggle.text()).toBe(summary)
+    expect(wrapper.find('.memory-calendar').exists()).toBe(false)
+    expect(wrapper.emitted('apply')).toBeUndefined()
+
+    await toggle.trigger('click')
+    await wrapper.get('.memory-filters__close').trigger('click')
+    await wrapper.get('.memory-filters__trigger').trigger('click')
+    expect(wrapper.get('.memory-filters__date-toggle').attributes('aria-expanded')).toBe('false')
+    expect(wrapper.get('.memory-filters__date-toggle').text()).toBe(summary)
+    expect(wrapper.find('.memory-calendar').exists()).toBe(false)
+    wrapper.unmount()
   })
 
   it('applies a content type through the shared memory filter panel', async () => {
@@ -367,24 +412,6 @@ describe('memory components', () => {
       contentTypes: ['screenshot', 'text'],
     })
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-  })
-
-  it('keeps an invalid custom date range open with inline recovery guidance', async () => {
-    const wrapper = mount(MemoryFilters, {
-      props: { modelValue: createEmptyMemoryFilters() },
-      attachTo: document.body,
-    })
-
-    await wrapper.get('.memory-filters__trigger').trigger('click')
-    await wrapper.get<HTMLInputElement>('.memory-filters__preset[value="custom"]').trigger('click')
-    const dates = wrapper.findAll<HTMLInputElement>('input[type="date"]')
-    await dates[0].setValue('2026-08-24')
-    await dates[1].setValue('2026-08-01')
-    await wrapper.get('.memory-filters__actions .btn-primary').trigger('click')
-
-    expect(wrapper.emitted('apply')).toBeUndefined()
-    expect(wrapper.get('[role="alert"]').text()).toContain('开始日期不能晚于结束日期')
-    expect(wrapper.get('[role="dialog"]').exists()).toBe(true)
   })
 
   it('closes the DEV panel before requesting the onboarding guide', async () => {

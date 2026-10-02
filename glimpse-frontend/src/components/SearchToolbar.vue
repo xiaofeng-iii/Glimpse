@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import {
   AdjustmentsHorizontalIcon,
   MagnifyingGlassIcon,
@@ -64,6 +64,11 @@ const sources = [
   { value: 'exact', labelKey: 'search.exactOnly' },
   { value: 'semantic', labelKey: 'search.semanticOnly' },
 ] as const
+
+// 滑块按列等宽，translateX 的 100% 即一列宽度，跨列平移只需叠加列距
+const activeSourceIndex = computed(() =>
+  Math.max(0, sources.findIndex((item) => item.value === source.value)),
+)
 
 let debounceTimer: ReturnType<typeof window.setTimeout> | null = null
 let composing = false
@@ -237,25 +242,30 @@ defineExpose({ focus, clear })
             >
               <XMarkIcon class="h-3 w-3" aria-hidden="true" />
             </button>
-            <kbd class="search-toolbar__detail-control border border-[var(--shell-line)] px-1.5 text-[11px] leading-[16px] text-[var(--shell-muted)]">
+            <kbd class="search-toolbar__detail-control border border-[var(--shell-line)] px-1 py-0 text-[11px] leading-[14px] text-[var(--shell-muted)]">
               {{ shortcutLabel }}
             </kbd>
           </div>
         </div>
 
         <div
-          class="search-toolbar__control search-toolbar__source-switcher inline-grid h-8 grid-flow-col auto-cols-fr items-center bg-[var(--color-surface-subtle)]"
+          class="search-toolbar__control search-toolbar__source-switcher inline-grid h-8 grid-flow-col auto-cols-fr items-center"
           role="group"
           :aria-label="t('search.sourceLabel')"
         >
+          <span
+            class="search-toolbar__source-thumb"
+            :style="{ transform: `translateX(calc(${activeSourceIndex} * (100% + var(--search-toolbar-segment-inset))))` }"
+            aria-hidden="true"
+          ></span>
           <button
             v-for="item in sources"
             :key="item.value"
             type="button"
-            class="search-toolbar__source-button h-6 min-h-0 px-2.5 text-[13px] font-medium transition"
+            class="search-toolbar__source-button h-7 min-h-0 px-2.5 text-[13px] font-medium"
             :class="source === item.value
-              ? 'bg-[var(--color-primary)] text-white shadow-sm'
-              : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
+              ? 'text-[var(--color-on-primary)]'
+              : 'text-[var(--shell-ink)] hover:text-[var(--color-primary)]'"
             :aria-pressed="source === item.value"
             @click="source = item.value"
           >
@@ -383,10 +393,10 @@ defineExpose({ focus, clear })
   --search-toolbar-surface-radius: var(--radius-xl);
   --search-toolbar-surface-inset: 0.625rem;
   --search-toolbar-control-radius: var(--radius-sm);
-  --search-toolbar-segment-inset: 3px;
+  --search-toolbar-segment-inset: 2px;
   --search-toolbar-segment-radius: max(
     1px,
-    calc(var(--search-toolbar-control-radius) - var(--search-toolbar-segment-inset))
+    calc(var(--radius-md) - var(--search-toolbar-segment-inset))
   );
   --search-toolbar-detail-radius: var(--search-toolbar-control-radius);
   --search-toolbar-surface-shadow:
@@ -432,10 +442,48 @@ defineExpose({ focus, clear })
   gap: 0.625rem;
 }
 
-.search-toolbar__source-switcher {
+/* 搜索模式三段式是工具条里的强调控件：仅此组件保留凹槽拟物（subtle 底 + 内阴影），
+   激活段用深主色保证醒目；圆角沿用记忆墙排版切换器的 md 体系。
+   用复合选择器压过下方 .search-toolbar__control 的统一圆角 */
+.search-toolbar__control.search-toolbar__source-switcher {
+  position: relative;
   width: 12.25rem;
   gap: var(--search-toolbar-segment-inset);
   padding: var(--search-toolbar-segment-inset);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+  box-shadow: inset 0 1px 2px rgba(26, 38, 64, 0.1);
+}
+
+/* 激活底色做成独立滑块，切换时在凹槽内线性平移 */
+.search-toolbar__source-thumb {
+  position: absolute;
+  top: var(--search-toolbar-segment-inset);
+  bottom: var(--search-toolbar-segment-inset);
+  left: var(--search-toolbar-segment-inset);
+  width: calc((100% - var(--search-toolbar-segment-inset) * 4) / 3);
+  border-radius: var(--search-toolbar-segment-radius);
+  background: var(--color-primary);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 5%);
+  will-change: transform;
+  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-toolbar__source-button {
+  position: relative;
+  transition: color 240ms cubic-bezier(0.4, 0, 0.2, 1), background-color 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-toolbar__source-button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-toolbar__source-thumb,
+  .search-toolbar__source-button {
+    transition: none;
+  }
 }
 
 .search-toolbar__control,

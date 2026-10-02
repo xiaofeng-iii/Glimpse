@@ -4,8 +4,9 @@ import { PhotoIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
 import { getMatchSourceKinds } from '@/utils/match-sources'
-import { isTextMemory } from '@/utils/memory-types'
-import { t } from '@/utils/i18n'
+import { getMemoryDisplayText, isTextMemory } from '@/utils/memory-types'
+import type { CardTimeDisplay } from '@/utils/memory-grouping'
+import { languagePreference, t } from '@/utils/i18n'
 import MemoryAnalysisState from './MemoryAnalysisState.vue'
 
 const props = defineProps<{
@@ -13,6 +14,7 @@ const props = defineProps<{
   selected?: boolean
   searching?: boolean
   showDebug?: boolean
+  timeDisplay?: CardTimeDisplay
 }>()
 
 const emit = defineEmits<{
@@ -25,6 +27,7 @@ const imageFailed = ref(false)
 const isDev = import.meta.env.DEV
 const imageUrl = computed(() => getMemoryImageUrls(props.memory)[0] ?? '')
 const textMemory = computed(() => isTextMemory(props.memory))
+const displayText = computed(() => getMemoryDisplayText(props.memory))
 const matchSourceKinds = computed(() => getMatchSourceKinds(props.memory.match_sources))
 const analysisStatus = computed(() => props.memory.analysis_status ?? 'COMPLETED')
 const analyzing = computed(() => analysisStatus.value === 'PROCESSING')
@@ -56,6 +59,24 @@ const handleCardDoubleClick = () => {
 
 const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+const formatCardTime = (value: string) => {
+  const date = new Date(value)
+  if (props.timeDisplay === 'full') {
+    return date.toLocaleString(languagePreference.value, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+  if (props.timeDisplay === 'dayTime') {
+    const dayText = date.toLocaleDateString(languagePreference.value, { month: 'long', day: 'numeric' })
+    return `${dayText} ${formatTime(value)}`
+  }
+  return formatTime(value)
+}
 
 const handleKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Enter') {
@@ -103,7 +124,7 @@ onBeforeUnmount(cancelSelectIntent)
       <img
         v-if="imageUrl && !imageFailed"
         :src="imageUrl"
-        :alt="memory.ai_summary || t('memory.analysisProcessing')"
+        :alt="displayText || t('memory.analysisProcessing')"
         class="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
         loading="lazy"
         @error="imageFailed = true"
@@ -121,7 +142,7 @@ onBeforeUnmount(cancelSelectIntent)
         compact
       />
       <p v-else-if="!textMemory" class="line-clamp-4 min-h-20 text-[13px] leading-5 text-[var(--shell-ink)]">
-        {{ memory.ai_summary || t('memory.noContent') }}
+        {{ displayText || t('memory.noContent') }}
       </p>
       <div
         class="memory-card__metadata-row mt-auto flex min-h-6 items-center gap-2"
@@ -142,7 +163,7 @@ onBeforeUnmount(cancelSelectIntent)
           </template>
         </div>
         <time class="flex-none text-xs text-[var(--shell-muted)]" :datetime="memory.created_at">
-          {{ formatTime(memory.created_at) }}
+          {{ formatCardTime(memory.created_at) }}
         </time>
       </div>
 

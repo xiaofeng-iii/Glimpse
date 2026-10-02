@@ -34,13 +34,19 @@ const emit = defineEmits<{
     <ArrowPathIcon v-if="capturing" class="h-5 w-5 flex-none animate-spin" aria-hidden="true" />
     <CameraIcon v-else class="h-5 w-5 flex-none" aria-hidden="true" />
     <span>{{ t('action.capture') }}</span>
-    <kbd v-if="showShortcut" class="capture-shortcut rounded-md bg-white/18 px-1.5 py-0.5 text-xs">
+    <kbd v-if="showShortcut" class="capture-shortcut rounded-md bg-white/18 text-xs">
       {{ shortcutLabel }}
     </kbd>
   </button>
 </template>
 
 <style scoped>
+/* 全局 kbd 规则（.capture-button kbd）优先级高于工具类，芯片内衬需在此覆盖 */
+.capture-shortcut {
+  padding: 0 0.25rem;
+  line-height: 14px;
+}
+
 @media (max-width: 1120px) {
   .capture-shortcut {
     display: none;
