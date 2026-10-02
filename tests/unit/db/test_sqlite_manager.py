@@ -312,6 +312,29 @@ class TestSQLiteManagerSearch:
         assert len(results) == 0
         mgr.close()
 
+    def test_search_covers_user_text(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager, MemoryRecord
+        mgr = SQLiteManager(mock_path_manager)
+        record = MemoryRecord(
+            id="s-note-1",
+            created_at="2026-01-01 12:00:00",
+            image_path="/img.png",
+            ai_summary="AI summary of the photo",
+            app_name="test",
+            user_text="typed quarantine keyword",
+        )
+        mgr.insert_memory(record)
+
+        # FTS 索引包含 user_text（英文分词可靠）。
+        assert [item.id for item in mgr.search_memories("quarantine")] == ["s-note-1"]
+
+        # 中文无法被 FTS 默认分词，走 LIKE 回退时同样命中 user_text。
+        assert mgr.search_memories("typed quarantine")[0].id == "s-note-1"
+
+        updated = mgr.get_memory_by_id("s-note-1")
+        assert updated.user_text == "typed quarantine keyword"
+        mgr.close()
+
 
 class TestSQLiteManagerUpdateDelete:
     def test_update_memory_summary(self, mock_path_manager):
@@ -331,6 +354,32 @@ class TestSQLiteManagerUpdateDelete:
         assert found.sync_status == "PENDING"
         assert mgr.search_memories("original") == []
         assert [item.id for item in mgr.search_memories("updated")] == ["u-1"]
+        mgr.close()
+
+    def test_update_memory_user_text_refreshes_fts_and_status(
+        self,
+        mock_path_manager,
+    ):
+        from db.sqlite_manager import MemoryRecord, SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        mgr.insert_memory(
+            MemoryRecord(
+                id="note-u-1",
+                created_at="2026-01-01",
+                image_path="/img.png",
+                ai_summary="summary",
+                app_name="test",
+                user_text="original note words",
+            )
+        )
+        assert mgr.update_memory_user_text("note-u-1", "revised note words") is True
+
+        found = mgr.get_memory_by_id("note-u-1")
+        assert found.user_text == "revised note words"
+        assert found.sync_status == "PENDING"
+        assert mgr.search_memories("original") == []
+        assert [item.id for item in mgr.search_memories("revised")] == ["note-u-1"]
         mgr.close()
 
     def test_update_memory_text_content_refreshes_fts_and_status(

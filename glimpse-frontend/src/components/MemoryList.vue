@@ -4,6 +4,7 @@ import { PhotoIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
 import { getMatchSourceKinds } from '@/utils/match-sources'
+import { getMemoryDisplayText } from '@/utils/memory-types'
 import { t } from '@/utils/i18n'
 import EmptyState from './EmptyState.vue'
 import LoadingSpinner from './LoadingSpinner.vue'
@@ -98,7 +99,7 @@ const markImageError = (memoryId: string) => {
                   <img
                     v-if="getPrimaryImageUrl(memory) && !failedImages[memory.id]"
                     :src="getPrimaryImageUrl(memory)"
-                    :alt="memory.ai_summary"
+                    :alt="getMemoryDisplayText(memory)"
                     class="h-full w-full object-cover"
                     loading="lazy"
                     @error="markImageError(memory.id)"
@@ -110,7 +111,7 @@ const markImageError = (memoryId: string) => {
               <!-- Content -->
               <div class="min-w-0 flex-1">
                 <p class="truncate text-sm font-medium text-gray-900">
-                  {{ truncate(memory.ai_summary, 80) }}
+                  {{ truncate(getMemoryDisplayText(memory), 80) }}
                 </p>
 
                 <!-- Badges -->

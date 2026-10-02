@@ -202,6 +202,18 @@ export const useMemoriesStore = defineStore('memories', () => {
     return entities.value[id]
   }
 
+  const updateUserText = async (id: string, userText: string) => {
+    const updated = await memoriesApi.updateUserText(id, userText.trim())
+    mergeMemory(updated)
+    selectedId.value = id
+
+    if (searchQuery.value) {
+      await executeSearch(searchQuery.value, searchSource.value, searchOptions.value, id)
+    }
+
+    return entities.value[id]
+  }
+
   const remove = async (id: string) => {
     try {
       await memoriesApi.delete(id)
@@ -254,6 +266,7 @@ export const useMemoriesStore = defineStore('memories', () => {
     select,
     upsert,
     updateSummary,
+    updateUserText,
     remove,
     refresh,
     applyFilters,

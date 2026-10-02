@@ -76,6 +76,22 @@ def _report_broadcast_result(future):
         logger.error("WebSocket broadcast error: %s", exc)
 
 
+def broadcast_event_from_thread(
+    loop: asyncio.AbstractEventLoop,
+    event_type: str,
+    data: Dict[str, Any],
+) -> None:
+    """Broadcast from a worker thread through the running server loop."""
+    if loop.is_closed():
+        return
+
+    future = asyncio.run_coroutine_threadsafe(
+        broadcast_event(event_type, data),
+        loop,
+    )
+    future.add_done_callback(_report_broadcast_result)
+
+
 def _schedule_broadcast(event_type: str, data: Dict[str, Any]):
     loop = _broadcast_loop
     if loop is None or loop.is_closed():

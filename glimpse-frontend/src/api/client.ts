@@ -57,6 +57,8 @@ export interface Memory {
   app_name: string
   text_content?: string
   extra_images?: string
+  /** 用户键入的说明；存在时展示它，AI 摘要仅作检索资源。 */
+  user_text?: string
   sync_status: string
   analysis_status?: 'PROCESSING' | 'COMPLETED' | 'FAILED'
   memory_type?: 'screenshot' | 'text'
@@ -131,6 +133,18 @@ export const memoriesApi = {
     return response.data
   },
 
+  createWithImages: async (images: File[], content: string): Promise<Memory> => {
+    const formData = new FormData()
+    for (const image of images) {
+      formData.append('images', image, image.name)
+    }
+    formData.append('content', content)
+    const response = await api.post('/memories/images', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  },
+
   list: async (options: MemoryListOptions | number = {}): Promise<{ memories: Memory[], total: number }> => {
     const normalizedOptions = typeof options === 'number' ? { limit: options } : options
     const response = await api.get('/memories', {
@@ -157,6 +171,11 @@ export const memoriesApi = {
 
   updateSummary: async (id: string, aiSummary: string): Promise<Memory> => {
     const response = await api.patch(`/memories/${id}`, { ai_summary: aiSummary })
+    return response.data
+  },
+
+  updateUserText: async (id: string, userText: string): Promise<Memory> => {
+    const response = await api.patch(`/memories/${id}`, { user_text: userText })
     return response.data
   },
 }

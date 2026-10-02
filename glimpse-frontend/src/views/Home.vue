@@ -16,6 +16,7 @@ import { useNotificationStore } from '@/stores/notification'
 import { createLogger } from '@/utils/logger'
 import { memoryMatchesFilters, type MemoryFilters } from '@/utils/memory-filters'
 import { getMemoryImagePaths } from '@/utils/memory-images'
+import { getMemoryDisplayText } from '@/utils/memory-types'
 import { copyImageFileToClipboard } from '@/platform/clipboard'
 import { t } from '@/utils/i18n'
 import AddTextMemoryDialog from '@/components/AddTextMemoryDialog.vue'
@@ -236,7 +237,7 @@ const closeTextMemoryDialog = () => {
   textMemoryError.value = ''
 }
 
-const handleAddTextMemory = async (content: string) => {
+const handleAddTextMemory = async (payload: { content: string; images: File[] }) => {
   if (isAddingTextMemory.value) return
   isAddingTextMemory.value = true
   textMemoryError.value = ''
@@ -246,7 +247,10 @@ const handleAddTextMemory = async (content: string) => {
       return
     }
 
-    const memory = await memoriesApi.createText(content)
+    const withImages = payload.images.length > 0
+    const memory = withImages
+      ? await memoriesApi.createWithImages(payload.images, payload.content)
+      : await memoriesApi.createText(payload.content)
     if (query.value.trim()) {
       searchToolbar.value?.clear()
       await nextTick()
@@ -256,15 +260,16 @@ const handleAddTextMemory = async (content: string) => {
       memoriesStore.select(memory)
     }
     textMemoryDialogOpen.value = false
+    const messageKey = memory.sync_status === 'FAILED'
+      ? (withImages ? 'message.imageMemoryCreatedIndexFailed' : 'message.textMemoryCreatedIndexFailed')
+      : (withImages ? 'message.imageMemoryCreated' : 'message.textMemoryCreated')
     notifications.show(
-      t(memory.sync_status === 'FAILED'
-        ? 'message.textMemoryCreatedIndexFailed'
-        : 'message.textMemoryCreated'),
+      t(messageKey),
       memory.sync_status === 'FAILED' ? 'warning' : 'success',
       memory.sync_status === 'FAILED' ? 3600 : 2200,
     )
   } catch (error) {
-    logger.error('Text memory creation failed: %s', error)
+    logger.error('Memory creation failed: %s', error)
     textMemoryError.value = t('addMemory.saveFailed')
   } finally {
     isAddingTextMemory.value = false
@@ -293,7 +298,7 @@ const handleMenuOpen = (memory: Memory) => {
 const handleMenuCopy = async (memory: Memory) => {
   closeContextMenu()
   try {
-    await navigator.clipboard.writeText(memory.ai_summary)
+    await navigator.clipboard.writeText(getMemoryDisplayText(memory))
     notifications.show(t('message.copied'), 'success', 1800)
   } catch {
     notifications.show(t('message.copyFailed'), 'error', 2800)

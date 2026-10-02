@@ -23,6 +23,7 @@ import { createEmptyMemoryFilters } from '@/utils/memory-filters'
 
 const apiMocks = vi.hoisted(() => ({
   updateSummary: vi.fn(),
+  updateUserText: vi.fn(),
 }))
 
 vi.mock('@/api/client', async (importOriginal) => {
@@ -32,6 +33,7 @@ vi.mock('@/api/client', async (importOriginal) => {
     memoriesApi: {
       ...original.memoriesApi,
       updateSummary: apiMocks.updateSummary,
+      updateUserText: apiMocks.updateUserText,
     },
   }
 })
@@ -567,6 +569,43 @@ describe('memory components', () => {
     await wrapper.get('textarea').trigger('keydown', { key: 'Escape' })
     expect(wrapper.find('textarea').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Discard me')
+  })
+
+  it('shows the user note instead of the AI summary and saves through user_text', async () => {
+    apiMocks.updateUserText.mockResolvedValue(
+      createMemory({ user_text: 'Revised note' }),
+    )
+    const wrapper = mount(SummaryEditor, {
+      props: {
+        memory: createMemory({ user_text: '我的原始说明' }),
+      },
+    })
+
+    expect(wrapper.text()).toContain('记忆内容')
+    expect(wrapper.text()).toContain('编辑内容')
+    expect(wrapper.text()).toContain('我的原始说明')
+    expect(wrapper.text()).not.toContain('A payment screen')
+
+    await wrapper.get('.summary-editor__edit-action').trigger('click')
+    await wrapper.get('textarea').setValue('Revised note')
+    await wrapper.get('textarea').trigger('keydown', { key: 'Enter', ctrlKey: true })
+    await flushPromises()
+
+    expect(apiMocks.updateUserText).toHaveBeenCalledWith('memory-1', 'Revised note')
+    expect(apiMocks.updateSummary).not.toHaveBeenCalled()
+    expect(wrapper.find('textarea').exists()).toBe(false)
+  })
+
+  it('renders the user note on wall cards in place of the AI summary', () => {
+    const wrapper = mount(MemoryCard, {
+      props: {
+        memory: createMemory({ user_text: '卡片上的用户说明' }),
+        selected: true,
+      },
+    })
+
+    expect(wrapper.text()).toContain('卡片上的用户说明')
+    expect(wrapper.text()).not.toContain('A payment screen')
   })
 
   it('asks before leaving with a dirty summary and resolves both choices', async () => {

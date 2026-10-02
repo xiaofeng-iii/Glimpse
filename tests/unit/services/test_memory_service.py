@@ -44,6 +44,14 @@ def mock_services():
         record.sync_status = sync_status
         return True
 
+    def update_user_text(memory_id, user_text, sync_status="PENDING"):
+        record = records.get(memory_id)
+        if record is None:
+            return False
+        record.user_text = user_text
+        record.sync_status = sync_status
+        return True
+
     def update_status(memory_id, sync_status):
         record = records.get(memory_id)
         if record is None:
@@ -101,6 +109,7 @@ def mock_services():
     sqlite_mgr.get_memory_by_id.side_effect = get_memory
     sqlite_mgr.update_memory_summary.side_effect = update_summary
     sqlite_mgr.update_memory_text_content.side_effect = update_text
+    sqlite_mgr.update_memory_user_text.side_effect = update_user_text
     sqlite_mgr.update_memory_sync_status.side_effect = update_status
     sqlite_mgr.update_memory_analysis.side_effect = update_analysis
     sqlite_mgr.update_memory_analysis_status.side_effect = update_analysis_status
@@ -265,6 +274,54 @@ class TestMemoryServiceCreate:
         record = mock_services["sqlite_manager"]._records[pending.id]
         assert record.analysis_status == "COMPLETED"
         assert record.ai_summary == "Cluster summary"
+
+    def test_cluster_user_note_is_stored_while_ai_summarizes_images(self, mock_services):
+        service = make_service(mock_services)
+
+        pending = service.prepare_cluster_memory(
+            ["first.png", "second.png"],
+            user_text="  手动说明  ",
+        )
+        assert pending.user_text == "手动说明"
+
+        memory_id = service.create_cluster_memory(
+            ["first.png", "second.png"],
+            memory_id=pending.id,
+        )
+
+        record = mock_services["sqlite_manager"]._records[memory_id]
+        assert record.user_text == "手动说明"
+        assert record.ai_summary == "Cluster summary"
+        mock_services["ai_client"].analyze_images.assert_called_once()
+        kwargs = mock_services["chroma_manager"].upsert_memory.call_args.kwargs
+        assert "手动说明" in kwargs["text"]
+        assert "extracted text" in kwargs["text"]
+
+    def test_cluster_blank_note_is_not_stored(self, mock_services):
+        service = make_service(mock_services)
+
+        pending = service.prepare_cluster_memory(["first.png"], user_text="   ")
+        service.create_cluster_memory(["first.png"], memory_id=pending.id)
+
+        record = mock_services["sqlite_manager"]._records[pending.id]
+        assert record.user_text is None
+        assert record.ai_summary == "Cluster summary"
+        mock_services["ai_client"].analyze_images.assert_called_once()
+
+    def test_update_memory_user_text_resets_index_and_reindexes(self, mock_services):
+        service = make_service(mock_services)
+        pending = service.prepare_cluster_memory(["first.png"], user_text="旧说明")
+        service.create_cluster_memory(["first.png"], memory_id=pending.id)
+
+        updated = service.update_memory_user_text(pending.id, "  新说明  ")
+
+        assert updated is not None
+        record = mock_services["sqlite_manager"]._records[pending.id]
+        assert record.user_text == "新说明"
+        assert record.ai_summary == "Cluster summary"
+        kwargs = mock_services["chroma_manager"].upsert_memory.call_args.kwargs
+        assert "新说明" in kwargs["text"]
+        mock_services["ai_client"].analyze_images.assert_called_once()
 
     def test_empty_cluster_is_rejected(self, mock_services):
         service = make_service(mock_services)

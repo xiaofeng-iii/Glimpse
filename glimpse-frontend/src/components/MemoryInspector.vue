@@ -10,7 +10,7 @@ import type { Memory } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { t } from '@/utils/i18n'
-import { isTextMemory } from '@/utils/memory-types'
+import { getMemoryDisplayText, hasUserNote, isTextMemory } from '@/utils/memory-types'
 import ConfirmDialog from './ConfirmDialog.vue'
 import MediaGallery from './MediaGallery.vue'
 import OcrText from './OcrText.vue'
@@ -47,7 +47,7 @@ const formatDate = (value: string) =>
 
 const copySummary = async () => {
   try {
-    await navigator.clipboard.writeText(props.memory.ai_summary)
+    await navigator.clipboard.writeText(getMemoryDisplayText(props.memory))
     notifications.show(t('message.copied'), 'success', 1800)
   } catch {
     notifications.show(t('message.copyFailed'), 'error', 2800)
@@ -113,7 +113,7 @@ defineExpose({ canLeave })
       >
         <button v-if="!analyzing && !analysisUnavailable" type="button" class="btn-secondary justify-center" @click="copySummary">
           <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />
-          {{ t(textMemory ? 'action.copyContent' : 'action.copySummary') }}
+          {{ t(textMemory || hasUserNote(props.memory) ? 'action.copyContent' : 'action.copySummary') }}
         </button>
         <button type="button" class="btn-secondary justify-center" @click="emit('open', memory.id)">
           <ArrowTopRightOnSquareIcon class="h-4 w-4 flex-none" aria-hidden="true" />

@@ -27,6 +27,7 @@ class MemoryResponse(BaseModel):
     app_name: str
     text_content: Optional[str] = None
     extra_images: Optional[str] = None
+    user_text: Optional[str] = None
     sync_status: str = "PENDING"
     analysis_status: Literal["PROCESSING", "COMPLETED", "FAILED"] = "COMPLETED"
     memory_type: MemoryType = "screenshot"
@@ -60,18 +61,21 @@ class MemoryCreateRequest(BaseModel):
 
 
 class MemoryUpdateRequest(BaseModel):
-    """Editable fields for one memory."""
+    """Editable fields for one memory. Provide at least one field."""
 
-    ai_summary: str = Field(min_length=1, max_length=4000)
+    ai_summary: Optional[str] = Field(default=None, min_length=1, max_length=4000)
+    user_text: Optional[str] = Field(default=None, min_length=1, max_length=4000)
 
-    @field_validator("ai_summary", mode="before")
+    @field_validator("ai_summary", "user_text", mode="before")
     @classmethod
-    def normalize_summary(cls, value):
+    def normalize_editable_text(cls, value):
+        if value is None:
+            return None
         if not isinstance(value, str):
-            raise ValueError("ai_summary must be a string")
+            raise ValueError("editable text fields must be strings")
         normalized = value.strip()
         if not normalized:
-            raise ValueError("ai_summary must not be blank")
+            raise ValueError("editable text fields must not be blank")
         return normalized
 
 

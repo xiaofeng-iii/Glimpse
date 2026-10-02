@@ -4,6 +4,7 @@ import { PhotoIcon } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { getMemoryImagePaths, getMemoryImageUrls } from '@/utils/memory-images'
+import { getMemoryDisplayText } from '@/utils/memory-types'
 import { t } from '@/utils/i18n'
 import ImageContextMenu from './ImageContextMenu.vue'
 
@@ -19,6 +20,7 @@ const failedImages = ref<Record<string, boolean>>({})
 const activeIndex = ref(0)
 const images = computed(() => getMemoryImageUrls(props.memory))
 const imagePaths = computed(() => getMemoryImagePaths(props.memory))
+const displayText = computed(() => getMemoryDisplayText(props.memory))
 const activeImage = computed(() => images.value[activeIndex.value] ?? '')
 const imageMenu = ref({ x: 0, y: 0, index: 0, token: 0 })
 
@@ -70,7 +72,7 @@ const markImageError = (url: string) => {
       <img
         v-if="activeImage && !failedImages[activeImage]"
         :src="activeImage"
-        :alt="memory.ai_summary"
+        :alt="displayText"
         class="object-contain"
         :class="compact ? 'h-full w-full' : 'max-h-[80%] max-w-[86%]'"
         @error="markImageError(activeImage)"
@@ -109,7 +111,7 @@ const markImageError = (url: string) => {
           <img
             v-if="!failedImages[image]"
             :src="image"
-            :alt="`${memory.ai_summary} ${index + 1}`"
+            :alt="`${displayText} ${index + 1}`"
             class="block max-h-full max-w-full object-contain"
             loading="lazy"
             @error="markImageError(image)"

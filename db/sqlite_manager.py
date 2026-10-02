@@ -29,6 +29,9 @@ class MemoryRecord:
     analysis_status: str = "COMPLETED"
     memory_type: str = "screenshot"
     match_sources: List[str] = field(default_factory=list)
+    # 用户手动键入的文本（与 AI 摘要分离；仅部分图片记忆携带）。
+    # 必须保持在最后一个字段：旧库的按列位读取分支依赖既有顺序。
+    user_text: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -56,6 +59,7 @@ class MemoryRecord:
                     if "memory_type" in row.keys() and row["memory_type"]
                     else "screenshot"
                 ),
+                user_text=row["user_text"] if "user_text" in row.keys() else None,
             )
         # Fallback for plain tuples (tests)
         if len(row) >= 8:
@@ -113,7 +117,8 @@ class SQLiteManager:
                 extra_images TEXT,
                 sync_status TEXT DEFAULT 'PENDING',
                 memory_type TEXT NOT NULL DEFAULT 'screenshot',
-                analysis_status TEXT NOT NULL DEFAULT 'COMPLETED'
+                analysis_status TEXT NOT NULL DEFAULT 'COMPLETED',
+                user_text TEXT
             )
         """)
 
@@ -122,31 +127,56 @@ class SQLiteManager:
             ON memories(created_at DESC)
         """)
 
+        # user_text 需要先于 FTS 重建就位，重建时才能把该列一并写入索引。
+        cursor.execute("PRAGMA table_info(memories)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if "user_text" not in columns:
+            cursor.execute("ALTER TABLE memories ADD COLUMN user_text TEXT")
+
         cursor.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts
-            USING fts5(ai_summary, text_content, content='memories', content_rowid='rowid')
+            USING fts5(ai_summary, text_content, user_text, content='memories', content_rowid='rowid')
         """)
 
+        # 旧库的 FTS 表只有 ai_summary/text_content 两列；FTS5 不支持加列，
+        # 只能整表重建并从 memories 重新灌入。
+        cursor.execute("PRAGMA table_info(memories_fts)")
+        fts_columns = [col[1] for col in cursor.fetchall()]
+        if fts_columns and "user_text" not in fts_columns:
+            cursor.execute("DROP TABLE memories_fts")
+            cursor.execute("""
+                CREATE VIRTUAL TABLE memories_fts
+                USING fts5(ai_summary, text_content, user_text, content='memories', content_rowid='rowid')
+            """)
+            cursor.execute("""
+                INSERT INTO memories_fts(rowid, ai_summary, text_content, user_text)
+                SELECT rowid, ai_summary, text_content, user_text FROM memories
+            """)
+
+        # 触发器用 DROP+CREATE 而非 IF NOT EXISTS：旧库里的两列版本必须被三列版本替换。
+        cursor.execute("DROP TRIGGER IF EXISTS memories_ai")
         cursor.execute("""
-            CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
-                INSERT INTO memories_fts(rowid, ai_summary, text_content)
-                VALUES (new.rowid, new.ai_summary, new.text_content);
+            CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
+                INSERT INTO memories_fts(rowid, ai_summary, text_content, user_text)
+                VALUES (new.rowid, new.ai_summary, new.text_content, new.user_text);
             END
         """)
 
+        cursor.execute("DROP TRIGGER IF EXISTS memories_au")
         cursor.execute("""
-            CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
-                INSERT INTO memories_fts(memories_fts, rowid, ai_summary, text_content)
-                VALUES ('delete', old.rowid, old.ai_summary, old.text_content);
-                INSERT INTO memories_fts(rowid, ai_summary, text_content)
-                VALUES (new.rowid, new.ai_summary, new.text_content);
+            CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+                INSERT INTO memories_fts(memories_fts, rowid, ai_summary, text_content, user_text)
+                VALUES ('delete', old.rowid, old.ai_summary, old.text_content, old.user_text);
+                INSERT INTO memories_fts(rowid, ai_summary, text_content, user_text)
+                VALUES (new.rowid, new.ai_summary, new.text_content, new.user_text);
             END
         """)
 
+        cursor.execute("DROP TRIGGER IF EXISTS memories_ad")
         cursor.execute("""
-            CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
-                INSERT INTO memories_fts(memories_fts, rowid, ai_summary, text_content)
-                VALUES ('delete', old.rowid, old.ai_summary, old.text_content);
+            CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
+                INSERT INTO memories_fts(memories_fts, rowid, ai_summary, text_content, user_text)
+                VALUES ('delete', old.rowid, old.ai_summary, old.text_content, old.user_text);
             END
         """)
 
@@ -205,8 +235,8 @@ class SQLiteManager:
                 cursor = self._conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO memories (id, created_at, image_path, ai_summary, app_name, text_content, extra_images, sync_status, memory_type, analysis_status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO memories (id, created_at, image_path, ai_summary, app_name, text_content, extra_images, sync_status, memory_type, analysis_status, user_text)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         record.id,
@@ -219,6 +249,7 @@ class SQLiteManager:
                         record.sync_status,
                         record.memory_type,
                         record.analysis_status,
+                        record.user_text,
                     ),
                 )
                 self._conn.commit()
@@ -331,11 +362,11 @@ class SQLiteManager:
         cursor.execute(
             f"""
             SELECT m.* FROM memories m
-            WHERE (m.ai_summary LIKE ? OR m.text_content LIKE ?){filter_sql}
+            WHERE (m.ai_summary LIKE ? OR m.text_content LIKE ? OR m.user_text LIKE ?){filter_sql}
             ORDER BY m.created_at DESC
             LIMIT ?
             """,
-            (f"%{query}%", f"%{query}%", *filter_params, limit),
+            (f"%{query}%", f"%{query}%", f"%{query}%", *filter_params, limit),
         )
         rows = cursor.fetchall()
         return [MemoryRecord.from_row(row) for row in rows]
@@ -384,6 +415,29 @@ class SQLiteManager:
                 return cursor.rowcount > 0
             except Exception as e:
                 logger.error("Update memory OCR text error: %s", e)
+                return False
+
+    def update_memory_user_text(
+        self,
+        memory_id: str,
+        user_text: str,
+        sync_status: str = "PENDING",
+    ) -> bool:
+        with self._write_lock:
+            try:
+                cursor = self._conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE memories
+                    SET user_text = ?, sync_status = ?
+                    WHERE id = ?
+                    """,
+                    (user_text, sync_status, memory_id),
+                )
+                self._conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                logger.error("Update memory user text error: %s", e)
                 return False
 
     def update_memory_analysis(

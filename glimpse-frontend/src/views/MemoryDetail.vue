@@ -16,7 +16,7 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { createLogger } from '@/utils/logger'
 import { t } from '@/utils/i18n'
-import { isTextMemory } from '@/utils/memory-types'
+import { getMemoryDisplayText, hasUserNote, isTextMemory } from '@/utils/memory-types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import MediaGallery from '@/components/MediaGallery.vue'
 import OcrText from '@/components/OcrText.vue'
@@ -41,6 +41,7 @@ const deleting = ref(false)
 const memoryId = computed(() => String(route.params.id ?? ''))
 const memory = computed(() => memoriesStore.entities[memoryId.value] ?? null)
 const textMemory = computed(() => Boolean(memory.value && isTextMemory(memory.value)))
+const hasNote = computed(() => Boolean(memory.value && hasUserNote(memory.value)))
 const analysisStatus = computed(() => memory.value?.analysis_status ?? 'COMPLETED')
 const analyzing = computed(() => analysisStatus.value === 'PROCESSING')
 const analysisUnavailable = computed(() => analysisStatus.value === 'FAILED')
@@ -77,7 +78,7 @@ onBeforeRouteUpdate(async () => canLeave())
 const copySummary = async () => {
   if (!memory.value) return
   try {
-    await navigator.clipboard.writeText(memory.value.ai_summary)
+    await navigator.clipboard.writeText(getMemoryDisplayText(memory.value))
     notifications.show(t('message.copied'), 'success', 1800)
   } catch {
     notifications.show(t('message.copyFailed'), 'error', 2800)
@@ -153,7 +154,7 @@ const confirmDelete = async () => {
 
           <button v-if="!analyzing && !analysisUnavailable" type="button" class="btn-secondary" @click="copySummary">
             <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />
-            {{ t(textMemory ? 'action.copyContent' : 'action.copySummary') }}
+            {{ t(textMemory || hasNote ? 'action.copyContent' : 'action.copySummary') }}
           </button>
 
           <div v-if="!textMemory && !analyzing && !analysisUnavailable" class="border-t border-[var(--shell-line)] pt-5">

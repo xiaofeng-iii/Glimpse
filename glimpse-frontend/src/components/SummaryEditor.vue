@@ -11,7 +11,7 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
 import { t, type MessageKey } from '@/utils/i18n'
-import { isTextMemory } from '@/utils/memory-types'
+import { hasUserNote, isTextMemory } from '@/utils/memory-types'
 import ConfirmDialog from './ConfirmDialog.vue'
 
 const props = withDefaults(defineProps<{
@@ -29,7 +29,9 @@ const memoriesStore = useMemoriesStore()
 const notifications = useNotificationStore()
 const unsavedChanges = useUnsavedChangesStore()
 const editing = ref(false)
-const draft = ref(props.memory.ai_summary)
+const draft = ref(
+  hasUserNote(props.memory) ? (props.memory.user_text ?? '') : props.memory.ai_summary,
+)
 const saving = ref(false)
 const errorMessage = ref('')
 const discardDialogOpen = ref(false)
@@ -38,9 +40,19 @@ const compactFrame = ref<HTMLElement | null>(null)
 const compactHeight = ref(80)
 const compactOverflowing = ref(false)
 const textMemory = computed(() => isTextMemory(props.memory))
-const contentLabel = computed(() => t(textMemory.value ? 'memory.content' : 'memory.summary'))
+const noteMode = computed(() => hasUserNote(props.memory))
+// 展示与编辑的文本字段：带用户说明的记忆编辑 user_text（AI 摘要仅作检索资源，不展示）；
+// 文案与纯文本记忆统一为“记忆内容”。其余记忆与旧行为一致，编辑 ai_summary。
+const fieldText = computed(() =>
+  noteMode.value ? (props.memory.user_text ?? '') : props.memory.ai_summary,
+)
+const contentLabel = computed(() =>
+  t(textMemory.value || noteMode.value ? 'memory.content' : 'memory.summary'),
+)
 const editorText = (key: string) =>
-  t(`${textMemory.value ? 'content' : 'summary'}.${key}` as MessageKey)
+  t(
+    `${textMemory.value || noteMode.value ? 'content' : 'summary'}.${key}` as MessageKey,
+  )
 let discardResolver: ((confirmed: boolean) => void) | null = null
 let pendingDiscardPromise: Promise<boolean> | null = null
 let unregisterGuard: (() => boolean) | null = null
@@ -77,7 +89,7 @@ const handleViewportResize = () => {
 }
 
 const normalizedDraft = computed(() => draft.value.trim())
-const dirty = computed(() => normalizedDraft.value !== props.memory.ai_summary.trim())
+const dirty = computed(() => normalizedDraft.value !== fieldText.value.trim())
 const validationMessage = computed(() => {
   if (!normalizedDraft.value) return editorText('required')
   if (normalizedDraft.value.length > 4000) return editorText('tooLong')
@@ -89,13 +101,13 @@ watch(
   () => props.memory.id,
   () => {
     editing.value = false
-    draft.value = props.memory.ai_summary
+    draft.value = fieldText.value
     errorMessage.value = ''
   },
 )
 
 watch(
-  () => props.memory.ai_summary,
+  fieldText,
   (value) => {
     if (!editing.value || !dirty.value) {
       draft.value = value
@@ -104,13 +116,13 @@ watch(
 )
 
 watch(
-  [draft, () => props.memory.ai_summary, editing],
+  [draft, fieldText, editing],
   () => void scheduleCompactEditorResize(),
   { flush: 'post' },
 )
 
 const startEditing = async () => {
-  draft.value = props.memory.ai_summary
+  draft.value = fieldText.value
   errorMessage.value = ''
   editing.value = true
   await nextTick()
@@ -135,7 +147,7 @@ const startEditing = async () => {
 }
 
 const cancelEditing = () => {
-  draft.value = props.memory.ai_summary
+  draft.value = fieldText.value
   errorMessage.value = ''
   editing.value = false
 }
@@ -146,8 +158,10 @@ const save = async () => {
   saving.value = true
   errorMessage.value = ''
   try {
-    const memory = await memoriesStore.updateSummary(props.memory.id, normalizedDraft.value)
-    draft.value = memory.ai_summary
+    const memory = noteMode.value
+      ? await memoriesStore.updateUserText(props.memory.id, normalizedDraft.value)
+      : await memoriesStore.updateSummary(props.memory.id, normalizedDraft.value)
+    draft.value = noteMode.value ? (memory.user_text ?? '') : memory.ai_summary
     editing.value = false
     emit('saved', memory)
   } catch (error) {
@@ -310,7 +324,7 @@ defineExpose({
         @keydown="handleEditorKeydown"
       />
       <p v-else class="whitespace-pre-wrap text-sm text-[var(--shell-ink)]">
-        {{ memory.ai_summary }}
+        {{ fieldText }}
       </p>
 
       <div v-if="editing" id="summary-editor-feedback" class="mt-2 flex items-center justify-between gap-3 text-xs">

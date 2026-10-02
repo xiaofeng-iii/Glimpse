@@ -83,7 +83,7 @@ class MemoryService:
     def _embedding_text_for_memory(memory) -> str:
         parts = [
             str(value).strip()
-            for value in (memory.ai_summary, memory.text_content)
+            for value in (memory.ai_summary, memory.user_text, memory.text_content)
             if value and str(value).strip()
         ]
         return "\n\n".join(parts)
@@ -402,26 +402,33 @@ class MemoryService:
         self,
         image_path: str,
         app_name: str = "unknown",
+        *,
+        user_text: Optional[str] = None,
     ) -> "MemoryRecord":
-        return self._prepare_image_memory([image_path], app_name)
+        return self._prepare_image_memory([image_path], app_name, user_text=user_text)
 
     def prepare_cluster_memory(
         self,
         image_paths: List[str],
         app_name: str = "unknown",
+        *,
+        user_text: Optional[str] = None,
     ) -> "MemoryRecord":
         if not image_paths:
             raise ValueError("Cluster memory requires at least one image")
-        return self._prepare_image_memory(image_paths, app_name)
+        return self._prepare_image_memory(image_paths, app_name, user_text=user_text)
 
     def _prepare_image_memory(
         self,
         image_paths: List[str],
         app_name: str,
+        *,
+        user_text: Optional[str] = None,
     ) -> "MemoryRecord":
         """Persist a readable image-memory shell before OCR/AI work starts."""
         from db.sqlite_manager import MemoryRecord
 
+        normalized_user_text = user_text.strip() if isinstance(user_text, str) else ""
         primary_image = image_paths[0]
         extra_images = image_paths[1:]
         record = MemoryRecord(
@@ -439,6 +446,7 @@ class MemoryService:
             sync_status="PENDING",
             analysis_status="PROCESSING",
             memory_type="screenshot",
+            user_text=normalized_user_text or None,
         )
         if not self._sqlite_manager.insert_memory(record):
             raise RuntimeError(f"Failed to insert memory {record.id} to SQLite")
@@ -605,6 +613,38 @@ class MemoryService:
                 return current
 
             if not self._sqlite_manager.update_memory_summary(
+                memory_id,
+                normalized,
+                sync_status="PENDING",
+            ):
+                raise RuntimeError(f"Failed to update memory {memory_id}")
+
+            updated = self._sqlite_manager.get_memory_by_id(memory_id)
+            # Queue the canonical PENDING event before a fast background worker
+            # can emit SYNCED/FAILED for the same edit.
+            self._emit_memory_updated(updated)
+        self.schedule_memory_reindex(memory_id)
+        return updated
+
+    def update_memory_user_text(
+        self,
+        memory_id: str,
+        user_text: str,
+    ) -> Optional["MemoryRecord"]:
+        normalized = str(user_text).strip()
+        if not normalized or len(normalized) > SUMMARY_MAX_LENGTH:
+            raise ValueError(
+                f"User text must contain between 1 and {SUMMARY_MAX_LENGTH} characters"
+            )
+
+        with self._get_memory_reindex_lock(memory_id):
+            current = self._sqlite_manager.get_memory_by_id(memory_id)
+            if current is None:
+                return None
+            if current.user_text == normalized:
+                return current
+
+            if not self._sqlite_manager.update_memory_user_text(
                 memory_id,
                 normalized,
                 sync_status="PENDING",

@@ -10,7 +10,7 @@ from api.dependencies import (
     get_memory_service,
     get_settings_manager,
 )
-from api.websocket import broadcast_event
+from api.websocket import broadcast_event, broadcast_event_from_thread
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -25,28 +25,6 @@ async def _capture_fullscreen(force: bool = False):
         None,
         lambda: capture_manager.capture_fullscreen(force_bypass_debounce=force),
     )
-
-
-def _report_background_future(future) -> None:
-    try:
-        future.result()
-    except Exception as exc:
-        logger.error("Background broadcast error: %s", exc)
-
-
-def _emit_from_thread(
-    loop: asyncio.AbstractEventLoop,
-    event_type: str,
-    data: Dict[str, Any],
-) -> None:
-    if loop.is_closed():
-        return
-
-    future = asyncio.run_coroutine_threadsafe(
-        broadcast_event(event_type, data),
-        loop,
-    )
-    future.add_done_callback(_report_background_future)
 
 
 async def _create_memory_in_background(
@@ -139,7 +117,7 @@ def setup_cluster_processing(loop: asyncio.AbstractEventLoop) -> None:
 
             def on_complete(memory_id):
                 if not memory_id:
-                    _emit_from_thread(
+                    broadcast_event_from_thread(
                         loop,
                         "error_occurred",
                         {
@@ -150,7 +128,7 @@ def setup_cluster_processing(loop: asyncio.AbstractEventLoop) -> None:
                     )
                     return
 
-                _emit_from_thread(
+                broadcast_event_from_thread(
                     loop,
                     "memory_saved",
                     {
@@ -162,7 +140,7 @@ def setup_cluster_processing(loop: asyncio.AbstractEventLoop) -> None:
                 )
 
             def on_error(message: str):
-                _emit_from_thread(
+                broadcast_event_from_thread(
                     loop,
                     "error_occurred",
                     {
@@ -278,7 +256,7 @@ async def capture_and_analyze(*, force: bool = False, source: str = "api") -> Di
 
         def on_complete(memory_id):
             if not memory_id:
-                _emit_from_thread(
+                broadcast_event_from_thread(
                     loop,
                     "error_occurred",
                     {
@@ -289,7 +267,7 @@ async def capture_and_analyze(*, force: bool = False, source: str = "api") -> Di
                 )
                 return
 
-            _emit_from_thread(
+            broadcast_event_from_thread(
                 loop,
                 "memory_saved",
                 {
@@ -300,7 +278,7 @@ async def capture_and_analyze(*, force: bool = False, source: str = "api") -> Di
             )
 
         def on_error(message: str):
-            _emit_from_thread(
+            broadcast_event_from_thread(
                 loop,
                 "error_occurred",
                 {
