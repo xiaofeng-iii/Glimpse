@@ -114,7 +114,7 @@ const preventOutsideDismiss = (event: Event) => {
         @escape-key-down="preventDismissWhileBusy"
         @pointer-down-outside="preventOutsideDismiss"
       >
-        <header class="flex flex-none items-center gap-3 border-b border-[var(--shell-line)] px-5 py-2.5">
+        <header class="flex flex-none items-center gap-3 px-5 pb-1 pt-3">
           <div class="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
             <DocumentTextIcon class="h-4 w-4" aria-hidden="true" />
           </div>
@@ -146,7 +146,7 @@ const preventOutsideDismiss = (event: Event) => {
               id="text-memory-content"
               ref="editor"
               v-model="content"
-              class="mt-2 block min-h-48 w-full resize-none rounded-lg border bg-[var(--shell-control-bg)] px-3.5 py-3 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)]"
+              class="mt-2 block min-h-48 w-full resize-none rounded-lg border bg-[var(--color-surface-subtle)] px-3.5 py-3 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)]"
               :class="visibleError ? 'border-red-400 focus:border-red-500' : 'border-[var(--shell-line)] focus:border-[color-mix(in_srgb,var(--color-primary)_55%,var(--shell-line))]'"
               :placeholder="t('addMemory.placeholder')"
               :readonly="busy"
@@ -174,7 +174,7 @@ const preventOutsideDismiss = (event: Event) => {
             </div>
           </div>
 
-          <footer class="flex flex-none justify-end gap-2.5 border-t border-[var(--shell-line)] px-5 py-2.5">
+          <footer class="flex flex-none justify-end gap-2.5 px-5 pb-3 pt-1.5">
             <button
               type="button"
               class="btn-secondary px-4 disabled:cursor-not-allowed disabled:opacity-60"
@@ -223,7 +223,7 @@ const preventOutsideDismiss = (event: Event) => {
   border: 1px solid var(--shell-line);
   border-radius: var(--radius-xl);
   color: var(--shell-ink);
-  background: var(--shell-card);
+  background: var(--color-surface-raised);
   box-shadow: var(--shadow-modal);
   transform: translate(-50%, -50%);
 }

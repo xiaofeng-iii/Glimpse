@@ -221,7 +221,7 @@ defineExpose({ focus, clear })
             ref="searchInput"
             v-model="query"
             type="search"
-            class="search-toolbar__control h-8 w-full border border-[var(--shell-line)] bg-[var(--shell-control-bg)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[display:none]"
+            class="search-toolbar__control h-8 w-full border border-transparent bg-[var(--color-surface-subtle)] pl-11 pr-24 text-sm text-[var(--shell-ink)] outline-none transition placeholder:text-[var(--shell-muted)] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:[display:none]"
             :placeholder="t('search.placeholder')"
             @keydown.esc.stop.prevent="clear"
             @compositionstart="handleCompositionStart"
@@ -244,7 +244,7 @@ defineExpose({ focus, clear })
         </div>
 
         <div
-          class="search-toolbar__control search-toolbar__source-switcher inline-grid h-8 grid-flow-col auto-cols-fr items-center border border-[var(--shell-line)] bg-[var(--shell-control-bg)]"
+          class="search-toolbar__control search-toolbar__source-switcher inline-grid h-8 grid-flow-col auto-cols-fr items-center bg-[var(--color-surface-subtle)]"
           role="group"
           :aria-label="t('search.sourceLabel')"
         >
@@ -266,7 +266,7 @@ defineExpose({ focus, clear })
         <div class="search-toolbar__actions flex shrink-0 items-center gap-2.5">
           <button
             type="button"
-            class="search-toolbar__control inline-flex h-8 min-h-0 w-8 items-center justify-center border border-[var(--shell-line)] bg-[var(--shell-control-bg)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:opacity-50"
+            class="search-toolbar__control inline-flex h-8 min-h-0 w-8 items-center justify-center bg-[var(--color-surface-subtle)] text-[var(--shell-muted)] transition hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
             :aria-label="t('action.refresh')"
             :disabled="refreshing"
             @click="emit('refresh')"
@@ -284,7 +284,7 @@ defineExpose({ focus, clear })
           @keydown="handleDebugPanelKeydown"
         >
           <summary
-            class="search-toolbar__control flex h-8 cursor-pointer list-none items-center gap-1.5 border border-amber-200/80 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
+            class="search-toolbar__control flex h-8 cursor-pointer list-none items-center gap-1.5 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
             :aria-label="t('search.debugTitle')"
           >
             <AdjustmentsHorizontalIcon class="h-4 w-4 flex-none" aria-hidden="true" />
@@ -390,8 +390,8 @@ defineExpose({ focus, clear })
   );
   --search-toolbar-detail-radius: var(--search-toolbar-control-radius);
   --search-toolbar-surface-shadow:
-    0 1px 2px rgba(26, 38, 64, 0.04),
-    0 2px 6px rgba(26, 38, 64, 0.035);
+    0 1px 2px rgba(26, 38, 64, 0.05),
+    0 6px 16px rgba(26, 38, 64, 0.08);
 
   position: sticky;
   z-index: var(--z-sticky);
@@ -401,26 +401,13 @@ defineExpose({ focus, clear })
   background: transparent;
 }
 
-.search-toolbar::before {
-  position: absolute;
-  z-index: 0;
-  inset: 0 0 -0.75rem;
-  pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--shell-window-bg) 60%, transparent) 0%,
-    color-mix(in srgb, var(--shell-window-bg) 28%, transparent) 62%,
-    transparent 100%
-  );
-  content: '';
-}
-
+/* 浮条滚动遮罩只做磨砂不做提亮：内容从卡下滑过时仅模糊、不叠加白色，
+   白色渐变遮罩已按设计决策移除。 */
 .search-toolbar::after {
   position: absolute;
   z-index: 0;
   inset: 0 0 -0.75rem;
   pointer-events: none;
-  background: color-mix(in srgb, var(--shell-window-bg) 1%, transparent);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 72%) 46%, transparent 100%);
@@ -478,7 +465,7 @@ defineExpose({ focus, clear })
 }
 
 :global(:root[data-theme='dark']) .search-toolbar {
-  --search-toolbar-surface-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  --search-toolbar-surface-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
 

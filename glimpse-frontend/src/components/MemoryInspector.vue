@@ -73,7 +73,7 @@ defineExpose({ canLeave })
 </script>
 
 <template>
-  <aside class="flex h-full min-h-0 w-full flex-col bg-[var(--shell-frame-bg)]">
+  <aside class="flex h-full min-h-0 w-full flex-col bg-[var(--color-surface)]">
     <header class="flex items-start justify-between border-b border-[var(--shell-line)] px-5 py-3.5">
       <div>
         <h2 class="text-base font-semibold text-[var(--shell-ink)]">{{ t('memory.detail') }}</h2>

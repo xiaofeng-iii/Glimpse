@@ -344,11 +344,7 @@ const confirmContextDelete = async () => {
 }
 
 const handleResize = () => {
-  const wasWide = wideLayout.value
   wideLayout.value = window.innerWidth >= 1180
-  if (!wasWide && wideLayout.value && !memoriesStore.selectedMemory && memoriesStore.memories.length) {
-    memoriesStore.select(memoriesStore.memories[0])
-  }
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
@@ -453,7 +449,7 @@ onUnmounted(() => {
       <Transition name="inspector">
         <div
           v-if="selectedMemory"
-          class="inspector-panel z-30 border-l border-[var(--shell-line)] shadow-[-12px_0_28px_rgba(15,23,42,.06)]"
+          class="inspector-panel z-30"
         >
           <MemoryInspector
             ref="memoryInspector"
@@ -504,15 +500,26 @@ onUnmounted(() => {
   position: relative;
   isolation: isolate;
   overflow-x: clip;
+  /* 墙到底/到顶后过滚就地截住，不再链给根视口——否则根视口弹性回弹会
+     连同吸顶的搜索浮条一起位移。 */
+  overscroll-behavior-y: contain;
   scrollbar-gutter: stable;
   container-name: memory-pane;
   container-type: inline-size;
 }
 
+/* 详情侧栏是浮在墙侧的内容块：四周留缝露出画布，用圆角+描边+卡片阴影成块，
+   不再通栏贴边。 */
 .inspector-panel {
   width: 380px;
   flex: 0 0 380px;
   min-height: 0;
+  overflow: hidden;
+  margin: 0.5rem 0.75rem 0.75rem 0.25rem;
+  border: 1px solid var(--shell-line);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
 @media (max-width: 1179px) {
@@ -527,6 +534,8 @@ onUnmounted(() => {
   .inspector-panel {
     inset: 0;
     width: 100%;
+    margin: 0;
+    border-radius: 0;
   }
 }
 

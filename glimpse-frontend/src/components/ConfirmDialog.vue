@@ -114,7 +114,7 @@ onBeforeUnmount(() => {
     >
       <section
         ref="dialogPanel"
-        class="w-full max-w-md rounded-xl border border-[var(--shell-line)] bg-[var(--shell-frame-bg)] p-5 shadow-2xl"
+        class="w-full max-w-md rounded-xl border border-[var(--shell-line)] bg-[var(--color-surface-raised)] p-5 shadow-2xl"
         role="alertdialog"
         aria-modal="true"
         :aria-busy="busy"

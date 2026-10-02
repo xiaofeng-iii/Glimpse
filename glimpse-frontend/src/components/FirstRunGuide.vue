@@ -153,7 +153,7 @@ onBeforeUnmount(() => {
     >
       <section
         ref="dialogPanel"
-        class="max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-frame-bg)] shadow-2xl"
+        class="max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[var(--shell-line)] bg-[var(--color-surface-raised)] shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="first-run-guide-title"

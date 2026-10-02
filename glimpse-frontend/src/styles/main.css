@@ -12,8 +12,8 @@
   --line-height-24: 32px;
   --line-height-30: 38px;
   --line-height-38: 46px;
-  --color-canvas: #f6f7fa;
-  --color-header: rgb(249, 248, 247);
+  --color-canvas: #e4e8f1;
+  --color-header: var(--color-canvas);
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
   --color-surface-subtle: #f4f6f9;
@@ -21,8 +21,8 @@
   --color-text: #1a2334;
   --color-text-secondary: #49566c;
   --color-text-muted: #66738a;
-  --color-border: #dde2ea;
-  --color-border-strong: #c3cbda;
+  --color-border: #d5dbe7;
+  --color-border-strong: #b7c1d4;
   --color-primary: #3b56c9;
   --color-primary-hover: #3048ab;
   --color-primary-soft: #edf0fa;
@@ -36,7 +36,7 @@
   --color-danger-soft: #fff0ee;
   --color-focus: #3b56c9;
   --color-overlay: rgba(27, 37, 57, 0.4);
-  --shadow-card: 0 1px 2px rgba(26, 38, 64, 0.04), 0 6px 16px rgba(26, 38, 64, 0.05);
+  --shadow-card: 0 1px 2px rgba(26, 38, 64, 0.08), 0 6px 16px rgba(26, 38, 64, 0.1);
   --shadow-modal: 0 20px 56px rgba(24, 34, 56, 0.18);
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -68,7 +68,7 @@
   --shell-glow-a: transparent;
   --shell-glow-b: transparent;
   --shell-frame-bg: var(--color-canvas);
-  --shell-window-bg: var(--color-surface);
+  --shell-window-bg: var(--color-canvas);
   --shell-header-bg: var(--color-header);
   --shell-card-border: var(--color-border);
   --shell-card-shadow: var(--shadow-card);
@@ -83,8 +83,8 @@
 }
 
 :root[data-theme='dark'] {
-  --color-canvas: #111522;
-  --color-header: #181e2c;
+  --color-canvas: #0c101b;
+  --color-header: var(--color-canvas);
   --color-surface: #181e2c;
   --color-surface-raised: #202737;
   --color-surface-subtle: #151a27;
@@ -122,7 +122,7 @@
   --shell-glow-a: transparent;
   --shell-glow-b: transparent;
   --shell-frame-bg: var(--color-canvas);
-  --shell-window-bg: var(--color-surface);
+  --shell-window-bg: var(--color-canvas);
   --shell-header-bg: var(--color-header);
   --shell-card-border: var(--color-border);
   --shell-card-shadow: var(--shadow-card);
@@ -140,6 +140,12 @@ html,
 body,
 #app {
   height: 100%;
+}
+
+/* 滚动容器过滚默认会链到根视口，WebView2/Chromium 的弹性回弹作用于根视口，
+   表现为整页（含吸顶浮条、标题栏）一起位移回弹。根视口自身禁止一切过滚效果。 */
+html {
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -219,14 +225,8 @@ button {
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0 0 0 0.5rem;
-  border-bottom: 1px solid var(--color-border);
   background: var(--shell-header-bg);
-  box-shadow: 0 1px 5px rgba(20, 31, 54, 0.07);
   user-select: none;
-}
-
-:root[data-theme='dark'] .desktop-shell__titlebar {
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.24);
 }
 
 .desktop-shell__drag-layer {

@@ -92,7 +92,7 @@ onBeforeUnmount(cancelSelectIntent)
   >
     <div
       v-if="textMemory"
-      class="memory-card__text-body relative bg-[var(--color-primary-soft)] p-4"
+      class="memory-card__text-body relative p-4"
     >
       <p class="memory-card__text-content whitespace-pre-wrap text-sm text-[var(--shell-ink)]">
         {{ memory.ai_summary || t('memory.noContent') }}
@@ -174,6 +174,8 @@ onBeforeUnmount(cancelSelectIntent)
 .memory-card__text-body {
   flex: 1 1 0;
   min-height: 0;
+  /* 文字卡主题色块：比画布更深、更蓝一档，避免整卡与画布背景混成一片 */
+  background: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
   border-bottom: 1px solid var(--shell-line);
 }
 
