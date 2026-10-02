@@ -1197,7 +1197,7 @@ dependencies = [
 
 [[package]]
 name = "glimpse"
-version = "0.3.4-preview.20261003"
+version = "0.3.3-preview.20261003"
 dependencies = [
  "clipboard-win",
  "getrandom 0.3.4",
