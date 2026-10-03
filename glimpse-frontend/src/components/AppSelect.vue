@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { CheckIcon, ChevronDownIcon } from '@heroicons/vue/20/solid'
 import {
   SelectContent,
@@ -37,15 +37,43 @@ const props = withDefaults(defineProps<{
 
 const model = defineModel<string>({ required: true })
 const selectedOption = computed(() => props.options.find((option) => option.value === model.value))
+
+// reka-ui 打开菜单时会把焦点放在选中项上，而 data-highlighted 又由焦点驱动，
+// 导致鼠标打开时选中项总是呈现悬浮高亮。这里在鼠标弹出后、指针真正移动前屏蔽高亮样式，
+// 指针一旦移动即恢复；键盘打开时焦点导航是预期行为，不屏蔽。
+const pointerIdle = ref(false)
+let openedByKeyboard = false
+
+const handleTriggerKeydown = () => {
+  openedByKeyboard = true
+}
+
+const handleOpenChange = (open: boolean) => {
+  if (open) {
+    pointerIdle.value = !openedByKeyboard
+    openedByKeyboard = false
+  } else {
+    pointerIdle.value = false
+  }
+}
+
+const handlePointerMove = () => {
+  pointerIdle.value = false
+}
+
+const handleKeyDown = () => {
+  pointerIdle.value = false
+}
 </script>
 
 <template>
-  <SelectRoot v-model="model" :disabled="disabled" :name="name">
+  <SelectRoot v-model="model" :disabled="disabled" :name="name" @update:open="handleOpenChange">
     <SelectTrigger
       :id="id"
       class="app-select__trigger"
       :aria-label="ariaLabel"
       :aria-labelledby="ariaLabelledby"
+      @keydown="handleTriggerKeydown"
     >
       <SelectValue :aria-label="selectedOption?.label">
         <span class="app-select__value">{{ selectedOption?.label }}</span>
@@ -58,12 +86,15 @@ const selectedOption = computed(() => props.options.find((option) => option.valu
     <SelectPortal>
       <SelectContent
         class="app-select__content"
+        :class="{ 'app-select__content--pointer-idle': pointerIdle }"
         position="popper"
         side="bottom"
         align="start"
         :side-offset="4"
         :collision-padding="12"
         :body-lock="false"
+        @pointermove="handlePointerMove"
+        @keydown="handleKeyDown"
       >
         <SelectViewport class="app-select__viewport">
           <SelectItem
@@ -195,6 +226,15 @@ const selectedOption = computed(() => props.options.find((option) => option.valu
 .app-select__item[data-highlighted] {
   color: var(--color-primary-hover);
   background: var(--color-primary-soft);
+}
+
+.app-select__content--pointer-idle .app-select__item[data-highlighted] {
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+.app-select__content--pointer-idle .app-select__item[data-highlighted][data-state='checked'] {
+  color: var(--color-text);
 }
 
 .app-select__content .app-select__item:focus-visible {

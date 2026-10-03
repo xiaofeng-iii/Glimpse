@@ -143,8 +143,8 @@ describe('Settings', () => {
   })
   it('groups navigation in the requested order and removes footer actions', async () => {
     const wrapper = await mountSettings()
-    expect(wrapper.findAll('nav h3').map((node) => node.text())).toEqual(['体验', '配置', '应用', '个人'])
-    expect(wrapper.findAll('nav button').map((node) => node.text())).toEqual(['快捷键', '截图设置', 'AI 服务', '维护', '软件更新', '界面'])
+    expect(wrapper.findAll('nav h3').map((node) => node.text())).toEqual(['个人', '配置', '应用'])
+    expect(wrapper.findAll('nav button').map((node) => node.text())).toEqual(['界面', '快捷键', '截图设置', 'AI 服务', '维护', '软件更新'])
     expect(wrapper.find('footer').exists()).toBe(false)
     expect(wrapper.get('.settings-content__footer').text()).toContain('恢复默认')
     expect(apiMocks.updateSettings).not.toHaveBeenCalled()
