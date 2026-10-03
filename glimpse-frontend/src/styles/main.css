@@ -136,6 +136,24 @@
   --shell-scrollbar-thumb-hover: rgba(148, 163, 184, 0.46);
 }
 
+/* 全局默认禁止鼠标拖选文字，避免在空白区域划出高亮选区；
+   正文内容区（记忆卡片、详情、更新说明等）单独放行。 */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 正文内容区恢复可选中 */
+.memory-card,
+.memory-detail,
+.notes-popover__body,
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 html,
 body,
 #app {

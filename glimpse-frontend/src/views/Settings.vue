@@ -42,7 +42,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppSelect from '@/components/AppSelect.vue'
 import UpdateNotesContent from '@/components/UpdateNotesContent.vue'
 import UpdateNotesPopover from '@/components/UpdateNotesPopover.vue'
-import { aggregateNotes, createNotesLoader, parseNotes, type Notes } from '@/utils/updateNotes'
+import { aggregateNotes, createNotesLoader, type Notes } from '@/utils/updateNotes'
 
 const logger = createLogger('views/Settings')
 const route = useRoute()
@@ -120,9 +120,6 @@ const installingUpdate = ref(false)
 const updateDialogOpen = ref(false)
 const currentNotesOpen = ref(false)
 const targetNotesOpen = ref(false)
-const currentNotes = ref<Notes | null>(null)
-const currentNotesError = ref<'' | 'settings.notesMissing' | 'settings.notesNetwork'>('')
-const currentNotesLoading = ref(false)
 const updateNotes = ref<Notes | null>(null)
 const updateNotesLoading = ref(false)
 const updateNotesPartial = ref(false)
@@ -130,19 +127,9 @@ const installFailed = ref(false)
 const loadNotes = createNotesLoader()
 let updateGeneration = 0
 let disposed = false
-let currentNotesRequested = false
-watch(currentNotesOpen, async (open) => {
-  if (!open || currentNotesRequested) return
-  currentNotesRequested = true
-  currentNotesLoading.value = true
-  try {
-    const entries = await loadNotes()
-    if (disposed) return
-    const entry = entries.find((release) => release.version === currentVersion.value)
-    if (entry) currentNotes.value = parseNotes(entry.notes)
-    else currentNotesError.value = 'settings.notesMissing'
-  } catch { if (!disposed) currentNotesError.value = 'settings.notesNetwork' }
-  finally { if (!disposed) currentNotesLoading.value = false }
+watch(currentNotesOpen, (open) => {
+  if (!open) return
+  updatesStore.loadCurrentNotes()
 })
 watch(updateChannel, () => {
   updateGeneration++
@@ -849,7 +836,7 @@ onUnmounted(() => {
                   <p class="setting-help">
                     <UpdateNotesPopover v-if="currentVersion" v-model:open="currentNotesOpen" :label="`${t('settings.updateVersion')} ${currentVersion}`">
                       <template #trigger><button type="button" class="version-notes-trigger">{{ currentVersion }}</button></template>
-                      <UpdateNotesContent :notes="currentNotes" :loading="currentNotesLoading" :error="currentNotesError ? t(currentNotesError) : ''" />
+                      <UpdateNotesContent :notes="updatesStore.currentNotes" :loading="updatesStore.currentNotesLoading" :error="updatesStore.currentNotesError ? t(updatesStore.currentNotesError) : ''" />
                     </UpdateNotesPopover>
                     <template v-else>{{ t('settings.updateDesktopOnly') }}</template>
                   </p>
@@ -1000,8 +987,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.version-notes-trigger,
-.version-notes-trigger:hover {
+.version-notes-trigger {
   display: inline;
   min-height: 0;
   padding: 0;
@@ -1012,7 +998,13 @@ onUnmounted(() => {
   font: inherit;
   letter-spacing: inherit;
   text-decoration: none;
-  cursor: default;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+.version-notes-trigger:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .settings-layout {
   display: grid;
@@ -1159,6 +1151,8 @@ onUnmounted(() => {
 }
 
 .setting-readonly {
+  display: flex;
+  align-items: center;
   color: var(--shell-muted);
   cursor: default;
 }
