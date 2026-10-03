@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick } from 'vue'
 import { CheckIcon, ChevronDownIcon } from '@heroicons/vue/20/solid'
 import {
   SelectContent,
@@ -38,31 +38,31 @@ const props = withDefaults(defineProps<{
 const model = defineModel<string>({ required: true })
 const selectedOption = computed(() => props.options.find((option) => option.value === model.value))
 
-// reka-ui 打开菜单时会把焦点放在选中项上，而 data-highlighted 又由焦点驱动，
-// 导致鼠标打开时选中项总是呈现悬浮高亮。这里在鼠标弹出后、指针真正移动前屏蔽高亮样式，
-// 指针一旦移动即恢复；键盘打开时焦点导航是预期行为，不屏蔽。
-const pointerIdle = ref(false)
+// reka-ui 打开菜单时通过 focusFirst([selectedItem, content]) 把焦点放到选中项上，
+// 而 data-highlighted 由焦点驱动，所以鼠标打开时选中项总呈现悬浮高亮。
+// 这里在鼠标打开后把焦点改放到 content 容器（focusFirst 原本的 fallback），
+// 选中项 blur 后高亮消失，此后只有鼠标悬浮或键盘导航才会产生高亮。
+// 键盘打开时不干预，焦点导航是预期行为。
 let openedByKeyboard = false
 
 const handleTriggerKeydown = () => {
   openedByKeyboard = true
 }
 
-const handleOpenChange = (open: boolean) => {
-  if (open) {
-    pointerIdle.value = !openedByKeyboard
-    openedByKeyboard = false
-  } else {
-    pointerIdle.value = false
+const handleOpenChange = async (open: boolean) => {
+  if (!open) return
+  const byKeyboard = openedByKeyboard
+  openedByKeyboard = false
+  if (byKeyboard) return
+  await nextTick()
+  // isPositioned 的 watch 在内容定位完成后才聚焦选中项，等一拍再重聚焦
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  const content = document.querySelector<HTMLElement>('.app-select__content')
+  const highlighted = content?.querySelector<HTMLElement>('[data-highlighted]')
+  if (content && highlighted) {
+    highlighted.blur()
+    content.focus({ preventScroll: true })
   }
-}
-
-const handlePointerMove = () => {
-  pointerIdle.value = false
-}
-
-const handleKeyDown = () => {
-  pointerIdle.value = false
 }
 </script>
 
@@ -86,15 +86,12 @@ const handleKeyDown = () => {
     <SelectPortal>
       <SelectContent
         class="app-select__content"
-        :class="{ 'app-select__content--pointer-idle': pointerIdle }"
         position="popper"
         side="bottom"
         align="start"
         :side-offset="4"
         :collision-padding="12"
         :body-lock="false"
-        @pointermove="handlePointerMove"
-        @keydown="handleKeyDown"
       >
         <SelectViewport class="app-select__viewport">
           <SelectItem
@@ -226,15 +223,6 @@ const handleKeyDown = () => {
 .app-select__item[data-highlighted] {
   color: var(--color-primary-hover);
   background: var(--color-primary-soft);
-}
-
-.app-select__content--pointer-idle .app-select__item[data-highlighted] {
-  color: var(--color-text-secondary);
-  background: transparent;
-}
-
-.app-select__content--pointer-idle .app-select__item[data-highlighted][data-state='checked'] {
-  color: var(--color-text);
 }
 
 .app-select__content .app-select__item:focus-visible {
