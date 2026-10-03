@@ -61,7 +61,7 @@ const selectedOption = computed(() => props.options.find((option) => option.valu
         position="popper"
         side="bottom"
         align="start"
-        :side-offset="6"
+        :side-offset="4"
         :collision-padding="12"
         :body-lock="false"
       >
@@ -89,41 +89,42 @@ const selectedOption = computed(() => props.options.find((option) => option.valu
 .app-select__trigger {
   display: inline-flex;
   width: 100%;
-  min-height: 2.5rem;
+  max-width: 240px;
+  min-height: 1.875rem;
   align-items: center;
   justify-content: space-between;
-  gap: .75rem;
-  padding: .45rem .75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  gap: .5rem;
+  padding: .25rem .65rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: .8125rem;
+  font-weight: 500;
   color: var(--color-text);
-  background: var(--shell-control-bg);
+  background: var(--color-surface-hover);
   cursor: pointer;
   text-align: left;
   transition:
-    color 160ms ease,
-    background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    color 140ms ease,
+    background-color 140ms ease;
 }
 
 .app-select__trigger:hover {
-  border-color: var(--color-border-strong);
-  background: color-mix(in srgb, var(--shell-control-bg) 72%, var(--shell-control-hover));
+  background: color-mix(in srgb, var(--color-surface-hover) 75%, var(--color-border-strong));
+  color: var(--color-text);
 }
 
 .app-select__trigger:focus-visible,
 .app-select__trigger[data-state='open'] {
-  border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--shell-control-bg) 96%, var(--color-primary));
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-hover);
+  outline: none;
 }
 
 .app-select__trigger:disabled {
   color: var(--color-text-muted);
   background: var(--color-surface-subtle);
   cursor: not-allowed;
-  opacity: .65;
+  opacity: .55;
 }
 
 .app-select__value {
@@ -134,11 +135,11 @@ const selectedOption = computed(() => props.options.find((option) => option.valu
 }
 
 .app-select__icon {
-  width: 1rem;
-  height: 1rem;
-  flex: 0 0 1rem;
+  width: .875rem;
+  height: .875rem;
+  flex: 0 0 .875rem;
   color: var(--color-text-muted);
-  transition: transform 160ms ease, color 160ms ease;
+  transition: transform 160ms ease, color 140ms ease;
 }
 
 .app-select__icon > svg {
@@ -148,23 +149,23 @@ const selectedOption = computed(() => props.options.find((option) => option.valu
 }
 
 .app-select__trigger[data-state='open'] .app-select__icon {
-  color: var(--color-primary);
+  color: var(--color-primary-hover);
   transform: rotate(180deg);
 }
 
 .app-select__content {
   z-index: 80;
-  width: var(--reka-select-trigger-width);
+  min-width: var(--reka-select-trigger-width);
   max-height: min(15rem, var(--reka-select-content-available-height));
   overflow: hidden;
-  padding: .25rem;
+  padding: 3px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   color: var(--color-text);
-  background: color-mix(in srgb, var(--color-surface-raised) 96%, transparent);
+  background: var(--color-surface-raised, var(--shell-card));
   box-shadow:
-    0 16px 36px rgba(26, 38, 64, .14),
-    0 3px 10px rgba(26, 38, 64, .08);
+    0 10px 24px rgba(26, 38, 64, .12),
+    0 2px 6px rgba(26, 38, 64, .06);
   transform-origin: var(--reka-select-content-transform-origin);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
@@ -178,13 +179,13 @@ const selectedOption = computed(() => props.options.find((option) => option.valu
 .app-select__item {
   position: relative;
   display: flex;
-  min-height: 2.25rem;
+  min-height: 1.875rem;
   align-items: center;
-  padding: .45rem 2.25rem .45rem .75rem;
+  padding: .25rem 1.85rem .25rem .65rem;
   border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: .875rem;
+  font-size: .8125rem;
   line-height: var(--line-height-14);
   outline: none;
   user-select: none;
@@ -218,24 +219,24 @@ const selectedOption = computed(() => props.options.find((option) => option.valu
 
 .app-select__indicator {
   position: absolute;
-  right: .7rem;
+  right: .55rem;
   display: inline-flex;
-  width: 1rem;
-  height: 1rem;
+  width: .875rem;
+  height: .875rem;
   align-items: center;
   justify-content: center;
   color: var(--color-primary);
 }
 
 .app-select__indicator > svg {
-  width: 1rem;
-  height: 1rem;
+  width: .875rem;
+  height: .875rem;
 }
 
 :root[data-theme='dark'] .app-select__content {
   box-shadow:
-    0 18px 44px rgba(0, 0, 0, .42),
-    0 3px 12px rgba(0, 0, 0, .28);
+    0 12px 28px rgba(0, 0, 0, .45),
+    0 2px 8px rgba(0, 0, 0, .3);
 }
 
 @keyframes app-select-in {
