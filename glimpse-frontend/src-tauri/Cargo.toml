@@ -14,6 +14,7 @@ tauri-plugin-clipboard-manager = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 getrandom = "0.3"
+tauri-plugin-updater = "2"
 
 # 与 tauri 2.11 的内部依赖版本保持一致，直接复用编译缓存。
 [target.'cfg(windows)'.dependencies]

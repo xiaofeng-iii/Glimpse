@@ -53,8 +53,20 @@
       ]
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU0RUVCMzE2RTdGQTg5QzQKUldURWlmcm5GclB1NUNKVU91SXZHTndtc1M1VlNTaTNXcTZMUHpobG5WUTRyNWNlSVAzRk1pSXcK",
+      "endpoints": [
+        "https://xiaofeng-iii.github.io/Glimpse/updates/stable.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": [
       "nsis"
     ],

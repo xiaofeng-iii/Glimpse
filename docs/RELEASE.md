@@ -137,6 +137,37 @@ gh release create $CurrentTag --verify-tag --prerelease --title "Glimpse $Curren
 当前预览版标签。后续正式版仍以两个正式版标签之间的全部变化为范围，可参考这期间
 的预览版说明进行归纳。
 
+## 应用内更新（GitHub Pages）
+
+桌面设置页的「软件更新」提供手动检查、确认下载和安装。正式通道只接收正式版；
+预览通道接收最新的预览版或版本更高的正式版。首次启用更新器的安装包仍须手动
+安装一次。源码启动或浏览器调试时不提供安装更新。
+
+发布准备（只需做一次）：
+
+1. 在仓库 Settings → Pages 中选择 **GitHub Actions** 作为 Build and deployment source。
+   站点预计为 `https://xiaofeng-iii.github.io/Glimpse/`；启用后须实际打开并验证
+   `updates/stable.json` 和 `updates/preview.json` 地址，再交付安装包。
+2. 更新公钥已经写入 `glimpse-frontend/src-tauri/tauri.conf.json`。相应私钥保存在
+   本地忽略的 `.tmp/glimpse-updater.key`；将该文件**完整内容**放进仓库 Actions
+   Secret `TAURI_SIGNING_PRIVATE_KEY`，不要提交、上传或放进 Release/Pages。
+   当前密钥未设置密码；如日后更换为有密码的密钥，需同时配置
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，且更换公钥会影响旧版更新能力，
+   因此不要随意轮换。务必离线备份私钥。其他构建环境也需设置上述环境变量。
+3. 正式版和预览版工作流在构建时生成 NSIS `.exe.sig`，与安装包、校验文件一起
+   上传 Release。仅 `SHA256SUMS.txt` 不足以让 Tauri Updater 验证更新。
+4. 任一发布工作流成功完成后，`updater-pages.yml` 会重新扫描已发布且具备签名的
+   GitHub Releases，按版本号生成 `updates/stable.json` 和 `updates/preview.json`，
+   部署至 Pages；工作流也支持手动触发以重建索引。检查 Pages 工作流已成功，
+   并回读 JSON 的版本、安装包 URL 和签名，再将更新视为可用。未签名的旧版
+   Release 不会进入索引；第一个签名发布版之前对应 JSON 可能尚不存在。
+5. 使用已安装的上一版本测试「检查更新 → 下载并安装 → 重启」，并检查后台
+   `GlimpseRuntime.exe` 是否正常退出与重启、`GlimpseData` 是否保留。只在
+   GitHub Pages 已启用、安装包已签名及测试通过之后对用户公布应用内更新。
+
+私钥丢失会导致已有安装版本无法验证后续更新。发布流程不擅自修改版本号；
+版本仍按本文现有规则由发布者决定。
+
 ## 版本命名规范
 
 项目统一采用 SemVer + 预发布后缀，三个发布通道，不再混用日历版本：

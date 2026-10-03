@@ -104,6 +104,7 @@ class SettingsManager:
                 "auto_hide": False,
                 "start_minimized": False,
                 "close_action": "ask",
+                "update_channel": "stable",
             },
             "cluster": {
                 "cluster_mode": False,
@@ -327,6 +328,10 @@ class SettingsManager:
             if not isinstance(close_action, str):
                 return False
             if close_action not in {"ask", "minimize", "exit"}:
+                return False
+        if "update_channel" in section:
+            channel = section["update_channel"]
+            if not isinstance(channel, str) or channel not in {"stable", "preview"}:
                 return False
         return True
 
