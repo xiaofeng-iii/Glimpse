@@ -39,6 +39,9 @@ import { createLogger } from '@/utils/logger'
 import { isDesktopShell } from '@/platform/desktop'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppSelect from '@/components/AppSelect.vue'
+import UpdateNotesContent from '@/components/UpdateNotesContent.vue'
+import UpdateNotesPopover from '@/components/UpdateNotesPopover.vue'
+import { aggregateNotes, createNotesLoader, parseNotes, type Notes } from '@/utils/updateNotes'
 
 const logger = createLogger('views/Settings')
 const settingsStore = useSettingsStore()
@@ -104,6 +107,42 @@ const currentVersion = ref('')
 const availableUpdate = ref<{ version: string; notes: string | null } | null>(null)
 const checkingUpdate = ref(false)
 const installingUpdate = ref(false)
+const updateDialogOpen = ref(false)
+const currentNotesOpen = ref(false)
+const targetNotesOpen = ref(false)
+const currentNotes = ref<Notes | null>(null)
+const currentNotesError = ref<'' | 'settings.notesMissing' | 'settings.notesNetwork'>('')
+const currentNotesLoading = ref(false)
+const updateNotes = ref<Notes | null>(null)
+const updateNotesLoading = ref(false)
+const updateNotesPartial = ref(false)
+const installFailed = ref(false)
+const loadNotes = createNotesLoader()
+let updateGeneration = 0
+let disposed = false
+let currentNotesRequested = false
+watch(currentNotesOpen, async (open) => {
+  if (!open || currentNotesRequested) return
+  currentNotesRequested = true
+  currentNotesLoading.value = true
+  try {
+    const entries = await loadNotes()
+    if (disposed) return
+    const entry = entries.find((release) => release.version === currentVersion.value)
+    if (entry) currentNotes.value = parseNotes(entry.notes)
+    else currentNotesError.value = 'settings.notesMissing'
+  } catch { if (!disposed) currentNotesError.value = 'settings.notesNetwork' }
+  finally { if (!disposed) currentNotesLoading.value = false }
+})
+watch(updateChannel, () => {
+  updateGeneration++
+  availableUpdate.value = null
+  updateNotes.value = null
+  updateDialogOpen.value = false
+  targetNotesOpen.value = false
+  installFailed.value = false
+})
+watch(activeSection, () => { currentNotesOpen.value = false; targetNotesOpen.value = false })
 
 const themeOptions = [
   { value: 'light', labelKey: 'settings.themeLight' },
@@ -347,22 +386,45 @@ const checkForUpdate = async () => {
   if (!isDesktopShell() || checkingUpdate.value || installingUpdate.value) return
   checkingUpdate.value = true
   availableUpdate.value = null
+  installFailed.value = false
+  targetNotesOpen.value = false
+  const generation = ++updateGeneration
+  const channel = updateChannel.value
   try {
     const { invoke } = await import('@tauri-apps/api/core')
-    availableUpdate.value = await invoke<{ version: string; notes: string | null } | null>('check_for_update', {
-      channel: updateChannel.value,
-    })
-    if (!availableUpdate.value) notifications.show(t('settings.updateCurrent'), 'info')
+    const target = await invoke<{ version: string; notes: string | null } | null>('check_for_update', { channel })
+    if (disposed || generation !== updateGeneration) return
+    availableUpdate.value = target
+    if (!target) notifications.show(t('settings.updateCurrent'), 'info')
+    else {
+      updateNotes.value = null
+      updateNotesPartial.value = false
+      updateNotesLoading.value = true
+      currentNotesOpen.value = false
+      updateDialogOpen.value = true
+      void loadNotes().then((entries) => {
+        if (disposed || generation !== updateGeneration) return
+        updateNotes.value = aggregateNotes(entries, currentVersion.value, target.version, channel)
+        updateNotesPartial.value = !updateNotes.value
+      }).catch(() => {
+        if (!disposed && generation === updateGeneration) updateNotesPartial.value = true
+      }).finally(() => {
+        if (!disposed && generation === updateGeneration) updateNotesLoading.value = false
+      })
+    }
   } catch (error) {
     logger.error('Failed to check for updates: %s', error)
-    notifications.show(t('settings.updateCheckFailed'), 'error')
+    if (!disposed && generation === updateGeneration) notifications.show(t('settings.updateCheckFailed'), 'error')
   } finally {
     checkingUpdate.value = false
   }
 }
 
 const installUpdate = async () => {
-  if (!availableUpdate.value || installingUpdate.value) return
+  if (!availableUpdate.value || installingUpdate.value || checkingUpdate.value) return
+  targetNotesOpen.value = false
+  currentNotesOpen.value = false
+  updateDialogOpen.value = true
   installingUpdate.value = true
   try {
     const { invoke } = await import('@tauri-apps/api/core')
@@ -371,6 +433,8 @@ const installUpdate = async () => {
     logger.error('Failed to install update: %s', error)
     notifications.show(t('settings.updateInstallFailed'), 'error')
     availableUpdate.value = null
+    installFailed.value = true
+    updateDialogOpen.value = false
   } finally {
     installingUpdate.value = false
   }
@@ -486,7 +550,7 @@ const canLeave = async () => {
   return pendingDiscardPromise
 }
 
-onBeforeRouteLeave(async () => canLeave())
+onBeforeRouteLeave(async () => installingUpdate.value ? false : canLeave())
 
 onMounted(async () => {
   unregisterGuard = unsavedChanges.register(canLeave)
@@ -503,6 +567,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  disposed = true
+  updateGeneration++
   if (maintenanceTimer) window.clearTimeout(maintenanceTimer)
   unregisterGuard?.()
   discardResolver?.(false)
@@ -510,6 +576,10 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <ConfirmDialog id="update-notes" :open="updateDialogOpen" :title="t('settings.updateAvailable', { version: availableUpdate?.version ?? '' })" :description="installingUpdate ? t('settings.updateInstalling') : ''" :confirm-label="t('settings.updateNow')" :cancel-label="t('settings.updateLater')" :busy="installingUpdate" @cancel="updateDialogOpen = false" @confirm="installUpdate">
+    <p v-if="installingUpdate" role="status" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateInstalling') }}</p>
+    <UpdateNotesContent v-else :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate?.notes ?? '' : undefined" />
+  </ConfirmDialog>
   <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-4 sm:p-5">
     <div class="mx-auto flex h-full min-h-0 w-full max-w-[1020px] flex-col">
       <header class="mb-4 flex-none">
@@ -755,7 +825,13 @@ onUnmounted(() => {
               <div class="maintenance-card space-y-4">
                 <div>
                   <h3 class="setting-label">{{ t('settings.updateVersion') }}</h3>
-                  <p class="setting-help">{{ currentVersion || t('settings.updateDesktopOnly') }}</p>
+                  <p class="setting-help">
+                    <UpdateNotesPopover v-if="currentVersion" v-model:open="currentNotesOpen" :label="`${t('settings.updateVersion')} ${currentVersion}`">
+                      <template #trigger><button type="button" class="version-notes-trigger">{{ currentVersion }}</button></template>
+                      <UpdateNotesContent :notes="currentNotes" :loading="currentNotesLoading" :error="currentNotesError ? t(currentNotesError) : ''" />
+                    </UpdateNotesPopover>
+                    <template v-else>{{ t('settings.updateDesktopOnly') }}</template>
+                  </p>
                 </div>
                 <div class="setting-row">
                   <div>
@@ -770,18 +846,24 @@ onUnmounted(() => {
                       { value: 'stable', label: t('settings.updateStable') },
                       { value: 'preview', label: t('settings.updatePreview') },
                     ]"
-                    @update:model-value="availableUpdate = null"
+                    :disabled="installingUpdate"
                   />
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                   <button type="button" class="btn-secondary" :disabled="!isDesktopShell() || checkingUpdate || installingUpdate" @click="checkForUpdate">
                     {{ checkingUpdate ? t('settings.updateChecking') : t('settings.updateCheck') }}
                   </button>
+                  <p v-if="installFailed" role="alert" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateRetryCheck') }}</p>
                   <p v-if="installingUpdate" role="status" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateInstalling') }}</p>
                 </div>
                 <div v-if="availableUpdate" class="rounded-lg border border-[var(--shell-line)] p-3.5">
-                  <p class="setting-label">{{ t('settings.updateAvailable', { version: availableUpdate.version }) }}</p>
-                  <p v-if="availableUpdate.notes" class="mt-2 whitespace-pre-wrap text-sm text-[var(--shell-muted)]">{{ availableUpdate.notes }}</p>
+                  <div class="flex items-center gap-2">
+                    <p class="setting-label">{{ t('settings.updateAvailable', { version: availableUpdate.version }) }}</p>
+                    <UpdateNotesPopover v-model:open="targetNotesOpen" :label="t('settings.updateAvailable', { version: availableUpdate.version })">
+                      <template #trigger><button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--shell-muted)]" :aria-label="t('settings.notesView')" :disabled="installingUpdate"><span aria-hidden="true">›</span></button></template>
+                      <UpdateNotesContent :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate.notes ?? '' : undefined" />
+                    </UpdateNotesPopover>
+                  </div>
                   <button type="button" class="btn-primary mt-3" :disabled="installingUpdate || checkingUpdate" @click="installUpdate">
                     {{ t('settings.updateInstall') }}
                   </button>
@@ -897,6 +979,20 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.version-notes-trigger,
+.version-notes-trigger:hover {
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-decoration: none;
+  cursor: default;
+}
 .settings-layout {
   display: grid;
   min-height: 0;
@@ -959,6 +1055,7 @@ onUnmounted(() => {
 .settings-nav__group {
   display: flex;
   flex-direction: column;
+  gap: .25rem;
 }
 
 .settings-content {

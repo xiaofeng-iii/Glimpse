@@ -151,6 +151,7 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
+        <div v-if="$slots.default" class="mt-4 max-h-[50dvh] overflow-y-auto"><slot /></div>
         <div class="mt-5 flex justify-end gap-2.5">
           <button ref="cancelButton" type="button" class="btn-secondary px-4" :disabled="busy" @click="cancel">
             {{ cancelLabel }}

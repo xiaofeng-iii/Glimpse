@@ -26,7 +26,7 @@ describe('frontend rendering contracts', () => {
     expect(selectTags).toEqual([])
 
     const settingsSource = readFileSync(resolve(sourceRoot, 'views/Settings.vue'), 'utf8')
-    expect(settingsSource.match(/<AppSelect\b/g)).toHaveLength(2)
+    expect(settingsSource.match(/<AppSelect\b/g)).toHaveLength(3)
 
     const selectSource = readFileSync(resolve(sourceRoot, 'components/AppSelect.vue'), 'utf8')
     expect(selectSource).toContain('<SelectPortal>')
