@@ -24,13 +24,16 @@ use std::time::Duration;
 use tauri::image::Image;
 use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Manager, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, Url, WindowEvent};
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
 const DEV_API_ORIGIN: &str = "http://127.0.0.1:8000";
 const APP_VERSION_ENV: &str = "GLIMPSE_APP_VERSION";
+const STABLE_UPDATE_URL: &str = "https://xiaofeng-iii.github.io/Glimpse/updates/stable.json";
+const PREVIEW_UPDATE_URL: &str = "https://xiaofeng-iii.github.io/Glimpse/updates/preview.json";
 const DATA_ROOT_ENV: &str = "GLIMPSE_DATA_ROOT";
 const PROJECT_ROOT_ENV: &str = "GLIMPSE_PROJECT_ROOT";
 #[cfg(not(debug_assertions))]
@@ -56,6 +59,7 @@ struct AppState {
     backend_child: Mutex<Option<Child>>,
     backend_runtime: Mutex<BackendRuntime>,
     quitting: AtomicBool,
+    pending_update: Mutex<Option<Update>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -80,6 +84,7 @@ impl Default for AppState {
             backend_child: Mutex::new(None),
             backend_runtime: Mutex::new(BackendRuntime::default()),
             quitting: AtomicBool::new(false),
+            pending_update: Mutex::new(None),
         }
     }
 }
@@ -491,6 +496,65 @@ fn quit_application(app: &AppHandle) {
     app.exit(0);
 }
 
+#[derive(Serialize)]
+struct AvailableUpdate {
+    version: String,
+    notes: Option<String>,
+}
+
+#[tauri::command]
+async fn check_for_update(
+    app: AppHandle,
+    channel: String,
+) -> Result<Option<AvailableUpdate>, String> {
+    let endpoint = match channel.as_str() {
+        "stable" => STABLE_UPDATE_URL,
+        "preview" => PREVIEW_UPDATE_URL,
+        _ => return Err("Unknown update channel".to_string()),
+    };
+    let url = Url::parse(endpoint).map_err(|error| error.to_string())?;
+    let updater = app
+        .updater_builder()
+        .endpoints(vec![url])
+        .map_err(|error| error.to_string())?
+        .on_before_exit({
+            let app = app.clone();
+            move || {
+                let state = app.state::<AppState>();
+                state.quitting.store(true, Ordering::SeqCst);
+                stop_backend_process(&app, &state);
+            }
+        })
+        .build()
+        .map_err(|error| error.to_string())?;
+    let update = updater.check().await.map_err(|error| error.to_string())?;
+    let available = update.as_ref().map(|update| AvailableUpdate {
+        version: update.version.clone(),
+        notes: update.body.clone(),
+    });
+    let state = app.state::<AppState>();
+    *state
+        .pending_update
+        .lock()
+        .map_err(|error| error.to_string())? = update;
+    Ok(available)
+}
+
+#[tauri::command]
+async fn install_checked_update(app: AppHandle) -> Result<(), String> {
+    let update = app
+        .state::<AppState>()
+        .pending_update
+        .lock()
+        .map_err(|error| error.to_string())?
+        .take()
+        .ok_or("No checked update available")?;
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 fn quit_app(app: AppHandle) {
     quit_application(&app);
@@ -612,8 +676,8 @@ fn load_app_icon() -> Option<Image<'static>> {
 #[cfg(windows)]
 fn harden_webview2_default_ui(window: &tauri::WebviewWindow) {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
-        COREWEBVIEW2_PERMISSION_STATE_DENY, ICoreWebView2,
-        ICoreWebView2PermissionRequestedEventArgs,
+        ICoreWebView2, ICoreWebView2PermissionRequestedEventArgs,
+        COREWEBVIEW2_PERMISSION_STATE_DENY,
     };
     use webview2_com::PermissionRequestedEventHandler;
 
@@ -671,8 +735,11 @@ fn harden_webview2_default_ui(window: &tauri::WebviewWindow) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            check_for_update,
+            install_checked_update,
             quit_app,
             get_backend_runtime,
             hide_window,

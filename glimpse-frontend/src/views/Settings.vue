@@ -13,6 +13,7 @@ import {
   PaintBrushIcon,
   ServerStackIcon,
   SparklesIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import {
@@ -36,6 +37,7 @@ import {
   type LanguagePreference,
 } from '@/utils/i18n'
 import { createLogger } from '@/utils/logger'
+import { isDesktopShell } from '@/platform/desktop'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppSelect from '@/components/AppSelect.vue'
 
@@ -50,6 +52,7 @@ const sections = [
   { id: 'screenshot', labelKey: 'settings.screenshot', descriptionKey: 'settings.screenshotDescription', icon: CameraIcon },
   { id: 'ai', labelKey: 'settings.ai', descriptionKey: 'settings.aiDescription', icon: SparklesIcon },
   { id: 'ui', labelKey: 'settings.ui', descriptionKey: 'settings.uiDescription', icon: PaintBrushIcon },
+  { id: 'updates', labelKey: 'settings.updates', descriptionKey: 'settings.updatesDescription', icon: ArrowDownTrayIcon },
   { id: 'maintenance', labelKey: 'settings.maintenance', descriptionKey: 'settings.maintenanceDescription', icon: CircleStackIcon },
 ] as const
 
@@ -78,6 +81,11 @@ const aiTimeout = ref(60)
 const themePreference = ref<ThemePreference>('light')
 const language = ref<LanguagePreference>('zh-CN')
 const closeAction = ref<'ask' | 'minimize' | 'exit'>('ask')
+const updateChannel = ref<'stable' | 'preview'>('stable')
+const currentVersion = ref('')
+const availableUpdate = ref<{ version: string; notes: string | null } | null>(null)
+const checkingUpdate = ref(false)
+const installingUpdate = ref(false)
 
 const testingAi = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
@@ -109,6 +117,7 @@ const formSnapshot = computed(() => JSON.stringify({
   themePreference: themePreference.value,
   language: language.value,
   closeAction: closeAction.value,
+  updateChannel: updateChannel.value,
 }))
 const dirty = computed(() => Boolean(savedSnapshot.value && formSnapshot.value !== savedSnapshot.value))
 const ocrSucceeded = computed(() =>
@@ -213,6 +222,8 @@ const populateForm = () => {
   themePreference.value = normalizeThemePreference(settings.ui?.theme)
   language.value = normalizeLanguagePreference(settings.ui?.language)
   closeAction.value = settings.ui?.close_action ?? 'ask'
+  updateChannel.value = settings.ui?.update_channel === 'preview' ? 'preview' : 'stable'
+  availableUpdate.value = null
   savedSnapshot.value = formSnapshot.value
 }
 
@@ -264,6 +275,7 @@ const handleSave = async () => {
         theme: themePreference.value,
         language: language.value,
         close_action: closeAction.value,
+        update_channel: updateChannel.value,
       },
       cluster: {
         ...current.cluster,
@@ -282,6 +294,39 @@ const handleSave = async () => {
     notifications.show(t('settings.saveFailed'), 'error', 2800)
   } finally {
     saving.value = false
+  }
+}
+
+const checkForUpdate = async () => {
+  if (!isDesktopShell() || checkingUpdate.value || installingUpdate.value) return
+  checkingUpdate.value = true
+  availableUpdate.value = null
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    availableUpdate.value = await invoke<{ version: string; notes: string | null } | null>('check_for_update', {
+      channel: updateChannel.value,
+    })
+    if (!availableUpdate.value) notifications.show(t('settings.updateCurrent'), 'info')
+  } catch (error) {
+    logger.error('Failed to check for updates: %s', error)
+    notifications.show(t('settings.updateCheckFailed'), 'error')
+  } finally {
+    checkingUpdate.value = false
+  }
+}
+
+const installUpdate = async () => {
+  if (!availableUpdate.value || installingUpdate.value) return
+  installingUpdate.value = true
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('install_checked_update')
+  } catch (error) {
+    logger.error('Failed to install update: %s', error)
+    notifications.show(t('settings.updateInstallFailed'), 'error')
+    availableUpdate.value = null
+  } finally {
+    installingUpdate.value = false
   }
 }
 
@@ -386,6 +431,14 @@ onBeforeRouteLeave(async () => canLeave())
 onMounted(async () => {
   unregisterGuard = unsavedChanges.register(canLeave)
   await Promise.all([loadSettings(), refreshMaintenance()])
+  if (isDesktopShell()) {
+    try {
+      const { getVersion } = await import('@tauri-apps/api/app')
+      currentVersion.value = await getVersion()
+    } catch (error) {
+      logger.error('Failed to read app version: %s', error)
+    }
+  }
   scheduleMaintenancePoll()
 })
 
@@ -618,6 +671,46 @@ onUnmounted(() => {
                     { value: 'exit', label: t('settings.closeExit') },
                   ]"
                 />
+              </div>
+            </template>
+
+            <template v-else-if="activeSection === 'updates'">
+              <div class="maintenance-card space-y-4">
+                <div>
+                  <h3 class="setting-label">{{ t('settings.updateVersion') }}</h3>
+                  <p class="setting-help">{{ currentVersion || t('settings.updateDesktopOnly') }}</p>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <label id="settings-update-channel-label" for="settings-update-channel" class="setting-label">{{ t('settings.updateChannel') }}</label>
+                    <p class="setting-help">{{ t('settings.updateChannelHint') }}</p>
+                  </div>
+                  <AppSelect
+                    id="settings-update-channel"
+                    v-model="updateChannel"
+                    aria-labelledby="settings-update-channel-label"
+                    :options="[
+                      { value: 'stable', label: t('settings.updateStable') },
+                      { value: 'preview', label: t('settings.updatePreview') },
+                    ]"
+                    @update:model-value="availableUpdate = null"
+                  />
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                  <button type="button" class="btn-secondary" :disabled="!isDesktopShell() || checkingUpdate || installingUpdate" @click="checkForUpdate">
+                    <ArrowPathIcon class="h-4 w-4 flex-none" :class="{ 'animate-spin': checkingUpdate }" aria-hidden="true" />
+                    {{ checkingUpdate ? t('settings.updateChecking') : t('settings.updateCheck') }}
+                  </button>
+                  <p v-if="installingUpdate" role="status" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateInstalling') }}</p>
+                </div>
+                <div v-if="availableUpdate" class="rounded-lg border border-[var(--shell-line)] p-3.5">
+                  <p class="setting-label">{{ t('settings.updateAvailable', { version: availableUpdate.version }) }}</p>
+                  <p v-if="availableUpdate.notes" class="mt-2 whitespace-pre-wrap text-sm text-[var(--shell-muted)]">{{ availableUpdate.notes }}</p>
+                  <button type="button" class="btn-primary mt-3" :disabled="installingUpdate || checkingUpdate" @click="installUpdate">
+                    <ArrowDownTrayIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+                    {{ t('settings.updateInstall') }}
+                  </button>
+                </div>
               </div>
             </template>
 

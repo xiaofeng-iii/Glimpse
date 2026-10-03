@@ -32,6 +32,7 @@ class TestSettingsManagerInit:
         assert sm.get("ai.base_url") == "https://api.openai.com/v1"
         assert sm.get("ai.model") == "gpt-4o-mini"
         assert sm.get("ui.close_action") == "ask"
+        assert sm.get("ui.update_channel") == "stable"
         assert sm.get("screenshot.capture_limit_window_seconds") == 5.0
         assert sm.get("screenshot.debounce_interval") is None
 
@@ -80,6 +81,7 @@ class TestSettingsManagerInit:
         assert sm.get("ai.model") == "custom-model"
         assert sm.get("ai.timeout") == 45
         assert sm.get("ui.close_action") == "exit"
+        assert sm.get("ui.update_channel") == "stable"
         assert sm.get("hotkeys.clear") is None
         assert sm.get("screenshot.capture_limit_window_seconds") == 5.0
         assert sm.get("screenshot.debounce_interval") is None
@@ -156,6 +158,15 @@ class TestSettingsManagerUpdate:
         assert result is True
         assert sm.get("ui.theme") == "dark"
         assert sm.get("ui.close_action") == "minimize"
+
+    def test_update_channel_accepts_preview_and_rejects_unknown(self, mock_path_manager):
+        from config.settings_manager import SettingsManager
+        sm = SettingsManager(mock_path_manager)
+        ui = sm.get("ui")
+        assert sm.update({"ui": {**ui, "update_channel": "preview"}})
+        assert sm.get("ui.update_channel") == "preview"
+        assert not sm.update({"ui": {**ui, "update_channel": "nightly"}})
+        assert sm.get("ui.update_channel") == "preview"
 
     def test_update_invalid_no_change(self, mock_path_manager):
         from config.settings_manager import SettingsManager
