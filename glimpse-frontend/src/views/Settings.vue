@@ -14,7 +14,7 @@ import {
   SparklesIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import {
   indexApi,
   ocrApi,
@@ -24,6 +24,7 @@ import {
 import { useNotificationStore } from '@/stores/notification'
 import { useSettingsStore } from '@/stores/settings'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
+import { useUpdatesStore } from '@/stores/updates'
 import {
   applyThemePreference,
   normalizeThemePreference,
@@ -44,9 +45,11 @@ import UpdateNotesPopover from '@/components/UpdateNotesPopover.vue'
 import { aggregateNotes, createNotesLoader, parseNotes, type Notes } from '@/utils/updateNotes'
 
 const logger = createLogger('views/Settings')
+const route = useRoute()
 const settingsStore = useSettingsStore()
 const notifications = useNotificationStore()
 const unsavedChanges = useUnsavedChangesStore()
+const updatesStore = useUpdatesStore()
 
 const sections = [
   { id: 'hotkeys', labelKey: 'settings.hotkeys', descriptionKey: 'settings.hotkeysDescription', icon: CommandLineIcon },
@@ -58,16 +61,23 @@ const sections = [
 ] as const
 
 const sectionGroups = ([
-  { labelKey: 'settings.groupExperience', ids: ['hotkeys', 'screenshot'] },
+  { labelKey: 'settings.groupPersonal', ids: ['ui', 'hotkeys', 'screenshot'] },
   { labelKey: 'settings.groupConfiguration', ids: ['ai', 'maintenance'] },
   { labelKey: 'settings.groupApplication', ids: ['updates'] },
-  { labelKey: 'settings.groupPersonal', ids: ['ui'] },
 ] as const).map((group) => ({ ...group, sections: group.ids.map((id) => sections.find((section) => section.id === id)!) }))
 
 type SectionId = typeof sections[number]['id']
 type ConfirmAction = 'reset' | 'index' | 'ocr' | null
 
+const isSectionId = (value: unknown): value is SectionId =>
+  typeof value === 'string' && sections.some((section) => section.id === value)
+
 const activeSection = ref<SectionId>('hotkeys')
+
+onMounted(() => {
+  // 「查看详情」等入口通过 ?section= 直达目标分区；缺省保持快捷键页。
+  if (isSectionId(route.query.section)) activeSection.value = route.query.section
+})
 const loading = ref(true)
 const saving = ref(false)
 const savedSnapshot = ref('')
@@ -137,6 +147,7 @@ watch(currentNotesOpen, async (open) => {
 watch(updateChannel, () => {
   updateGeneration++
   availableUpdate.value = null
+  updatesStore.availableUpdate = null
   updateNotes.value = null
   updateDialogOpen.value = false
   targetNotesOpen.value = false
@@ -395,6 +406,8 @@ const checkForUpdate = async () => {
     const target = await invoke<{ version: string; notes: string | null } | null>('check_for_update', { channel })
     if (disposed || generation !== updateGeneration) return
     availableUpdate.value = target
+    updatesStore.availableUpdate = target
+    if (target) updatesStore.refreshUpdateNotes(target.version)
     if (!target) notifications.show(t('settings.updateCurrent'), 'info')
     else {
       updateNotes.value = null
@@ -433,6 +446,7 @@ const installUpdate = async () => {
     logger.error('Failed to install update: %s', error)
     notifications.show(t('settings.updateInstallFailed'), 'error')
     availableUpdate.value = null
+    updatesStore.availableUpdate = null
     installFailed.value = true
     updateDialogOpen.value = false
   } finally {
@@ -562,6 +576,13 @@ onMounted(async () => {
     } catch (error) {
       logger.error('Failed to read app version: %s', error)
     }
+  }
+  // 启动检测已发现新版本时直接弹出更新对话框，复用同一份聚合说明。
+  if (updatesStore.availableUpdate) {
+    availableUpdate.value = updatesStore.availableUpdate
+    updateNotes.value = updatesStore.updateNotes
+    updateNotesPartial.value = updatesStore.updateNotesPartial
+    updateDialogOpen.value = true
   }
   scheduleMaintenancePoll()
 })
@@ -785,7 +806,7 @@ onUnmounted(() => {
                     type="button"
                     class="theme-switcher__button text-xs"
                     :class="themePreference === option.value
-                      ? 'text-[var(--shell-ink)] font-semibold'
+                      ? 'text-[var(--shell-ink)] font-medium'
                       : 'text-[var(--shell-muted)] font-medium hover:text-[var(--shell-ink)]'"
                     :aria-pressed="themePreference === option.value"
                     @click="themePreference = option.value"

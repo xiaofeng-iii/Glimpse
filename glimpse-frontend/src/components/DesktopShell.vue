@@ -13,6 +13,7 @@ import {
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import CloseActionDialog from '@/components/CloseActionDialog.vue'
+import UpdateBadge from '@/components/UpdateBadge.vue'
 import glimpseLogo from '@/assets/glimpse.svg'
 import { settingsApi } from '@/api/client'
 import { whenBackendRuntimeReady } from '@/config/runtime'
@@ -31,6 +32,7 @@ import { useBackendStatusStore } from '@/stores/backendStatus'
 import { useNotificationStore } from '@/stores/notification'
 import { useSettingsStore } from '@/stores/settings'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
+import { useUpdatesStore } from '@/stores/updates'
 import { t } from '@/utils/i18n'
 import { createLogger } from '@/utils/logger'
 
@@ -44,6 +46,7 @@ const backendStatus = useBackendStatusStore()
 const notificationStore = useNotificationStore()
 const settingsStore = useSettingsStore()
 const unsavedChanges = useUnsavedChangesStore()
+const updatesStore = useUpdatesStore()
 const logger = createLogger('components/DesktopShell')
 
 const isDesktop = isDesktopShell()
@@ -163,6 +166,22 @@ const navigateSettings = async () => {
   }
 }
 
+// 启动时静默检测一次更新：读当前版本（识别"刚升级完"），再按通道查新版本。
+// 失败完全静默，用户仍可在设置页手动检查。
+const checkUpdatesAtStartup = async () => {
+  if (!isDesktop) return
+  try {
+    const { getVersion } = await import('@tauri-apps/api/app')
+    updatesStore.recordCurrentVersion(await getVersion())
+  } catch (error) {
+    logger.error('Failed to read app version: %s', error)
+  }
+  if (!settingsStore.settings) {
+    await settingsStore.load()
+  }
+  await updatesStore.checkForUpdate()
+}
+
 onMounted(async () => {
   removeNavigationGuard = router.beforeEach(async (to, from) => {
     if (to.fullPath === from.fullPath) {
@@ -187,6 +206,7 @@ onMounted(async () => {
 
   await whenBackendRuntimeReady()
   await backendStatus.check()
+  void checkUpdatesAtStartup()
   healthPollTimer = window.setInterval(() => {
     void backendStatus.check()
   }, HEALTH_POLL_INTERVAL_MS)
@@ -245,6 +265,7 @@ onUnmounted(() => {
           >
             <Cog6ToothIcon class="h-[15px] w-[15px]" aria-hidden="true" />
           </button>
+          <UpdateBadge v-if="isHome" />
           <button
             v-else
             type="button"
