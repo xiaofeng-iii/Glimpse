@@ -41,6 +41,33 @@ def test_preview_channel_can_lead_stable_and_orders_numeric_sequence(tmp_path):
     assert preview["version"] == "0.3.4-preview.20261003.10"
 
 
+def test_index_json_lists_every_release_newest_first_with_sort_key(tmp_path):
+    releases = [
+        candidate("0.3.3-preview.20261003", True),
+        candidate("0.3.3", False),
+        candidate("0.3.2", False),
+    ]
+    releases[0][2]["notes"] = "预览说明"
+    releases[1][2]["notes"] = "正式说明"
+    releases[2][2]["notes"] = ""
+
+    write_feeds(tmp_path, releases)
+
+    index = json.loads((tmp_path / "updates/index.json").read_text(encoding="utf-8"))
+    assert index["schemaVersion"] == 1
+    entries = index["releases"]
+    assert [item["version"] for item in entries] == [
+        "0.3.3",
+        "0.3.3-preview.20261003",
+        "0.3.2",
+    ]
+    assert [item["preview"] for item in entries] == [False, True, False]
+    assert [item["notes"] for item in entries] == ["正式说明", "预览说明", ""]
+    assert entries[0]["sortKey"] == [0, 3, 3, 1, 0, 0]
+    assert entries[1]["sortKey"] == [0, 3, 3, 0, 20261003, 0]
+    assert entries[2]["sortKey"] == [0, 3, 2, 1, 0, 0]
+
+
 def test_signed_releases_skips_unsigned_and_uses_signature_contents(monkeypatch):
     requests = []
     release = {

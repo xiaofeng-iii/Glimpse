@@ -75,6 +75,17 @@ def signed_releases(token: str) -> list[tuple[tuple[int, ...], bool, dict]]:
 
 
 def write_feeds(output: Path, releases: list[tuple[tuple[int, ...], bool, dict]]) -> None:
+    index_path = output / "updates" / "index.json"
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index = {
+        "schemaVersion": 1,
+        "releases": [
+            {"version": manifest["version"], "preview": preview,
+             "notes": manifest.get("notes", ""), "sortKey": list(key)}
+            for key, preview, manifest in sorted(releases, key=lambda release: release[0], reverse=True)
+        ],
+    }
+    index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     stable = [release for release in releases if not release[1]]
     preview = releases
     for channel, eligible in (("stable", stable), ("preview", preview)):
