@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   ArrowPathIcon,
   CameraIcon,
@@ -11,11 +11,10 @@ import {
   CommandLineIcon,
   LockClosedIcon,
   PaintBrushIcon,
-  ServerStackIcon,
   SparklesIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline'
-import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import { onBeforeRouteLeave } from 'vue-router'
 import {
   indexApi,
   ocrApi,
@@ -42,7 +41,6 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppSelect from '@/components/AppSelect.vue'
 
 const logger = createLogger('views/Settings')
-const router = useRouter()
 const settingsStore = useSettingsStore()
 const notifications = useNotificationStore()
 const unsavedChanges = useUnsavedChangesStore()
@@ -56,6 +54,13 @@ const sections = [
   { id: 'maintenance', labelKey: 'settings.maintenance', descriptionKey: 'settings.maintenanceDescription', icon: CircleStackIcon },
 ] as const
 
+const sectionGroups = ([
+  { labelKey: 'settings.groupExperience', ids: ['hotkeys', 'screenshot'] },
+  { labelKey: 'settings.groupConfiguration', ids: ['ai', 'maintenance'] },
+  { labelKey: 'settings.groupApplication', ids: ['updates'] },
+  { labelKey: 'settings.groupPersonal', ids: ['ui'] },
+] as const).map((group) => ({ ...group, sections: group.ids.map((id) => sections.find((section) => section.id === id)!) }))
+
 type SectionId = typeof sections[number]['id']
 type ConfirmAction = 'reset' | 'index' | 'ocr' | null
 
@@ -63,6 +68,19 @@ const activeSection = ref<SectionId>('hotkeys')
 const loading = ref(true)
 const saving = ref(false)
 const savedSnapshot = ref('')
+const savedAiSnapshot = ref('')
+const autoSaveError = ref(false)
+const aiSaveError = ref(false)
+const resetting = ref(false)
+let writeQueue: Promise<unknown> = Promise.resolve()
+let autoSavePromise: Promise<boolean> | null = null
+
+// Share one queue across ordinary settings, AI and reset, even after a failure.
+const enqueueWrite = <T,>(operation: () => Promise<T>): Promise<T> => {
+  const result = writeQueue.then(operation)
+  writeQueue = result.catch(() => undefined)
+  return result
+}
 const showApiKey = ref(false)
 
 const screenshotHotkey = ref('')
@@ -87,6 +105,16 @@ const availableUpdate = ref<{ version: string; notes: string | null } | null>(nu
 const checkingUpdate = ref(false)
 const installingUpdate = ref(false)
 
+const themeOptions = [
+  { value: 'light', labelKey: 'settings.themeLight' },
+  { value: 'dark', labelKey: 'settings.themeDark' },
+  { value: 'system', labelKey: 'settings.themeSystem' },
+] as const
+const activeThemeIndex = computed(() => {
+  const index = themeOptions.findIndex((o) => o.value === themePreference.value)
+  return index >= 0 ? index : 0
+})
+
 const testingAi = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
 const indexStatus = ref<IndexRepairStatus | null>(null)
@@ -101,25 +129,36 @@ let maintenanceTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const currentSection = computed(() => sections.find((section) => section.id === activeSection.value) ?? sections[0])
 const maintenanceRunning = computed(() => Boolean(indexStatus.value?.running || ocrStatus.value?.running))
-const formSnapshot = computed(() => JSON.stringify({
-  screenshotHotkey: screenshotHotkey.value,
-  captureLimitWindowSeconds: captureLimitWindowSeconds.value,
-  clusterThreshold: clusterThreshold.value,
-  maxCaptures: maxCaptures.value,
-  clusterMode: clusterMode.value,
-  clusterAutoSubmit: clusterAutoSubmit.value,
-  clusterMaxImages: clusterMaxImages.value,
-  clusterTimeout: clusterTimeout.value,
-  aiApiKey: aiApiKey.value,
-  aiBaseUrl: aiBaseUrl.value,
-  aiModel: aiModel.value,
-  aiTimeout: aiTimeout.value,
-  themePreference: themePreference.value,
-  language: language.value,
-  closeAction: closeAction.value,
-  updateChannel: updateChannel.value,
+const ordinarySettings = computed(() => ({
+  hotkeys: { screenshot: screenshotHotkey.value },
+  screenshot: {
+    capture_limit_window_seconds: captureLimitWindowSeconds.value,
+    cluster_threshold: clusterThreshold.value,
+    max_captures_per_window: maxCaptures.value,
+  },
+  cluster: {
+    cluster_mode: clusterMode.value,
+    cluster_auto_submit: clusterAutoSubmit.value,
+    cluster_max_images: clusterMaxImages.value,
+    cluster_timeout: clusterTimeout.value,
+  },
+  ui: {
+    theme: themePreference.value,
+    language: language.value,
+    close_action: closeAction.value,
+    update_channel: updateChannel.value,
+  },
 }))
+const aiSettings = computed(() => ({
+  api_key: aiApiKey.value,
+  base_url: aiBaseUrl.value,
+  model: aiModel.value,
+  timeout: aiTimeout.value,
+}))
+const formSnapshot = computed(() => JSON.stringify(ordinarySettings.value))
+const aiSnapshot = computed(() => JSON.stringify(aiSettings.value))
 const dirty = computed(() => Boolean(savedSnapshot.value && formSnapshot.value !== savedSnapshot.value))
+const aiDirty = computed(() => Boolean(savedAiSnapshot.value && aiSnapshot.value !== savedAiSnapshot.value))
 const ocrSucceeded = computed(() =>
   ocrStatus.value?.result?.succeeded ?? ocrStatus.value?.result?.updated ?? 0,
 )
@@ -225,6 +264,7 @@ const populateForm = () => {
   updateChannel.value = settings.ui?.update_channel === 'preview' ? 'preview' : 'stable'
   availableUpdate.value = null
   savedSnapshot.value = formSnapshot.value
+  savedAiSnapshot.value = aiSnapshot.value
 }
 
 const loadSettings = async () => {
@@ -249,48 +289,54 @@ const scheduleMaintenancePoll = () => {
   }, 1500)
 }
 
-const handleSave = async () => {
-  const current = settingsStore.settings
-  if (!current || saving.value) return
-  saving.value = true
-  try {
-    const ai = {
-      ...current.ai,
-      api_key: aiApiKey.value.trim(),
-      base_url: aiBaseUrl.value.trim(),
-      model: aiModel.value.trim(),
-      timeout: aiTimeout.value,
+// Acknowledge only the submitted snapshot; never overwrite newer edits or AI drafts.
+const flushAutoSave = (): Promise<boolean> => {
+  if (autoSavePromise) return autoSavePromise
+  if (loading.value || resetting.value || !dirty.value) return Promise.resolve(!dirty.value)
+  autoSaveError.value = false
+  autoSavePromise = enqueueWrite(async () => {
+    while (dirty.value && !resetting.value) {
+      const snapshot = formSnapshot.value
+      const payload = JSON.parse(snapshot) as typeof ordinarySettings.value
+      try {
+        await settingsStore.update(payload)
+        savedSnapshot.value = snapshot
+        applyThemePreference(payload.ui.theme)
+        setLanguagePreference(payload.ui.language)
+      } catch (error) {
+        logger.error('Failed to auto-save settings: %s', error)
+        autoSaveError.value = true
+        notifications.show(t('settings.saveFailed'), 'error', 2800)
+        return false
+      }
     }
-    await settingsStore.update({
-      hotkeys: { ...current.hotkeys, screenshot: screenshotHotkey.value },
-      screenshot: {
-        ...current.screenshot,
-        capture_limit_window_seconds: captureLimitWindowSeconds.value,
-        cluster_threshold: clusterThreshold.value,
-        max_captures_per_window: maxCaptures.value,
-      },
-      ai,
-      ui: {
-        ...current.ui,
-        theme: themePreference.value,
-        language: language.value,
-        close_action: closeAction.value,
-        update_channel: updateChannel.value,
-      },
-      cluster: {
-        ...current.cluster,
-        cluster_mode: clusterMode.value,
-        cluster_auto_submit: clusterAutoSubmit.value,
-        cluster_max_images: clusterMaxImages.value,
-        cluster_timeout: clusterTimeout.value,
-      },
-    })
-    populateForm()
-    applyThemePreference(themePreference.value)
-    setLanguagePreference(language.value)
+    return !dirty.value
+  }).finally(() => { autoSavePromise = null })
+  return autoSavePromise
+}
+
+watch(formSnapshot, () => {
+  if (!loading.value && !resetting.value) void flushAutoSave()
+})
+
+const handleSaveAi = async () => {
+  if (saving.value || resetting.value || !aiDirty.value) return
+  const snapshot = aiSnapshot.value
+  const draft = { ...aiSettings.value }
+  saving.value = true
+  aiSaveError.value = false
+  try {
+    await enqueueWrite(() => settingsStore.update({ ai: {
+      ...draft,
+      api_key: draft.api_key.trim(),
+      base_url: draft.base_url.trim(),
+      model: draft.model.trim(),
+    } }))
+    savedAiSnapshot.value = snapshot
     notifications.show(t('settings.saved'), 'success', 1800)
   } catch (error) {
-    logger.error('Failed to save settings: %s', error)
+    logger.error('Failed to save AI settings: %s', error)
+    aiSaveError.value = true
     notifications.show(t('settings.saveFailed'), 'error', 2800)
   } finally {
     saving.value = false
@@ -377,12 +423,17 @@ const confirmationCopy = computed(() => {
 
 const runConfirmedAction = async () => {
   const action = confirmAction.value
-  if (!action) return
+  if (!action || confirmBusy.value) return
   confirmBusy.value = true
+  if (action === 'reset') resetting.value = true
   try {
     if (action === 'reset') {
-      await settingsStore.reset()
-      populateForm()
+      await enqueueWrite(async () => {
+        await settingsStore.reset()
+        populateForm()
+        autoSaveError.value = false
+        aiSaveError.value = false
+      })
       applyThemePreference(themePreference.value)
       setLanguagePreference(language.value)
       notifications.show(t('settings.resetDone'), 'success', 1800)
@@ -405,19 +456,28 @@ const runConfirmedAction = async () => {
     )
   } finally {
     confirmBusy.value = false
+    resetting.value = false
   }
 }
 
 const resolveDiscard = (confirmed: boolean) => {
   discardDialogOpen.value = false
-  if (confirmed) populateForm()
+  if (confirmed) {
+    const saved = JSON.parse(savedAiSnapshot.value) as typeof aiSettings.value
+    aiApiKey.value = saved.api_key
+    aiBaseUrl.value = saved.base_url
+    aiModel.value = saved.model
+    aiTimeout.value = saved.timeout
+  }
   discardResolver?.(confirmed)
   discardResolver = null
   pendingDiscardPromise = null
 }
 
 const canLeave = async () => {
-  if (!dirty.value) return true
+  await writeQueue
+  if (!await flushAutoSave()) return false
+  if (!aiDirty.value) return true
   if (pendingDiscardPromise) return pendingDiscardPromise
   discardDialogOpen.value = true
   pendingDiscardPromise = new Promise<boolean>((resolve) => {
@@ -451,7 +511,7 @@ onUnmounted(() => {
 
 <template>
   <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-4 sm:p-5">
-    <div class="mx-auto flex h-full min-h-0 max-w-[1420px] flex-col">
+    <div class="mx-auto flex h-full min-h-0 w-full max-w-[1020px] flex-col">
       <header class="mb-4 flex-none">
         <h1 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('settings.title') }}</h1>
       </header>
@@ -462,29 +522,39 @@ onUnmounted(() => {
 
       <div v-else class="settings-layout min-h-0 flex-1">
         <nav class="settings-nav min-h-0 overflow-y-auto" :aria-label="t('settings.sectionNavigation')">
-          <button
-            v-for="section in sections"
-            :key="section.id"
-            type="button"
-            class="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition"
-            :class="activeSection === section.id
-              ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
-              : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
-            :aria-current="activeSection === section.id ? 'page' : undefined"
-            @click="activeSection = section.id"
-          >
-            <component :is="section.icon" class="h-5 w-5 flex-none" aria-hidden="true" />
-            {{ t(section.labelKey) }}
-          </button>
+          <div v-for="group in sectionGroups" :key="group.labelKey" class="settings-nav__group flex flex-col">
+            <h3 class="px-3 pb-0.5 pt-1 text-xs font-medium text-[var(--shell-muted)]">{{ t(group.labelKey) }}</h3>
+            <button
+              v-for="section in group.sections"
+              :key="section.id"
+              type="button"
+              class="flex min-h-8 w-full items-center gap-2.5 rounded-lg px-3 py-1 text-left text-sm font-medium transition"
+              :class="activeSection === section.id
+                ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
+                : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
+              :aria-current="activeSection === section.id ? 'page' : undefined"
+              @click="activeSection = section.id"
+            >
+              <component :is="section.icon" class="h-4 w-4 flex-none" aria-hidden="true" />
+              {{ t(section.labelKey) }}
+            </button>
+          </div>
         </nav>
 
         <section class="settings-content min-h-0">
-          <header class="flex-none border-b border-[var(--shell-line)] px-5 py-3 sm:px-6">
-            <h2 class="text-base font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t(currentSection.labelKey) }}</h2>
-            <p class="mt-1 text-sm text-[var(--shell-muted)]">{{ t(currentSection.descriptionKey) }}</p>
+          <header class="settings-content__header flex-none">
+            <div class="settings-content__header-inner">
+              <h2 class="text-base font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t(currentSection.labelKey) }}</h2>
+              <p class="mt-1 text-sm text-[var(--shell-muted)]">{{ t(currentSection.descriptionKey) }}</p>
+              <div v-if="autoSaveError" class="mt-1 flex items-center gap-2 text-xs text-red-600" role="status" aria-live="polite">
+                <span>{{ t('settings.saveFailed') }}</span>
+                <button type="button" class="underline" :disabled="resetting" @click="flushAutoSave">{{ t('settings.retrySave') }}</button>
+              </div>
+            </div>
+            <div class="settings-content__header-divider"></div>
           </header>
 
-          <div class="settings-content__body min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+          <div :inert="resetting || discardDialogOpen" class="settings-content__body min-h-0 flex-1 space-y-4 overflow-y-auto px-7 py-5">
             <template v-if="activeSection === 'hotkeys'">
               <div class="setting-row">
                 <div>
@@ -493,8 +563,8 @@ onUnmounted(() => {
                 </div>
                 <button
                   type="button"
-                  class="setting-input flex min-h-10 items-center justify-between text-left"
-                  :class="{ 'border-[var(--color-primary)] ring-2 ring-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]': recordingHotkey }"
+                  class="setting-input flex min-h-[1.875rem] items-center justify-between text-left"
+                  :class="{ 'setting-input--recording': recordingHotkey }"
                   @click="recordingHotkey = true"
                   @keydown="recordHotkey"
                 >
@@ -556,11 +626,11 @@ onUnmounted(() => {
                   <label for="ai-api-key" class="setting-label">API Key</label>
                   <p class="setting-help">{{ t('settings.localOnly') }}</p>
                 </div>
-                <div class="relative">
+                <div class="relative w-full max-w-[320px]">
                   <input
                     id="ai-api-key"
                     v-model="aiApiKey"
-                    class="setting-input pr-12"
+                    class="setting-input w-full pr-12"
                     :type="showApiKey ? 'text' : 'password'"
                     autocomplete="off"
                   />
@@ -600,10 +670,12 @@ onUnmounted(() => {
 
               <div class="flex flex-wrap items-center gap-3">
                 <button type="button" class="btn-secondary" :disabled="testingAi" @click="testAi">
-                  <ArrowPathIcon v-if="testingAi" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
-                  <ServerStackIcon v-else class="h-4 w-4 flex-none" aria-hidden="true" />
                   {{ testingAi ? t('settings.testing') : t('settings.test') }}
                 </button>
+                <button type="button" class="btn-primary" data-testid="save-ai" :disabled="saving || !aiDirty || resetting" :aria-busy="saving" @click="handleSaveAi">
+                  {{ saving ? t('settings.saving') : t('action.save') }}
+                </button>
+                <span v-if="aiSaveError" role="alert" class="text-sm text-red-600">{{ t('settings.saveFailed') }}</span>
                 <p
                   v-if="aiTestResult"
                   class="flex items-center gap-2 text-sm"
@@ -629,24 +701,29 @@ onUnmounted(() => {
             </template>
 
             <template v-else-if="activeSection === 'ui'">
-              <fieldset>
-                <legend class="setting-label">{{ t('settings.theme') }}</legend>
-                <div class="mt-2.5 grid grid-cols-3 gap-2.5">
-                  <label
-                    v-for="option in [
-                      { value: 'light', label: t('settings.themeLight') },
-                      { value: 'dark', label: t('settings.themeDark') },
-                      { value: 'system', label: t('settings.themeSystem') },
-                    ]"
+              <div class="setting-row">
+                <span class="setting-label">{{ t('settings.theme') }}</span>
+                <div class="theme-switcher inline-grid grid-flow-col auto-cols-fr items-center" role="radiogroup" :aria-label="t('settings.theme')">
+                  <span
+                    class="theme-switcher__thumb"
+                    :style="{ transform: `translateX(calc(${activeThemeIndex} * (100% + var(--theme-segment-inset))))` }"
+                    aria-hidden="true"
+                  ></span>
+                  <button
+                    v-for="option in themeOptions"
                     :key="option.value"
-                    class="cursor-pointer rounded-lg border p-2.5 text-center text-sm font-medium transition"
-                    :class="themePreference === option.value ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]' : 'border-[var(--shell-line)]'"
+                    type="button"
+                    class="theme-switcher__button text-xs"
+                    :class="themePreference === option.value
+                      ? 'text-[var(--shell-ink)] font-semibold'
+                      : 'text-[var(--shell-muted)] font-medium hover:text-[var(--shell-ink)]'"
+                    :aria-pressed="themePreference === option.value"
+                    @click="themePreference = option.value"
                   >
-                    <input v-model="themePreference" class="sr-only" type="radio" :value="option.value" />
-                    {{ option.label }}
-                  </label>
+                    {{ t(option.labelKey) }}
+                  </button>
                 </div>
-              </fieldset>
+              </div>
               <div class="setting-row">
                 <label id="settings-language-label" for="settings-language" class="setting-label">{{ t('settings.language') }}</label>
                 <AppSelect
@@ -698,7 +775,6 @@ onUnmounted(() => {
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                   <button type="button" class="btn-secondary" :disabled="!isDesktopShell() || checkingUpdate || installingUpdate" @click="checkForUpdate">
-                    <ArrowPathIcon class="h-4 w-4 flex-none" :class="{ 'animate-spin': checkingUpdate }" aria-hidden="true" />
                     {{ checkingUpdate ? t('settings.updateChecking') : t('settings.updateCheck') }}
                   </button>
                   <p v-if="installingUpdate" role="status" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateInstalling') }}</p>
@@ -707,7 +783,6 @@ onUnmounted(() => {
                   <p class="setting-label">{{ t('settings.updateAvailable', { version: availableUpdate.version }) }}</p>
                   <p v-if="availableUpdate.notes" class="mt-2 whitespace-pre-wrap text-sm text-[var(--shell-muted)]">{{ availableUpdate.notes }}</p>
                   <button type="button" class="btn-primary mt-3" :disabled="installingUpdate || checkingUpdate" @click="installUpdate">
-                    <ArrowDownTrayIcon class="h-4 w-4 flex-none" aria-hidden="true" />
                     {{ t('settings.updateInstall') }}
                   </button>
                 </div>
@@ -742,7 +817,6 @@ onUnmounted(() => {
                     :disabled="maintenanceRunning"
                     @click="openConfirmation('index')"
                   >
-                    <ArrowPathIcon class="h-4 w-4 flex-none" :class="{ 'animate-spin': indexStatus?.running }" aria-hidden="true" />
                     {{ indexStatus?.running ? t('settings.repairingIndex') : t('settings.repairIndex') }}
                   </button>
                 </div>
@@ -775,7 +849,6 @@ onUnmounted(() => {
                     :disabled="maintenanceRunning"
                     @click="openConfirmation('ocr')"
                   >
-                    <ArrowPathIcon class="h-4 w-4 flex-none" :class="{ 'animate-spin': ocrStatus?.running }" aria-hidden="true" />
                     {{ ocrStatus?.running ? t('settings.backfillingOcr') : t('settings.startBackfill') }}
                   </button>
                 </div>
@@ -783,24 +856,16 @@ onUnmounted(() => {
             </template>
           </div>
 
-          <footer class="flex flex-none flex-wrap items-center justify-between gap-2.5 border-t border-[var(--shell-line)] px-5 py-2.5 sm:px-6">
-            <button type="button" class="btn-ghost-danger" @click="openConfirmation('reset')">
+          <div class="settings-content__footer flex-none px-7 py-3">
+            <button
+              type="button"
+              class="settings-reset-link text-xs text-[var(--shell-muted)] hover:text-red-600 transition"
+              :disabled="resetting"
+              @click="openConfirmation('reset')"
+            >
               {{ t('action.reset') }}
             </button>
-            <div class="flex gap-2.5">
-              <button type="button" class="btn-secondary px-4" @click="router.push('/')">{{ t('action.cancel') }}</button>
-              <button
-                type="button"
-                class="btn-primary px-4"
-                :disabled="saving || !dirty"
-                :aria-busy="saving"
-                @click="handleSave"
-              >
-                <ArrowPathIcon v-if="saving" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
-                {{ saving ? t('settings.saving') : t('settings.saveChanges') }}
-              </button>
-            </div>
-          </footer>
+          </div>
         </section>
       </div>
     </div>
