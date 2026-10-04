@@ -83,6 +83,18 @@ const activeSourceIndex = computed(() =>
   Math.max(0, sources.findIndex((item) => item.value === source.value)),
 )
 
+// 滑动时长随路径长短变化：基础 200ms + 每格 100ms——相邻切换 0.3s、最远跨两格 0.4s。
+// 滑块位移与段按钮颜色共用同一时长，文字在滑块抵达时恰好完成变色。
+const SLIDE_BASE_MS = 100
+const SLIDE_MS_PER_STEP = 100
+const slideDurationMs = ref(SLIDE_BASE_MS + SLIDE_MS_PER_STEP)
+let previousSourceIndex = activeSourceIndex.value
+watch(activeSourceIndex, (next) => {
+  slideDurationMs.value =
+    SLIDE_BASE_MS + Math.max(1, Math.abs(next - previousSourceIndex)) * SLIDE_MS_PER_STEP
+  previousSourceIndex = next
+})
+
 let debounceTimer: ReturnType<typeof window.setTimeout> | null = null
 let composing = false
 let clearImmediately = false
@@ -282,6 +294,7 @@ defineExpose({ focus, clear })
           class="search-toolbar__control search-toolbar__source-switcher inline-grid h-8 grid-flow-col auto-cols-fr items-center"
           role="group"
           :aria-label="t('search.sourceLabel')"
+          :style="{ '--segment-slide-duration': `${slideDurationMs}ms` }"
         >
           <span
             class="search-toolbar__source-thumb"
@@ -292,15 +305,32 @@ defineExpose({ focus, clear })
             v-for="item in sources"
             :key="item.value"
             type="button"
-            class="search-toolbar__source-button h-7 min-h-0 px-2.5 text-[13px] font-medium"
-            :class="source === item.value
-              ? 'text-[var(--color-on-primary)]'
-              : 'text-[var(--shell-ink)] hover:text-[var(--color-primary)]'"
+            class="search-toolbar__source-button h-7 min-h-0 px-2.5 text-[13px] font-medium text-[var(--shell-ink)] hover:text-[var(--color-primary)]"
             :aria-pressed="source === item.value"
             @click="source = item.value"
           >
             {{ t(item.labelKey) }}
           </button>
+          <!-- 遮罩窗与滑块同几何、同平移：窗口内露出白色文字副本（反向平移保持与底层
+               逐像素对齐），滑动中文字随窗口边缘变色，全部为合成器 transform 动画 -->
+          <span
+            class="search-toolbar__source-ink"
+            :style="{ transform: `translateX(calc(${activeSourceIndex} * (100% + var(--search-toolbar-segment-inset))))` }"
+            aria-hidden="true"
+          >
+            <span
+              class="search-toolbar__source-ink-row"
+              :style="{ transform: `translateX(calc(${-activeSourceIndex} * ((100% + var(--search-toolbar-segment-inset)) / 3)))` }"
+            >
+              <span
+                v-for="item in sources"
+                :key="item.value"
+                class="search-toolbar__source-ink-label"
+              >
+                {{ t(item.labelKey) }}
+              </span>
+            </span>
+          </span>
         </div>
 
         <div class="search-toolbar__actions flex shrink-0 items-center gap-2.5">
@@ -472,12 +502,17 @@ defineExpose({ focus, clear })
   --search-toolbar-segment-inset: 2px;
   --search-toolbar-segment-radius: max(
     1px,
-    calc(var(--radius-md) - var(--search-toolbar-segment-inset))
+    calc(var(--search-toolbar-control-radius) - var(--search-toolbar-segment-inset))
   );
   --search-toolbar-detail-radius: var(--search-toolbar-control-radius);
   --search-toolbar-surface-shadow:
     0 1px 2px rgba(26, 38, 64, 0.05),
     0 6px 16px rgba(26, 38, 64, 0.08);
+  /* 浮条下方模糊尾巴的长度：模糊在下缘之外继续向下渐变这么远 */
+  --search-toolbar-blur-tail: 2rem;
+  /* 分段器滑动缓动：easeOutCubic——起步平缓、逐帧位移均匀递减，收尾柔和。
+     更陡的 easeOut 曲线（如 easeOutQuint）会把大部分位移压在开头几帧，产生跳跃感 */
+  --segment-slide-easing: cubic-bezier(0.33, 1, 0.68, 1);
 
   position: sticky;
   z-index: var(--z-sticky);
@@ -488,16 +523,27 @@ defineExpose({ focus, clear })
 }
 
 /* 浮条滚动遮罩只做磨砂不做提亮：内容从卡下滑过时仅模糊、不叠加白色，
-   白色渐变遮罩已按设计决策移除。 */
+   白色渐变遮罩已按设计决策移除。模糊带向下延伸出浮条下缘一段距离再淡出，
+   下边界不再骤然截断；停靠点用长度表达，浮条高度变化（紧凑换行）时依然对齐。 */
 .search-toolbar::after {
   position: absolute;
   z-index: 0;
-  inset: 0 0 -0.75rem;
+  inset: 0 0 calc(-1 * var(--search-toolbar-blur-tail));
   pointer-events: none;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 72%) 46%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 72%) 46%, transparent 100%);
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    rgb(0 0 0 / 72%) calc(100% - var(--search-toolbar-blur-tail) - 0.75rem),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    rgb(0 0 0 / 72%) calc(100% - var(--search-toolbar-blur-tail) - 0.75rem),
+    transparent 100%
+  );
   content: '';
 }
 
@@ -519,19 +565,17 @@ defineExpose({ focus, clear })
 }
 
 /* 搜索模式三段式是工具条里的强调控件：仅此组件保留凹槽拟物（subtle 底 + 内阴影），
-   激活段用深主色保证醒目；圆角沿用记忆墙排版切换器的 md 体系。
-   用复合选择器压过下方 .search-toolbar__control 的统一圆角 */
+   激活段用深主色保证醒目；圆角与同排一级控件统一（control 档），内层按同心公式内缩。 */
 .search-toolbar__control.search-toolbar__source-switcher {
   position: relative;
   width: 12.25rem;
   gap: var(--search-toolbar-segment-inset);
   padding: var(--search-toolbar-segment-inset);
-  border-radius: var(--radius-md);
   background: var(--color-surface-subtle);
   box-shadow: inset 0 1px 2px rgba(26, 38, 64, 0.1);
 }
 
-/* 激活底色做成独立滑块，切换时在凹槽内线性平移 */
+/* 激活底色做成独立滑块，切换时在凹槽内平移；时长随路径长短由脚本给出 */
 .search-toolbar__source-thumb {
   position: absolute;
   top: var(--search-toolbar-segment-inset);
@@ -542,12 +586,50 @@ defineExpose({ focus, clear })
   background: var(--color-primary);
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 5%);
   will-change: transform;
-  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--segment-slide-duration, 300ms) var(--segment-slide-easing);
+}
+
+/* 遮罩窗：与滑块同几何同平移，窗口内是白色文字副本；副本反向平移抵消窗口位移，
+   与底层文字逐像素对齐。滑动中窗口边缘扫过字母，文字随滑块即时光色。 */
+.search-toolbar__source-ink {
+  position: absolute;
+  top: var(--search-toolbar-segment-inset);
+  bottom: var(--search-toolbar-segment-inset);
+  left: var(--search-toolbar-segment-inset);
+  width: calc((100% - var(--search-toolbar-segment-inset) * 4) / 3);
+  overflow: hidden;
+  border-radius: var(--search-toolbar-segment-radius);
+  pointer-events: none;
+  will-change: transform;
+  transition: transform var(--segment-slide-duration, 300ms) var(--segment-slide-easing);
+}
+
+.search-toolbar__source-ink-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--search-toolbar-segment-inset);
+  width: calc(300% + var(--search-toolbar-segment-inset) * 2);
+  height: 100%;
+  will-change: transform;
+  transition: transform var(--segment-slide-duration, 300ms) var(--segment-slide-easing);
+}
+
+.search-toolbar__source-ink-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.625rem;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--color-on-primary);
 }
 
 .search-toolbar__source-button {
   position: relative;
-  transition: color 240ms cubic-bezier(0.4, 0, 0.2, 1), background-color 240ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .search-toolbar__source-button:focus-visible {
@@ -557,7 +639,8 @@ defineExpose({ focus, clear })
 
 @media (prefers-reduced-motion: reduce) {
   .search-toolbar__source-thumb,
-  .search-toolbar__source-button {
+  .search-toolbar__source-ink,
+  .search-toolbar__source-ink-row {
     transition: none;
   }
 }
