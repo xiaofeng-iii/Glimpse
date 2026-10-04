@@ -28,6 +28,8 @@ const props = defineProps<{
   addingMemory?: boolean
   addMemoryDisabled?: boolean
   filters?: MemoryFilters
+  /** 列数上限：未显示右侧装饰板前封顶三列，宽度先攒着（由调用方传入）。 */
+  maxColumns?: number
 }>()
 
 const emit = defineEmits<{
@@ -120,6 +122,29 @@ const updateStickyFilter = () => {
   compactFilter.value = scrollContainer.scrollTop > 0
 }
 
+// 墙内容块整体居中：按容器可用宽度求出实际列数（受 maxColumns 封顶），把
+// 内容块宽度写入 --wall-content-width，供样式把分组标题、网格与骨架屏一起居中。
+const CARD_WIDTH_PX = 239
+const CARD_GAP_PX = 12
+let paneResizeObserver: ResizeObserver | null = null
+
+const updateContentWidth = () => {
+  const wallElement = wall.value
+  if (!wallElement || !scrollContainer) return
+  const inset = Number.parseFloat(
+    getComputedStyle(wallElement).getPropertyValue('--memory-wall-inline-inset'),
+  ) || 16
+  const available = scrollContainer.clientWidth - inset * 2
+  const fit = Math.max(1, Math.floor((available + CARD_GAP_PX) / (CARD_WIDTH_PX + CARD_GAP_PX)))
+  const columns = props.maxColumns ? Math.min(fit, props.maxColumns) : fit
+  wallElement.style.setProperty(
+    '--wall-content-width',
+    `${columns * CARD_WIDTH_PX + (columns - 1) * CARD_GAP_PX}px`,
+  )
+}
+
+watch(() => props.maxColumns, () => void nextTick(updateContentWidth))
+
 onMounted(() => {
   scrollContainer = wall.value?.closest<HTMLElement>('.home-memory-pane') ?? null
   if (!scrollContainer) return
@@ -130,12 +155,20 @@ onMounted(() => {
     toolbarResizeObserver = new ResizeObserver(updateStickyFilter)
     toolbarResizeObserver.observe(toolbar)
   }
-  void nextTick(updateStickyFilter)
+  if ('ResizeObserver' in window) {
+    paneResizeObserver = new ResizeObserver(updateContentWidth)
+    paneResizeObserver.observe(scrollContainer)
+  }
+  void nextTick(() => {
+    updateStickyFilter()
+    updateContentWidth()
+  })
 })
 
 onUnmounted(() => {
   scrollContainer?.removeEventListener('scroll', updateStickyFilter)
   toolbarResizeObserver?.disconnect()
+  paneResizeObserver?.disconnect()
 })
 const groups = computed<MemoryGroup[]>(() => {
   void languagePreference.value
@@ -285,7 +318,11 @@ const groups = computed<MemoryGroup[]>(() => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.375rem var(--memory-wall-inline-inset) 0.25rem;
+  /* 内容按与卡片块相同的居中轴内缩，全宽背板保留；宽度不足时退回最小内衬。 */
+  padding: 0.375rem max(
+    var(--memory-wall-inline-inset),
+    calc((100% - var(--wall-content-width, 100%)) / 2)
+  ) 0.25rem;
   background: var(--shell-window-bg);
 }
 
@@ -313,9 +350,15 @@ const groups = computed<MemoryGroup[]>(() => {
 .memory-wall__header::after {
   content: '';
   position: absolute;
-  right: var(--memory-wall-inline-inset);
+  right: max(
+    var(--memory-wall-inline-inset),
+    calc((100% - var(--wall-content-width, 100%)) / 2)
+  );
   bottom: 0;
-  left: var(--memory-wall-inline-inset);
+  left: max(
+    var(--memory-wall-inline-inset),
+    calc((100% - var(--wall-content-width, 100%)) / 2)
+  );
   height: 1px;
   background: color-mix(in srgb, var(--shell-line) 72%, transparent);
   transition: opacity 160ms ease;
@@ -328,6 +371,14 @@ const groups = computed<MemoryGroup[]>(() => {
 .memory-wall-scroll {
   position: relative;
   padding-inline: var(--memory-wall-inline-inset);
+}
+
+/* 内容块整体居中：宽度 = 实际列数宽（--wall-content-width 由脚本按容器实测给出），
+   分组标题与网格一起随动，标题与卡片的左基准线保持对齐。 */
+.memory-wall__results > section,
+.memory-wall__skeleton-grid {
+  width: min(100%, var(--wall-content-width, 100%));
+  margin-inline: auto;
 }
 
 /* 搜索加载期：旧内容降透明提示“检索中”，布局保持稳定不跳动。 */
@@ -350,8 +401,14 @@ const groups = computed<MemoryGroup[]>(() => {
 
 .wall-cross-leave-active {
   position: absolute;
-  left: var(--memory-wall-inline-inset);
-  right: var(--memory-wall-inline-inset);
+  left: max(
+    var(--memory-wall-inline-inset),
+    calc((100% - var(--wall-content-width, 100%)) / 2)
+  );
+  right: max(
+    var(--memory-wall-inline-inset),
+    calc((100% - var(--wall-content-width, 100%)) / 2)
+  );
 }
 
 /* 延迟骨架：超过阈值才淡入，快路径搜索完全不可见（进出场由 wall-cross 驱动）。 */

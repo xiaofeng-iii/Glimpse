@@ -466,10 +466,7 @@ onUnmounted(() => {
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
       <div
         class="home-memory-pane min-w-0 flex-1 overflow-y-auto"
-        :class="{
-          'is-scrolling': paneScrollbarActive,
-          'home-memory-pane--wall-capped': !wideLayout,
-        }"
+        :class="{ 'is-scrolling': paneScrollbarActive }"
         @scroll.passive="markPaneScrollbarActive"
       >
         <SearchToolbar
@@ -507,6 +504,7 @@ onUnmounted(() => {
           :adding-memory="isAddingTextMemory"
           :add-memory-disabled="!backendStatus.isReady"
           :filters="memoriesStore.activeFilters"
+          :max-columns="wideLayout ? undefined : 3"
           @select="handleSelectMemory"
           @open="handleOpenMemory"
           @contextmenu="openContextMenu"
@@ -588,13 +586,6 @@ onUnmounted(() => {
   scrollbar-gutter: stable;
   container-name: memory-pane;
   container-type: inline-size;
-}
-
-/* 装饰板出现前（宽度 < 1180px）墙列数封顶三列：宽度先攒着，等够
-   「三列 + 装饰板」时整体切换，避免「四列满宽 → 三列 + 装饰板」的回退跳动。
-   装饰板出现后该限宽移除，随宽度正常增列。 */
-.home-memory-pane--wall-capped :deep(.memory-grid) {
-  max-width: calc(3 * 239px + 2 * 12px);
 }
 
 /* 记忆墙滚动条仅在滚动进行时浮现，停止约 0.8 秒后隐回：常驻拇指会在记忆墙与

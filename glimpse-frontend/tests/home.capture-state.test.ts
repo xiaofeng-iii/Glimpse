@@ -253,17 +253,17 @@ describe('Home capture state wiring', () => {
     await flushPromises()
     expect(memoriesStore.selectedId).toBe('memory-1')
 
-    // 关闭后：1024px（窄于 docked 边界 1180）不渲染装饰板，墙满宽且列数封顶三列
+    // 关闭后：1024px（窄于 docked 边界 1180）不渲染装饰板，墙列数封顶三列
     memoriesStore.select(null)
     await flushPromises()
     expect(document.querySelector('.inspector-panel--decor')).toBeNull()
-    expect(wrapper.get('.home-memory-pane').classes()).toContain('home-memory-pane--wall-capped')
+    expect(wrapper.findComponent({ name: 'MemoryWall' }).attributes('max-columns')).toBe('3')
 
     // 宽度到达 docked 边界（≥1180px）时关闭侧栏，槽位渲染装饰面板，封顶解除
     vi.stubGlobal('innerWidth', 1280)
     window.dispatchEvent(new Event('resize'))
     await flushPromises()
-    expect(wrapper.get('.home-memory-pane').classes()).not.toContain('home-memory-pane--wall-capped')
+    expect(wrapper.findComponent({ name: 'MemoryWall' }).attributes('max-columns')).toBeUndefined()
     memoriesStore.select(memory as never)
     await flushPromises()
     memoriesStore.select(null)
