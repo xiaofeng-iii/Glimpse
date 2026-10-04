@@ -2,7 +2,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   ArrowPathIcon,
-  CheckCircleIcon,
   ExclamationTriangleIcon,
   PencilSquareIcon,
 } from '@heroicons/vue/24/outline'
@@ -10,6 +9,7 @@ import type { Memory } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
+import { useDevStateStore } from '@/stores/devState'
 import { t, type MessageKey } from '@/utils/i18n'
 import { hasUserNote, isTextMemory } from '@/utils/memory-types'
 import ConfirmDialog from './ConfirmDialog.vue'
@@ -28,6 +28,7 @@ const emit = defineEmits<{
 const memoriesStore = useMemoriesStore()
 const notifications = useNotificationStore()
 const unsavedChanges = useUnsavedChangesStore()
+const devState = useDevStateStore()
 const editing = ref(false)
 const draft = ref(
   hasUserNote(props.memory) ? (props.memory.user_text ?? '') : props.memory.ai_summary,
@@ -41,6 +42,10 @@ const compactHeight = ref(80)
 const compactOverflowing = ref(false)
 const textMemory = computed(() => isTextMemory(props.memory))
 const noteMode = computed(() => hasUserNote(props.memory))
+// DEV 状态覆盖只影响同步状态展示；编辑与保存仍走原始 memory。
+const displaySyncStatus = computed(() =>
+  import.meta.env.DEV ? devState.applyOverride(props.memory).sync_status : props.memory.sync_status,
+)
 // 展示与编辑的文本字段：带用户说明的记忆编辑 user_text（AI 摘要仅作检索资源，不展示）；
 // 文案与纯文本记忆统一为“记忆内容”。其余记忆与旧行为一致，编辑 ai_summary。
 const fieldText = computed(() =>
@@ -337,23 +342,18 @@ defineExpose({
       </div>
     </div>
 
+    <!-- 一切正常时不打扰：只有索引尚未同步或同步失败才显示状态行。 -->
     <div
+      v-if="displaySyncStatus === 'PENDING' || displaySyncStatus === 'FAILED'"
       class="mt-3 flex min-h-5 items-center gap-2 text-xs"
-      :class="memory.sync_status === 'FAILED'
-        ? 'text-red-600'
-        : memory.sync_status === 'PENDING'
-          ? 'text-amber-600'
-          : 'text-emerald-600'"
+      :class="displaySyncStatus === 'FAILED' ? 'text-red-600' : 'text-amber-600'"
     >
-      <ExclamationTriangleIcon v-if="memory.sync_status === 'FAILED'" class="h-4 w-4 flex-none" aria-hidden="true" />
-      <ArrowPathIcon v-else-if="memory.sync_status === 'PENDING'" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
-      <CheckCircleIcon v-else class="h-4 w-4 flex-none" aria-hidden="true" />
+      <ExclamationTriangleIcon v-if="displaySyncStatus === 'FAILED'" class="h-4 w-4 flex-none" aria-hidden="true" />
+      <ArrowPathIcon v-else class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
       {{
-        memory.sync_status === 'FAILED'
+        displaySyncStatus === 'FAILED'
           ? editorText('indexFailed')
-          : memory.sync_status === 'PENDING'
-            ? editorText('indexPending')
-            : editorText('indexSynced')
+          : editorText('indexPending')
       }}
     </div>
 

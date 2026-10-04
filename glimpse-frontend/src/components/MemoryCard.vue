@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { PhotoIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/vue/20/solid'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
 import { getMatchSourceKinds } from '@/utils/match-sources'
-import { getMemoryDisplayText, isTextMemory } from '@/utils/memory-types'
+import { getMemoryDisplayText, hasUserNote, isTextMemory } from '@/utils/memory-types'
 import type { CardTimeDisplay } from '@/utils/memory-grouping'
 import { languagePreference, t } from '@/utils/i18n'
+import { useDevStateStore } from '@/stores/devState'
 import MemoryAnalysisState from './MemoryAnalysisState.vue'
 
 const props = defineProps<{
@@ -25,13 +27,21 @@ const emit = defineEmits<{
 
 const imageFailed = ref(false)
 const isDev = import.meta.env.DEV
+const devState = useDevStateStore()
+// DEV 状态覆盖只影响展示判定；交互与数据仍走原始 memory。
+const effectiveMemory = computed(() =>
+  isDev ? devState.applyOverride(props.memory) : props.memory,
+)
 const imageUrl = computed(() => getMemoryImageUrls(props.memory)[0] ?? '')
 const textMemory = computed(() => isTextMemory(props.memory))
 const displayText = computed(() => getMemoryDisplayText(props.memory))
 const matchSourceKinds = computed(() => getMatchSourceKinds(props.memory.match_sources))
-const analysisStatus = computed(() => props.memory.analysis_status ?? 'COMPLETED')
+const analysisStatus = computed(() => effectiveMemory.value.analysis_status ?? 'COMPLETED')
 const analyzing = computed(() => analysisStatus.value === 'PROCESSING')
 const analysisUnavailable = computed(() => analysisStatus.value === 'FAILED')
+// 有用户文字的记忆随时有内容可展示：分析期间不再用加载块占位，只叠加状态提示。
+const userNote = computed(() => hasUserNote(props.memory))
+const showAnalysisBlock = computed(() => !textMemory.value && !userNote.value && (analyzing.value || analysisUnavailable.value))
 
 // 单击选中延迟确认：双击进入详情时取消侧栏弹出，避免“先弹预览再跳页”的闪动。
 const SELECT_INTENT_DELAY_MS = 250
@@ -137,7 +147,7 @@ onBeforeUnmount(cancelSelectIntent)
       :class="textMemory ? 'memory-card__text-footer' : 'flex-1 p-2'"
     >
       <MemoryAnalysisState
-        v-if="!textMemory && (analyzing || analysisUnavailable)"
+        v-if="showAnalysisBlock"
         :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"
         compact
       />
@@ -149,6 +159,20 @@ onBeforeUnmount(cancelSelectIntent)
         :class="{ 'pt-[5px]': !textMemory }"
       >
         <div class="memory-card__tag-area">
+          <span
+            v-if="!textMemory && userNote && analyzing"
+            class="memory-card__analysis-flag text-[var(--color-primary)]"
+          >
+            <ArrowPathIcon class="h-3.5 w-3.5 flex-none animate-spin" aria-hidden="true" />
+            {{ t('memory.imageAnalyzing') }}
+          </span>
+          <span
+            v-else-if="!textMemory && userNote && analysisUnavailable"
+            class="memory-card__analysis-flag text-red-600"
+          >
+            <ExclamationTriangleIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
+            {{ t('memory.imageAnalysisFailed') }}
+          </span>
           <template v-if="searching">
             <span
               v-for="kind in matchSourceKinds"
@@ -221,6 +245,15 @@ onBeforeUnmount(cancelSelectIntent)
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+}
+
+.memory-card__analysis-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
 }
 
 .memory-card:focus-visible {

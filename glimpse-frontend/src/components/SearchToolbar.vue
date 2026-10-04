@@ -9,6 +9,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { SearchOptions } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
+import { useDevStateStore, type AnalysisOverride, type SyncOverride } from '@/stores/devState'
 import { t } from '@/utils/i18n'
 import { requestOnboarding } from '@/utils/onboarding'
 import AddMemoryButton from './AddMemoryButton.vue'
@@ -43,6 +44,7 @@ const emit = defineEmits<{
 }>()
 
 const memoriesStore = useMemoriesStore()
+const devState = useDevStateStore()
 const query = ref(props.modelValue)
 const source = ref(memoriesStore.searchSource || 'all')
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -63,6 +65,17 @@ const sources = [
   { value: 'all', labelKey: 'search.all' },
   { value: 'exact', labelKey: 'search.exactOnly' },
   { value: 'semantic', labelKey: 'search.semanticOnly' },
+] as const
+
+const analysisOverrideOptions = [
+  { value: 'none', labelKey: 'search.devAnalysisDefault' },
+  { value: 'processing', labelKey: 'search.devAnalysisProcessing' },
+  { value: 'failed', labelKey: 'search.devAnalysisFailed' },
+] as const
+const syncOverrideOptions = [
+  { value: 'none', labelKey: 'search.devSyncDefault' },
+  { value: 'pending', labelKey: 'search.devSyncPending' },
+  { value: 'failed', labelKey: 'search.devSyncFailed' },
 ] as const
 
 // 滑块按列等宽，translateX 的 100% 即一列宽度，跨列平移只需叠加列距
@@ -115,6 +128,13 @@ const cancelScheduledSearch = () => {
   }
 }
 
+const closeDebugPanel = () => {
+  if (!debugPanelOpen.value) return
+  debugPanelOpen.value = false
+  if (debugPanelElement.value) debugPanelElement.value.open = false
+  emit('debug-panel-change', false)
+}
+
 const handleDebugToggle = (event: Event) => {
   const open = (event.currentTarget as HTMLDetailsElement).open
   if (debugPanelOpen.value === open) return
@@ -122,29 +142,38 @@ const handleDebugToggle = (event: Event) => {
   emit('debug-panel-change', open)
 }
 
-// 失焦自动关闭：焦点移到文档内面板之外（点击外部/Tab 走出）即收起。
-// relatedTarget 为空表示整个窗口失焦（Alt+Tab 等），不视为面板失焦。
-const handleDebugPanelFocusout = (event: FocusEvent) => {
+// 全局指针监听：点击面板外任何位置（包括不可聚焦的空白处）都关闭。
+// 用 pointerdown 而非 click，在焦点转移前判定，避免点击按钮等控件先抢走焦点再判定时丢失目标。
+const handleDocumentPointerDown = (event: PointerEvent) => {
   if (!debugPanelOpen.value) return
   const panel = debugPanelElement.value
-  if (!panel) return
-  if (!(event.relatedTarget instanceof Node)) return
-  if (panel.contains(event.relatedTarget)) return
-  panel.open = false
+  if (!panel || !(event.target instanceof Node)) return
+  if (panel.contains(event.target)) return
+  closeDebugPanel()
 }
 
-// Esc 自动关闭：阻断冒泡，避免同时触发全局“Esc 清空搜索”。
-const handleDebugPanelKeydown = (event: KeyboardEvent) => {
+// 全局 ESC：挂 document 而非 details，避免浏览器原生 details-ESC 行为绕过处理器导致状态脱轨。
+// 捕获阶段 + stopPropagation，避免同时触发全局“Esc 清空搜索”。
+const handleDocumentKeydown = (event: KeyboardEvent) => {
   if (event.key !== 'Escape' || !debugPanelOpen.value) return
   event.stopPropagation()
-  const panel = debugPanelElement.value
-  if (panel) panel.open = false
+  closeDebugPanel()
 }
 
+const bindDebugPanelListeners = (open: boolean) => {
+  if (open) {
+    document.addEventListener('pointerdown', handleDocumentPointerDown, true)
+    document.addEventListener('keydown', handleDocumentKeydown, true)
+  } else {
+    document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
+    document.removeEventListener('keydown', handleDocumentKeydown, true)
+  }
+}
+
+watch(debugPanelOpen, bindDebugPanelListeners)
+
 const handleShowOnboarding = () => {
-  debugPanelOpen.value = false
-  if (debugPanelElement.value) debugPanelElement.value.open = false
-  emit('debug-panel-change', false)
+  closeDebugPanel()
   requestOnboarding()
 }
 
@@ -207,6 +236,7 @@ const focus = () => {
 
 onBeforeUnmount(() => {
   if (debounceTimer) window.clearTimeout(debounceTimer)
+  bindDebugPanelListeners(false)
   if (debugPanelOpen.value) emit('debug-panel-change', false)
 })
 
@@ -290,8 +320,6 @@ defineExpose({ focus, clear })
           class="relative"
           :open="debugPanelOpen"
           @toggle="handleDebugToggle"
-          @focusout="handleDebugPanelFocusout"
-          @keydown="handleDebugPanelKeydown"
         >
           <summary
             class="search-toolbar__control flex h-8 cursor-pointer list-none items-center gap-1.5 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
@@ -348,6 +376,54 @@ defineExpose({ focus, clear })
               <input v-model="devOptions.debug" type="checkbox" class="h-4 w-4 accent-amber-600" />
               {{ t('search.showScores') }}
             </label>
+
+            <div class="mt-3 border-t border-amber-200/60 pt-3">
+              <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold text-amber-800">{{ t('search.devStateOverride') }}</p>
+                <p v-if="devState.hasOverride" class="text-[10px] font-medium text-amber-700">{{ t('search.devStateOverrideActive') }}</p>
+              </div>
+              <p class="mt-0.5 text-[11px] text-[var(--shell-muted)]">{{ t('search.devStateOverrideHint') }}</p>
+              <div class="mt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <span class="mb-1 block text-xs text-[var(--shell-muted)]">{{ t('search.devAnalysisState') }}</span>
+                  <div class="flex flex-col gap-1.5">
+                    <label
+                      v-for="option in analysisOverrideOptions"
+                      :key="option.value"
+                      class="flex cursor-pointer items-center gap-1.5 text-xs text-amber-800"
+                    >
+                      <input
+                        type="radio"
+                        name="dev-analysis-override"
+                        :checked="devState.analysisOverride === option.value"
+                        class="h-3.5 w-3.5 accent-amber-600"
+                        @change="devState.setAnalysisOverride(option.value as AnalysisOverride)"
+                      />
+                      {{ t(option.labelKey) }}
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <span class="mb-1 block text-xs text-[var(--shell-muted)]">{{ t('search.devSyncState') }}</span>
+                  <div class="flex flex-col gap-1.5">
+                    <label
+                      v-for="option in syncOverrideOptions"
+                      :key="option.value"
+                      class="flex cursor-pointer items-center gap-1.5 text-xs text-amber-800"
+                    >
+                      <input
+                        type="radio"
+                        name="dev-sync-override"
+                        :checked="devState.syncOverride === option.value"
+                        class="h-3.5 w-3.5 accent-amber-600"
+                        @change="devState.setSyncOverride(option.value as SyncOverride)"
+                      />
+                      {{ t(option.labelKey) }}
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
             <button
               data-testid="show-onboarding"
               type="button"

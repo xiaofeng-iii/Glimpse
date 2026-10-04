@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import type { Memory } from '@/api/client'
@@ -17,6 +18,7 @@ import memoryAnalysisStateSource from '@/components/MemoryAnalysisState.vue?raw'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
+import { useDevStateStore } from '@/stores/devState'
 import { setLanguagePreference } from '@/utils/i18n'
 import { ONBOARDING_REQUEST_EVENT } from '@/utils/onboarding'
 import { createEmptyMemoryFilters } from '@/utils/memory-filters'
@@ -54,6 +56,7 @@ const createMemory = (overrides: Partial<Memory> = {}): Memory => ({
 describe('memory components', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    window.localStorage.clear()
     setActivePinia(createPinia())
     setLanguagePreference('zh-CN')
   })
@@ -172,6 +175,47 @@ describe('memory components', () => {
     expect(inspector.findComponent(MemoryAnalysisState).exists()).toBe(true)
     expect(inspector.text()).toContain('1 / 2')
     expect(inspector.findAll('.media-gallery__thumbnail')).toHaveLength(2)
+  })
+
+  it('shows user text with an analyzing flag instead of the wait block for user-added images', () => {
+    const memory = createMemory({
+      ai_summary: '',
+      text_content: '',
+      user_text: '用户输入的说明',
+      analysis_status: 'PROCESSING',
+      sync_status: 'PENDING',
+    })
+
+    const card = mount(MemoryCard, { props: { memory } })
+    expect(card.get('.memory-card').attributes('aria-busy')).toBe('true')
+    expect(card.text()).toContain('用户输入的说明')
+    expect(card.text()).toContain('正在分析图片内容')
+    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(false)
+
+    const inspector = mount(MemoryInspector, { props: { memory } })
+    expect(inspector.text()).toContain('用户输入的说明')
+    expect(inspector.text()).toContain('正在分析图片内容')
+    expect(inspector.findComponent(MemoryAnalysisState).exists()).toBe(false)
+    expect(inspector.findComponent(SummaryEditor).exists()).toBe(false)
+    expect(inspector.text()).toContain('复制内容')
+  })
+
+  it('flags failed analysis on user-note memories without hiding the content', () => {
+    const memory = createMemory({
+      ai_summary: '',
+      user_text: '用户输入的说明',
+      analysis_status: 'FAILED',
+    })
+
+    const card = mount(MemoryCard, { props: { memory } })
+    expect(card.text()).toContain('用户输入的说明')
+    expect(card.text()).toContain('图片内容分析失败')
+    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(false)
+
+    const inspector = mount(MemoryInspector, { props: { memory } })
+    expect(inspector.text()).toContain('用户输入的说明')
+    expect(inspector.text()).toContain('图片内容分析失败')
+    expect(inspector.findComponent(MemoryAnalysisState).exists()).toBe(false)
   })
 
   it('drives every analysis progress bar from the shared wall-clock phase', () => {
@@ -437,6 +481,32 @@ describe('memory components', () => {
     }
   })
 
+  it('closes the DEV panel on outside pointerdown and Escape regardless of focus', async () => {
+    const wrapper = mount(SearchToolbar, { attachTo: document.body })
+    const panel = wrapper.get('details')
+
+    ;(panel.element as HTMLDetailsElement).open = true
+    await panel.trigger('toggle')
+    expect(wrapper.emitted('debug-panel-change')?.at(-1)).toEqual([true])
+
+    // 点击面板外（不触发 focusout 的空白场景）：全局 pointerdown 捕获应关闭。
+    // jsdom 无 PointerEvent 构造器，用 MouseEvent 但保持 type 为 pointerdown。
+    document.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }))
+    await nextTick()
+    expect((panel.element as HTMLDetailsElement).open).toBe(false)
+    expect(wrapper.emitted('debug-panel-change')?.at(-1)).toEqual([false])
+
+    // 重新打开后按 ESC（document 级捕获）：面板内外的焦点位置都不影响关闭。
+    ;(panel.element as HTMLDetailsElement).open = true
+    await panel.trigger('toggle')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await nextTick()
+    expect((panel.element as HTMLDetailsElement).open).toBe(false)
+    expect(wrapper.emitted('debug-panel-change')?.at(-1)).toEqual([false])
+
+    wrapper.unmount()
+  })
+
   it('opens the shared in-app preview from a double-click', async () => {
     const wrapper = mount(MediaGallery, {
       props: { memory: createMemory() },
@@ -633,6 +703,48 @@ describe('memory components', () => {
 
     expect(wrapper.text()).toContain('卡片上的用户说明')
     expect(wrapper.text()).not.toContain('A payment screen')
+  })
+
+  it('stays quiet when the index is synced and flags only unsynced states', () => {
+    const synced = mount(SummaryEditor, {
+      props: { memory: createMemory({ sync_status: 'SYNCED' }) },
+    })
+    expect(synced.text()).not.toContain('已同步')
+    expect(synced.text()).not.toContain('语义索引')
+
+    const pending = mount(SummaryEditor, {
+      props: { memory: createMemory({ user_text: '我的说明', sync_status: 'PENDING' }) },
+    })
+    expect(pending.text()).toContain('正在更新语义索引')
+  })
+
+  it('overrides displayed analysis and sync states from the dev panel store', async () => {
+    const devState = useDevStateStore()
+    const memory = createMemory({ user_text: '用户输入的说明' })
+
+    const card = mount(MemoryCard, { props: { memory } })
+    expect(card.text()).not.toContain('正在分析图片内容')
+    expect(card.text()).not.toContain('图片内容分析失败')
+
+    devState.setAnalysisOverride('processing')
+    await nextTick()
+    expect(card.text()).toContain('正在分析图片内容')
+    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(false)
+
+    devState.setAnalysisOverride('failed')
+    await nextTick()
+    expect(card.text()).toContain('图片内容分析失败')
+
+    devState.setAnalysisOverride('none')
+    devState.setSyncOverride('pending')
+    await nextTick()
+    const editor = mount(SummaryEditor, { props: { memory } })
+    expect(editor.text()).toContain('正在更新语义索引')
+
+    devState.setSyncOverride('none')
+    await nextTick()
+    expect(editor.text()).not.toContain('语义索引')
+    expect(window.localStorage.getItem('glimpse.devMemoryStateOverride')).toBeNull()
   })
 
   it('asks before leaving with a dirty summary and resolves both choices', async () => {
