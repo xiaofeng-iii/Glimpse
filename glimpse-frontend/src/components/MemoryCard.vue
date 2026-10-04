@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { PhotoIcon } from '@heroicons/vue/24/outline'
-import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/vue/20/solid'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
 import { getMatchSourceKinds } from '@/utils/match-sources'
-import { getMemoryDisplayText, hasUserNote, isTextMemory } from '@/utils/memory-types'
+import { getMemoryDisplayText, isTextMemory } from '@/utils/memory-types'
 import type { CardTimeDisplay } from '@/utils/memory-grouping'
 import { languagePreference, t } from '@/utils/i18n'
 import { useDevStateStore } from '@/stores/devState'
@@ -39,9 +38,8 @@ const matchSourceKinds = computed(() => getMatchSourceKinds(props.memory.match_s
 const analysisStatus = computed(() => effectiveMemory.value.analysis_status ?? 'COMPLETED')
 const analyzing = computed(() => analysisStatus.value === 'PROCESSING')
 const analysisUnavailable = computed(() => analysisStatus.value === 'FAILED')
-// 有用户文字的记忆随时有内容可展示：分析期间不再用加载块占位，只叠加状态提示。
-const userNote = computed(() => hasUserNote(props.memory))
-const showAnalysisBlock = computed(() => !textMemory.value && !userNote.value && (analyzing.value || analysisUnavailable.value))
+// 图片记忆的分析/失败态统一叠加在元数据行；正文始终内容优先，有用户文字时不占位。
+const showStatus = computed(() => !textMemory.value && (analyzing.value || analysisUnavailable.value))
 
 // 单击选中延迟确认：双击进入详情时取消侧栏弹出，避免“先弹预览再跳页”的闪动。
 const SELECT_INTENT_DELAY_MS = 250
@@ -134,45 +132,34 @@ onBeforeUnmount(cancelSelectIntent)
       <img
         v-if="imageUrl && !imageFailed"
         :src="imageUrl"
-        :alt="displayText || t('memory.analysisProcessing')"
+        :alt="displayText || t('memory.imageAnalyzing')"
         class="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
         loading="lazy"
         @error="imageFailed = true"
       />
-      <PhotoIcon v-else class="h-9 w-9 text-[var(--shell-muted)]" aria-hidden="true" />
+      <div v-else class="flex flex-col items-center gap-1.5 text-[var(--shell-muted)]">
+        <PhotoIcon class="h-9 w-9" aria-hidden="true" />
+        <span class="text-xs">{{ t('memory.previewFailed') }}</span>
+      </div>
     </div>
 
     <div
       class="flex flex-col"
       :class="textMemory ? 'memory-card__text-footer' : 'flex-1 p-2'"
     >
-      <MemoryAnalysisState
-        v-if="showAnalysisBlock"
-        :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"
-        compact
-      />
-      <p v-else-if="!textMemory" class="line-clamp-4 min-h-20 text-[13px] leading-5 text-[var(--shell-ink)]">
-        {{ displayText || t('memory.noContent') }}
+      <p v-if="!textMemory" class="line-clamp-4 min-h-20 text-[13px] leading-5 text-[var(--shell-ink)]">
+        {{ displayText || (showStatus ? '' : t('memory.noContent')) }}
       </p>
       <div
         class="memory-card__metadata-row mt-auto flex min-h-6 items-center gap-2"
         :class="{ 'pt-[5px]': !textMemory }"
       >
         <div class="memory-card__tag-area">
-          <span
-            v-if="!textMemory && userNote && analyzing"
-            class="memory-card__analysis-flag text-[var(--color-primary)]"
-          >
-            <ArrowPathIcon class="h-3.5 w-3.5 flex-none animate-spin" aria-hidden="true" />
-            {{ t('memory.imageAnalyzing') }}
-          </span>
-          <span
-            v-else-if="!textMemory && userNote && analysisUnavailable"
-            class="memory-card__analysis-flag text-red-600"
-          >
-            <ExclamationTriangleIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
-            {{ t('memory.imageAnalysisFailed') }}
-          </span>
+          <MemoryAnalysisState
+            v-if="showStatus"
+            variant="inline"
+            :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"
+          />
           <template v-if="searching">
             <span
               v-for="kind in matchSourceKinds"
@@ -245,15 +232,6 @@ onBeforeUnmount(cancelSelectIntent)
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-}
-
-.memory-card__analysis-flag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  line-height: 1rem;
 }
 
 .memory-card:focus-visible {

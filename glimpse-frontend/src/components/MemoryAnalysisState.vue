@@ -1,25 +1,28 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import { t } from '@/utils/i18n'
 import { startSynchronizedProgress } from '@/utils/synchronized-progress'
 
+// inline：卡片与检查器的一行状态（图标+文案），不遮挡内容；
+// block：详情页的完整等待面板，状态即主内容，进度条与其他等待面板共享墙钟相位。
 const props = withDefaults(defineProps<{
   status?: 'PROCESSING' | 'FAILED'
-  compact?: boolean
+  variant?: 'inline' | 'block'
 }>(), {
   status: 'PROCESSING',
-  compact: false,
+  variant: 'block',
 })
 
 const failed = computed(() => props.status === 'FAILED')
+const isBlock = computed(() => props.variant === 'block')
 const progressBar = ref<HTMLElement | null>(null)
 let progressAnimation: Animation | null = null
 
 const syncProgressAnimation = async () => {
   progressAnimation?.cancel()
   progressAnimation = null
-  if (failed.value) return
+  if (failed.value || !isBlock.value) return
   await nextTick()
   if (progressBar.value) {
     progressAnimation = startSynchronizedProgress(progressBar.value)
@@ -27,17 +30,28 @@ const syncProgressAnimation = async () => {
 }
 
 onMounted(() => void syncProgressAnimation())
-watch(failed, () => void syncProgressAnimation())
+watch([failed, isBlock], () => void syncProgressAnimation())
 onBeforeUnmount(() => progressAnimation?.cancel())
 </script>
 
 <template>
   <div
+    v-if="!isBlock"
+    class="memory-analysis-state__row"
+    :class="{ 'memory-analysis-state__row--failed': failed }"
+    role="status"
+    :aria-live="failed ? 'assertive' : 'polite'"
+    :aria-busy="!failed"
+  >
+    <ArrowPathIcon v-if="!failed" class="h-3.5 w-3.5 flex-none animate-spin" aria-hidden="true" />
+    <ExclamationTriangleIcon v-else class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
+    <span>{{ t(failed ? 'memory.imageAnalysisFailed' : 'memory.imageAnalyzing') }}</span>
+  </div>
+
+  <div
+    v-else
     class="memory-analysis-state"
-    :class="{
-      'memory-analysis-state--compact': compact,
-      'memory-analysis-state--failed': failed,
-    }"
+    :class="{ 'memory-analysis-state--failed': failed }"
     role="status"
     :aria-live="failed ? 'assertive' : 'polite'"
     :aria-busy="!failed"
@@ -48,7 +62,7 @@ onBeforeUnmount(() => progressAnimation?.cancel())
         class="memory-analysis-state__icon"
         aria-hidden="true"
       />
-      <span>{{ t(failed ? 'memory.analysisFailed' : 'memory.analysisProcessing') }}</span>
+      <span>{{ t(failed ? 'memory.imageAnalysisFailed' : 'memory.imageAnalyzing') }}</span>
     </div>
     <p class="memory-analysis-state__hint">
       {{ t(failed ? 'memory.analysisFailedHint' : 'memory.analysisProcessingHint') }}
@@ -68,17 +82,24 @@ onBeforeUnmount(() => progressAnimation?.cancel())
   background: var(--color-primary-soft);
 }
 
-.memory-analysis-state--compact {
-  min-height: 3.75rem;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
 .memory-analysis-state--failed {
   border-color: color-mix(in srgb, var(--color-danger) 28%, var(--shell-line));
   background: color-mix(in srgb, var(--color-danger) 7%, var(--shell-card));
+}
+
+.memory-analysis-state__row {
+  display: inline-flex;
+  min-height: 1.25rem;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+}
+
+.memory-analysis-state__row--failed {
+  color: var(--color-danger);
 }
 
 .memory-analysis-state__heading {

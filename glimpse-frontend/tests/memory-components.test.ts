@@ -14,6 +14,7 @@ import SummaryEditor from '@/components/SummaryEditor.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import OcrText from '@/components/OcrText.vue'
 import MemoryAnalysisState from '@/components/MemoryAnalysisState.vue'
+import MemoryDetail from '@/views/MemoryDetail.vue'
 import memoryAnalysisStateSource from '@/components/MemoryAnalysisState.vue?raw'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { useNotificationStore } from '@/stores/notification'
@@ -24,6 +25,7 @@ import { ONBOARDING_REQUEST_EVENT } from '@/utils/onboarding'
 import { createEmptyMemoryFilters } from '@/utils/memory-filters'
 
 const apiMocks = vi.hoisted(() => ({
+  get: vi.fn(),
   updateSummary: vi.fn(),
   updateUserText: vi.fn(),
 }))
@@ -34,9 +36,21 @@ vi.mock('@/api/client', async (importOriginal) => {
     ...original,
     memoriesApi: {
       ...original.memoriesApi,
+      get: apiMocks.get,
       updateSummary: apiMocks.updateSummary,
       updateUserText: apiMocks.updateUserText,
     },
+  }
+})
+
+vi.mock('vue-router', async (importOriginal) => {
+  const original = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...original,
+    useRoute: () => ({ params: { id: 'memory-1' } }),
+    useRouter: () => ({ push: vi.fn() }),
+    onBeforeRouteLeave: () => {},
+    onBeforeRouteUpdate: () => {},
   }
 })
 
@@ -135,8 +149,9 @@ describe('memory components', () => {
       })
 
       expect(card.get('.memory-card').attributes('aria-busy')).toBe('true')
-      expect(card.text()).toContain('正在生成记忆摘要')
-      expect(card.text()).toContain('等待AI摘要和OCR识别')
+      expect(card.text()).toContain('正在分析图片内容')
+      expect(card.find('.memory-analysis-state__row').exists()).toBe(true)
+      expect(card.find('.memory-analysis-state__bar').exists()).toBe(false)
       expect(card.findComponent(MemoryAnalysisState).exists()).toBe(true)
 
       await card.get('.memory-card').trigger('click')
@@ -155,6 +170,8 @@ describe('memory components', () => {
     expect(inspector.findComponent(MediaGallery).exists()).toBe(true)
     expect(inspector.findComponent(MemoryAnalysisState).exists()).toBe(true)
     expect(inspector.findComponent(SummaryEditor).exists()).toBe(false)
+    expect(inspector.text()).toContain('正在分析图片内容')
+    expect(inspector.find('.memory-analysis-state__bar').exists()).toBe(false)
     expect(inspector.text()).toContain('查看详情')
     expect(inspector.text()).not.toContain('删除')
   })
@@ -190,12 +207,12 @@ describe('memory components', () => {
     expect(card.get('.memory-card').attributes('aria-busy')).toBe('true')
     expect(card.text()).toContain('用户输入的说明')
     expect(card.text()).toContain('正在分析图片内容')
-    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(false)
+    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(true)
 
     const inspector = mount(MemoryInspector, { props: { memory } })
     expect(inspector.text()).toContain('用户输入的说明')
     expect(inspector.text()).toContain('正在分析图片内容')
-    expect(inspector.findComponent(MemoryAnalysisState).exists()).toBe(false)
+    expect(inspector.findComponent(MemoryAnalysisState).exists()).toBe(true)
     expect(inspector.findComponent(SummaryEditor).exists()).toBe(false)
     expect(inspector.text()).toContain('复制内容')
   })
@@ -210,18 +227,61 @@ describe('memory components', () => {
     const card = mount(MemoryCard, { props: { memory } })
     expect(card.text()).toContain('用户输入的说明')
     expect(card.text()).toContain('图片内容分析失败')
-    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(false)
+    expect(card.find('.memory-analysis-state__row--failed').exists()).toBe(true)
+    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(true)
 
     const inspector = mount(MemoryInspector, { props: { memory } })
     expect(inspector.text()).toContain('用户输入的说明')
     expect(inspector.text()).toContain('图片内容分析失败')
-    expect(inspector.findComponent(MemoryAnalysisState).exists()).toBe(false)
+    expect(inspector.findComponent(MemoryAnalysisState).exists()).toBe(true)
   })
 
   it('drives every analysis progress bar from the shared wall-clock phase', () => {
     expect(memoryAnalysisStateSource).toContain('startSynchronizedProgress')
     expect(memoryAnalysisStateSource).toContain('ref="progressBar"')
     expect(memoryAnalysisStateSource).not.toMatch(/\.memory-analysis-state__bar\s*\{[^}]*animation:/s)
+  })
+
+  it('renders the inline state row without a progress bar and keeps the block panel bar', () => {
+    const inline = mount(MemoryAnalysisState, { props: { variant: 'inline' } })
+    expect(inline.find('.memory-analysis-state__row').exists()).toBe(true)
+    expect(inline.find('.memory-analysis-state__bar').exists()).toBe(false)
+    expect(inline.text()).toContain('正在分析图片内容')
+
+    const failedInline = mount(MemoryAnalysisState, { props: { variant: 'inline', status: 'FAILED' } })
+    expect(failedInline.find('.memory-analysis-state__row--failed').exists()).toBe(true)
+    expect(failedInline.text()).toContain('图片内容分析失败')
+
+    const block = mount(MemoryAnalysisState)
+    expect(block.find('.memory-analysis-state__bar').exists()).toBe(true)
+    expect(block.text()).toContain('正在分析图片内容')
+    expect(block.text()).toContain('等待AI摘要和OCR识别')
+  })
+
+  it('labels a card image that fails to load with the shared preview message', async () => {
+    const card = mount(MemoryCard, { props: { memory: createMemory() } })
+    await card.get('.memory-card__media img').trigger('error')
+    expect(card.text()).toContain('图片预览加载失败')
+    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(false)
+  })
+
+  it('keeps user text visible on the detail page while analysis is running', async () => {
+    apiMocks.get.mockResolvedValue(
+      createMemory({
+        ai_summary: '',
+        user_text: '用户输入的说明',
+        analysis_status: 'PROCESSING',
+      }),
+    )
+
+    const wrapper = mount(MemoryDetail)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('用户输入的说明')
+    expect(wrapper.text()).toContain('正在分析图片内容')
+    expect(wrapper.find('.memory-analysis-state__row').exists()).toBe(false)
+    expect(wrapper.find('.memory-analysis-state__bar').exists()).toBe(true)
+    expect(wrapper.findComponent(SummaryEditor).exists()).toBe(false)
   })
 
   it('presents the compact search modes as one group before separated actions', () => {
@@ -729,7 +789,7 @@ describe('memory components', () => {
     devState.setAnalysisOverride('processing')
     await nextTick()
     expect(card.text()).toContain('正在分析图片内容')
-    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(false)
+    expect(card.findComponent(MemoryAnalysisState).exists()).toBe(true)
 
     devState.setAnalysisOverride('failed')
     await nextTick()

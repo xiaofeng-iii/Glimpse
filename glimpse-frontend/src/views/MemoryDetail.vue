@@ -146,6 +146,12 @@ const confirmDelete = async () => {
         </section>
 
         <section class="min-w-0 space-y-5">
+          <p
+            v-if="hasNote && (analyzing || analysisUnavailable)"
+            class="whitespace-pre-wrap text-sm text-[var(--shell-ink)]"
+          >
+            {{ memory.user_text }}
+          </p>
           <MemoryAnalysisState
             v-if="analyzing || analysisUnavailable"
             :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"

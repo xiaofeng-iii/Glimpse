@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
-  ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
   ClipboardDocumentIcon,
-  ExclamationTriangleIcon,
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
@@ -43,9 +41,10 @@ const effectiveMemory = computed(() =>
 const analysisStatus = computed(() => effectiveMemory.value.analysis_status ?? 'COMPLETED')
 const analyzing = computed(() => analysisStatus.value === 'PROCESSING')
 const analysisUnavailable = computed(() => analysisStatus.value === 'FAILED')
-// 有用户文字的记忆随时有内容可展示：分析期间以只读文本替代加载块，只叠加状态提示。
+const statusVisible = computed(() => analyzing.value || analysisUnavailable.value)
+// 有用户文字的记忆随时有内容可展示：分析期间保留用户文字，只叠加状态行。
 const userNote = computed(() => hasUserNote(props.memory))
-const showAnalysisBlock = computed(() => !userNote.value && (analyzing.value || analysisUnavailable.value))
+const displayText = computed(() => getMemoryDisplayText(props.memory))
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleString([], {
@@ -112,28 +111,24 @@ defineExpose({ canLeave })
         {{ t('memory.savedOutsideSearch') }}
       </div>
 
+      <p
+        v-if="statusVisible && userNote"
+        class="whitespace-pre-wrap text-sm text-[var(--shell-ink)]"
+      >
+        {{ memory.user_text }}
+      </p>
       <MemoryAnalysisState
-        v-if="showAnalysisBlock"
+        v-if="statusVisible"
+        variant="inline"
         :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"
       />
-      <div v-else-if="analyzing || analysisUnavailable">
-        <p class="whitespace-pre-wrap text-sm text-[var(--shell-ink)]">{{ memory.user_text }}</p>
-        <div
-          class="mt-3 flex min-h-5 items-center gap-2 text-xs"
-          :class="analyzing ? 'text-[var(--color-primary)]' : 'text-red-600'"
-        >
-          <ArrowPathIcon v-if="analyzing" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
-          <ExclamationTriangleIcon v-else class="h-4 w-4 flex-none" aria-hidden="true" />
-          {{ t(analyzing ? 'memory.imageAnalyzing' : 'memory.imageAnalysisFailed') }}
-        </div>
-      </div>
       <SummaryEditor v-else ref="summaryEditor" :memory="memory" compact />
 
       <div
         class="memory-inspector__summary-actions grid gap-2.5"
-        :class="showAnalysisBlock ? 'grid-cols-1' : 'grid-cols-2'"
+        :class="displayText ? 'grid-cols-2' : 'grid-cols-1'"
       >
-        <button v-if="!showAnalysisBlock" type="button" class="btn-secondary justify-center" @click="copySummary">
+        <button v-if="displayText" type="button" class="btn-secondary justify-center" @click="copySummary">
           <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t(textMemory || hasUserNote(props.memory) ? 'action.copyContent' : 'action.copySummary') }}
         </button>
