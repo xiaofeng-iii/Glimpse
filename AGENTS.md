@@ -118,6 +118,10 @@ Keep `AGENTS.md` tracked. It is the one generic document meant for the next AI s
 模块的最小单元或 API 测试，必要时再补充直接相关的集成检查。完整测试套件、完整前端
 测试或安装包验证仅在用户明确要求时运行。交付时说明实际运行和跳过的验证。
 
+改动任何行为后，必须同步审查受影响的测试并一并更新：结构或文案变化改旧断言，
+新行为补最小覆盖；代码与对应测试放在同一提交里。常见信号与示例见 docs/TESTING.md
+第 0.1 节。
+
 按上述边界选择改动范围内的 focused tests。Useful defaults:
 
 ```powershell
