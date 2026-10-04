@@ -564,6 +564,10 @@ onMounted(async () => {
       logger.error('Failed to read app version: %s', error)
     }
   }
+  // 当前版本笔记从共享 store 读取；这里兜底记录版本，避免启动检测未完成时查询落空。
+  if (currentVersion.value) {
+    updatesStore.recordCurrentVersion(currentVersion.value)
+  }
   // 启动检测已发现新版本时直接弹出更新对话框，复用同一份聚合说明。
   if (updatesStore.availableUpdate) {
     availableUpdate.value = updatesStore.availableUpdate
