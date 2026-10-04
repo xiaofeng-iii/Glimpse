@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import type { Memory } from '@/api/client'
 import { clusterApi, memoriesApi, screenshotApi, searchApi, settingsApi } from '@/api/client'
@@ -24,6 +24,7 @@ import ClusterBar from '@/components/ClusterBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import MemoryContextMenu from '@/components/MemoryContextMenu.vue'
 import MemoryInspector from '@/components/MemoryInspector.vue'
+import SideDecorPanel from '@/components/SideDecorPanel.vue'
 import MemoryWall from '@/components/MemoryWall.vue'
 import SearchToolbar from '@/components/SearchToolbar.vue'
 
@@ -45,6 +46,7 @@ const logger = createLogger('views/Home')
 
 const searchToolbar = ref<SearchToolbarExpose | null>(null)
 const memoryInspector = ref<MemoryInspectorExpose | null>(null)
+const inspectorPanelElement = ref<HTMLElement | null>(null)
 const query = ref(memoriesStore.searchQuery)
 const isCapturing = ref(false)
 const isRefreshing = ref(false)
@@ -59,6 +61,7 @@ const showSearchDebug = ref(false)
 const clusterModeEnabled = ref(false)
 const screenshotShortcutLabel = ref('Ctrl+Shift+G')
 const wideLayout = ref(window.innerWidth >= 1180)
+const dockedLayout = ref(window.innerWidth >= 820)
 const isDesktop = isDesktopShell()
 let semanticWarmupTimer: ReturnType<typeof window.setTimeout> | null = null
 let unmounted = false
@@ -350,7 +353,47 @@ const confirmContextDelete = async () => {
 
 const handleResize = () => {
   wideLayout.value = window.innerWidth >= 1180
+  // 侧栏关闭交互跟随视觉形态：≥820px 侧栏是排版内的内容块（docked），点外/Esc 不关闭；
+  // <820px 侧栏浮于内容之上，才有关闭语义。分界与 .inspector-panel 的媒体查询保持一致。
+  dockedLayout.value = window.innerWidth >= 820
 }
+
+// 记忆墙滚动条仅在滚动进行时浮现，停止片刻即隐回（详见 .home-memory-pane 样式注释）。
+const SCROLLBAR_IDLE_MS = 800
+const paneScrollbarActive = ref(false)
+let scrollbarIdleTimer: ReturnType<typeof window.setTimeout> | null = null
+
+const markPaneScrollbarActive = () => {
+  paneScrollbarActive.value = true
+  if (scrollbarIdleTimer) window.clearTimeout(scrollbarIdleTimer)
+  scrollbarIdleTimer = window.setTimeout(() => {
+    paneScrollbarActive.value = false
+    scrollbarIdleTimer = null
+  }, SCROLLBAR_IDLE_MS)
+}
+
+// 浮层形态（<820px）下，点击面板以外（记忆卡片除外）即关闭；docked 形态是排版内
+// 的内容块，点外不关闭。拖动标题栏是窗口操作，任何形态都不视为关闭意图。走
+// handleCloseInspector 以保留未保存草稿确认。模态对话框打开时不参与关闭。
+const handleDocumentPointerDown = (event: PointerEvent) => {
+  if (!memoriesStore.selectedId || event.button !== 0) return
+  if (dockedLayout.value) return
+  if (!(event.target instanceof Node)) return
+  if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+  if (event.target instanceof Element && event.target.closest('.desktop-shell__titlebar')) return
+  const panel = inspectorPanelElement.value
+  if (panel?.contains(event.target)) return
+  if (event.target instanceof Element && event.target.closest('.memory-card')) return
+  void handleCloseInspector()
+}
+
+watch(selectedMemory, (value) => {
+  if (value) {
+    document.addEventListener('pointerdown', handleDocumentPointerDown, true)
+  } else {
+    document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
+  }
+})
 
 const handleKeydown = (event: KeyboardEvent) => {
   const key = event.key.toLowerCase()
@@ -359,6 +402,19 @@ const handleKeydown = (event: KeyboardEvent) => {
   const editingText = target instanceof HTMLTextAreaElement || Boolean(target?.isContentEditable)
 
   if (dialogOpen) return
+
+  // 浮层形态且焦点不在搜索工具栏时，Esc 优先关闭侧栏；docked 形态与搜索栏内保持既有语义。
+  if (
+    key === 'escape'
+    && selectedMemory.value
+    && !dockedLayout.value
+    && !editingText
+    && !(target instanceof Element && target.closest('.search-toolbar'))
+  ) {
+    event.preventDefault()
+    void handleCloseInspector()
+    return
+  }
 
   if (key === 'escape' && query.value && !editingText) {
     event.preventDefault()
@@ -396,17 +452,26 @@ onMounted(async () => {
 onUnmounted(() => {
   unmounted = true
   if (semanticWarmupTimer) window.clearTimeout(semanticWarmupTimer)
+  if (scrollbarIdleTimer) window.clearTimeout(scrollbarIdleTimer)
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('glimpse:focus-search', handleFocusSearchEvent)
   window.removeEventListener('glimpse:shortcut-screenshot', handleShortcutCapture)
+  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
 })
 </script>
 
 <template>
   <main class="relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--shell-window-bg)]">
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
-      <div class="home-memory-pane min-w-0 flex-1 overflow-y-auto">
+      <div
+        class="home-memory-pane min-w-0 flex-1 overflow-y-auto"
+        :class="{
+          'is-scrolling': paneScrollbarActive,
+          'home-memory-pane--wall-capped': !wideLayout,
+        }"
+        @scroll.passive="markPaneScrollbarActive"
+      >
         <SearchToolbar
           ref="searchToolbar"
           v-model="query"
@@ -454,6 +519,8 @@ onUnmounted(() => {
       <Transition name="inspector">
         <div
           v-if="selectedMemory"
+          key="inspector"
+          ref="inspectorPanelElement"
           class="inspector-panel z-30"
         >
           <MemoryInspector
@@ -464,6 +531,16 @@ onUnmounted(() => {
           />
         </div>
       </Transition>
+      <!-- 装饰板不参与 Transition：普通条件渲染瞬时挂载/卸载，永远在流内占位，
+           不存在离场中间态。只在 wideLayout（≥1180px，与侧栏 docked 边界一致）
+           下渲染——更窄时媒体查询会把 .inspector-panel 变成右侧浮层，装饰板
+           在该区间会悬浮在墙上，且预留槽位后墙面不足三列。 -->
+      <div
+        v-if="!selectedMemory && wideLayout"
+        class="inspector-panel inspector-panel--decor"
+      >
+        <SideDecorPanel />
+      </div>
     </div>
 
     <AddTextMemoryDialog
@@ -513,18 +590,62 @@ onUnmounted(() => {
   container-type: inline-size;
 }
 
-/* 详情侧栏是浮在墙侧的内容块：四周留缝露出画布，用圆角+描边+卡片阴影成块，
-   不再通栏贴边。 */
+/* 装饰板出现前（宽度 < 1180px）墙列数封顶三列：宽度先攒着，等够
+   「三列 + 装饰板」时整体切换，避免「四列满宽 → 三列 + 装饰板」的回退跳动。
+   装饰板出现后该限宽移除，随宽度正常增列。 */
+.home-memory-pane--wall-capped :deep(.memory-grid) {
+  max-width: calc(3 * 239px + 2 * 12px);
+}
+
+/* 记忆墙滚动条仅在滚动进行时浮现，停止约 0.8 秒后隐回：常驻拇指会在记忆墙与
+   右侧装饰板/侧栏之间形成一条分割线，而悬停墙面本身不应视为滚动意图。 */
+.home-memory-pane::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.home-memory-pane.is-scrolling::-webkit-scrollbar-thumb {
+  background: var(--shell-scrollbar-thumb);
+}
+
+.home-memory-pane.is-scrolling::-webkit-scrollbar-thumb:hover {
+  background: var(--shell-scrollbar-thumb-hover);
+}
+
+/* Firefox/Chromium 标准属性兜底（设置 scrollbar-color 后 webkit 伪元素被忽略） */
+.home-memory-pane {
+  scrollbar-color: transparent transparent;
+}
+
+.home-memory-pane.is-scrolling {
+  scrollbar-color: var(--shell-scrollbar-thumb) transparent;
+}
+
+/* 详情侧栏是浮在墙侧的内容块：白底、圆角与卡片阴影成块；边缘不加描边。 */
 .inspector-panel {
   width: 380px;
   flex: 0 0 380px;
   min-height: 0;
   overflow: hidden;
   margin: 0.5rem 0.75rem 0.75rem 0.25rem;
-  border: 1px solid var(--shell-line);
   border-radius: var(--radius-xl);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
+}
+
+/* 装饰面板与记忆墙背景一体：无底色、无圆角、无阴影，仅借用槽位宽度。 */
+.inspector-panel--decor {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Transition 双分支切换时，离场面板立即脱离 flex 流（原地绝对定位播完动画），
+   否则两个面板短暂同占一行，内容区先压扁再弹回，吸顶搜索浮条随之闪现。 */
+.inspector-leave-active {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
 }
 
 @media (max-width: 1179px) {
