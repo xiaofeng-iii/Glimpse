@@ -21,9 +21,11 @@ const props = withDefaults(defineProps<{
   cancelLabel: string
   destructive?: boolean
   busy?: boolean
+  hideIcon?: boolean
 }>(), {
   destructive: false,
   busy: false,
+  hideIcon: false,
 })
 
 const emit = defineEmits<{
@@ -124,6 +126,7 @@ onBeforeUnmount(() => {
       >
         <div class="flex items-start gap-3.5">
           <div
+            v-if="!hideIcon"
             class="flex h-9 w-9 flex-none items-center justify-center rounded-lg"
             :class="destructive ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'"
           >
@@ -151,14 +154,14 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div v-if="$slots.default" class="mt-4 max-h-[50dvh] overflow-y-auto"><slot /></div>
+        <div v-if="$slots.default" class="confirm-dialog__body mt-4 max-h-[50dvh] overflow-y-auto overflow-x-hidden"><slot /></div>
         <div class="mt-5 flex justify-end gap-2.5">
-          <button ref="cancelButton" type="button" class="btn-secondary px-4" :disabled="busy" @click="cancel">
+          <button ref="cancelButton" type="button" class="btn-secondary btn-sm" :disabled="busy" @click="cancel">
             {{ cancelLabel }}
           </button>
           <button
             type="button"
-            class="px-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+            class="btn-sm text-white transition disabled:cursor-not-allowed disabled:opacity-60"
             :class="[destructive ? 'btn-danger' : 'btn-primary']"
             :disabled="busy"
             @click="emit('confirm')"
@@ -170,3 +173,14 @@ onBeforeUnmount(() => {
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+/* 弹窗内的小滚动区不挂全局常驻轨道：隐藏滚动条、保留滚轮纵向滚动。 */
+.confirm-dialog__body {
+  scrollbar-width: none;
+}
+
+.confirm-dialog__body::-webkit-scrollbar {
+  display: none;
+}
+</style>

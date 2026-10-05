@@ -54,20 +54,17 @@ const installNow = async () => {
         <ArrowDownTrayIcon class="h-[15px] w-[15px]" aria-hidden="true" />
       </button>
     </template>
-    <p class="mb-3 text-sm text-[var(--shell-ink)]">
-      {{ t('settings.updateAvailable', { version: updates.availableUpdate.version }) }}
-    </p>
     <UpdateNotesContent
       :notes="updates.updateNotes"
       :loading="updates.updateNotesLoading"
       :partial="updates.updateNotesPartial"
       :raw="updates.updateNotesPartial ? updates.availableUpdate.notes ?? '' : undefined"
     />
-    <div class="mt-4 flex items-center gap-3">
-      <button type="button" class="btn-secondary" :disabled="updates.installing" @click="viewDetails">
+    <div class="mt-4 flex items-center gap-2.5">
+      <button type="button" class="btn-secondary btn-sm" :disabled="updates.installing" @click="viewDetails">
         {{ t('updates.viewDetails') }}
       </button>
-      <button type="button" class="btn-primary" :disabled="updates.installing" @click="installNow">
+      <button type="button" class="btn-primary btn-sm" :disabled="updates.installing" @click="installNow">
         {{ updates.installing ? t('settings.updateInstalling') : t('settings.updateNow') }}
       </button>
     </div>
@@ -97,7 +94,14 @@ const installNow = async () => {
 </template>
 
 <style scoped>
+/* 顶栏图标按钮与设置齿轮同尺寸同 hover：28px 见方、纯背景反馈，不位移。 */
 .update-badge {
-  color: var(--color-primary);
+  width: 1.75rem;
+  height: 1.75rem;
+  min-height: 1.75rem;
+}
+
+.update-badge:hover {
+  transform: none;
 }
 </style>

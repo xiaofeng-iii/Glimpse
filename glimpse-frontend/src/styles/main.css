@@ -635,6 +635,20 @@ kbd {
   color: rgba(255, 255, 255, 0.92);
 }
 
+/* 弹窗/浮层里的动作按钮是低频操作，用苗条档：28px 高、13px 常规字重、无投影，
+   与设置区"更苗条的控件"同一策略，不拿主路径按钮的分量。 */
+.btn-sm {
+  min-height: var(--control-h-sm);
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  box-shadow: none;
+}
+
+.btn-sm:not(:disabled):hover {
+  box-shadow: none;
+}
+
 .shell-icon-button {
   display: inline-flex;
   align-items: center;
