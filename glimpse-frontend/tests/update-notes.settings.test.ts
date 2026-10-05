@@ -20,6 +20,7 @@ const apiMocks = vi.hoisted(() => ({
   getVersion: vi.fn(),
   fetchIndex: vi.fn(),
   isDesktopShell: vi.fn(),
+  openUrl: vi.fn(),
 }))
 
 vi.mock('@/api/client', async (importOriginal) => {
@@ -39,6 +40,7 @@ vi.mock('@/api/client', async (importOriginal) => {
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: apiMocks.invoke }))
 vi.mock('@tauri-apps/api/app', () => ({ getVersion: apiMocks.getVersion }))
+vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: apiMocks.openUrl }))
 vi.mock('@/platform/desktop', () => ({ isDesktopShell: apiMocks.isDesktopShell }))
 
 const indexEntries = [
@@ -94,7 +96,7 @@ const openUpdates = async (wrapper: VueWrapper) => {
 }
 
 const currentVersionButton = (wrapper: VueWrapper) =>
-  wrapper.findAll('button').find((button) => button.text() === '0.3.2')!
+  wrapper.findAll('button').find((button) => button.classes().includes('version-notes-trigger'))!
 const checkButton = (wrapper: VueWrapper) =>
   wrapper.findAll('button').find((button) => button.text().includes('检查更新'))!
 
@@ -140,6 +142,29 @@ describe('Settings update notes', () => {
     const fixHeading = [...document.querySelectorAll('h3')].find((node) => node.textContent === '修复')
     expect(fixHeading).toBeDefined()
     expect(fixHeading!.parentElement!.querySelector('li')).toBeNull()
+  })
+
+  it('shows the version and repository link below the panel on every section', async () => {
+    const wrapper = await mountSettings()
+    const meta = wrapper.get('.settings-meta')
+    expect(meta.text()).toContain('Glimpse v0.3.2')
+
+    const repositoryLink = meta.get('a')
+    expect(repositoryLink.text()).toBe('GitHub')
+    expect(repositoryLink.attributes('href')).toBe('https://github.com/xiaofeng-iii/Glimpse')
+    expect(repositoryLink.attributes('target')).toBe('_blank')
+
+    await selectSection(wrapper, '软件更新')
+    expect(wrapper.get('.settings-meta').text()).toContain('Glimpse v0.3.2')
+  })
+
+  it('opens the repository via the desktop opener instead of the webview', async () => {
+    const wrapper = await mountSettings()
+
+    await wrapper.get('.settings-meta__link').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.openUrl).toHaveBeenCalledWith('https://github.com/xiaofeng-iii/Glimpse')
   })
 
   it('shows a network-specific error when the notes index cannot be loaded', async () => {

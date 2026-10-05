@@ -498,7 +498,7 @@ defineExpose({ focus, clear })
 .search-toolbar {
   --search-toolbar-surface-radius: var(--radius-xl);
   --search-toolbar-surface-inset: 0.625rem;
-  --search-toolbar-control-radius: var(--radius-sm);
+  --search-toolbar-control-radius: var(--radius-md);
   --search-toolbar-segment-inset: 2px;
   --search-toolbar-segment-radius: max(
     1px,

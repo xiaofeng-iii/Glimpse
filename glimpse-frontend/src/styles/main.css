@@ -387,14 +387,26 @@ button {
 
 .shell-navigation-button:hover {
   color: var(--color-text);
-  border-color: var(--color-border);
-  background: var(--color-surface-hover);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
 }
 
-.shell-icon-button.desktop-shell__settings-button {
+.shell-icon-button.desktop-shell__settings-button,
+.update-badge {
   width: 1.75rem;
   height: 1.75rem;
   min-height: 1.75rem;
+}
+
+.desktop-shell__leading .shell-icon-button:hover {
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  border-color: transparent;
+}
+
+:root[data-theme='dark'] .desktop-shell__leading .shell-icon-button:hover,
+:root[data-theme='dark'] .shell-navigation-button:hover {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  border-color: transparent;
 }
 
 .desktop-shell__window-controls {
@@ -796,13 +808,14 @@ kbd {
 }
 
 :root[data-theme='dark'] .shell-icon-button {
-  background: rgba(31, 40, 53, 0.72);
-  border-color: rgba(226, 232, 240, 0.1);
+  background: transparent;
+  border-color: transparent;
   color: var(--shell-muted);
 }
 
 :root[data-theme='dark'] .shell-icon-button:hover {
-  background: rgba(42, 54, 70, 0.95);
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
   color: var(--shell-ink);
 }
 

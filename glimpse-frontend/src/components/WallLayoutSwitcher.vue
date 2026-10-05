@@ -56,6 +56,8 @@ const choose = (mode: WallLayoutMode) => {
   border: 1px solid color-mix(in srgb, var(--shell-line) 70%, transparent);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--shell-window-bg) 70%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   transition: box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease;
 }
 
@@ -89,8 +91,18 @@ const choose = (mode: WallLayoutMode) => {
 }
 
 .wall-layout-switcher__option--active {
-  color: var(--color-primary);
-  background: var(--color-primary-soft);
+  color: var(--shell-ink);
+  background: var(--color-surface-raised, var(--shell-card));
+  box-shadow: 0 0 6px rgba(0, 0, 0, .12);
+}
+
+:root[data-theme='dark'] .wall-layout-switcher__option--active {
+  background: var(--shell-control-hover);
+  box-shadow: 0 0 8px rgba(0, 0, 0, .45);
+}
+
+:root[data-theme='dark'] .wall-layout-switcher__option:hover:not(:disabled):not(.wall-layout-switcher__option--active) {
+  background: var(--color-surface-raised, var(--shell-card));
 }
 
 .wall-layout-switcher__option:focus-visible {

@@ -6,6 +6,13 @@ export default {
   ],
   theme: {
     extend: {
+      // 圆角类必须与 main.css 的 --radius-* 刻度同轨，勿在此处另设数值。
+      borderRadius: {
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
+      },
       fontSize: {
         xs: ['12px', { lineHeight: 'var(--line-height-12)' }],
         sm: ['14px', { lineHeight: 'var(--line-height-14)' }],

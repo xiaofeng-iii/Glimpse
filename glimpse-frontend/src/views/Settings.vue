@@ -72,10 +72,10 @@ type ConfirmAction = 'reset' | 'index' | 'ocr' | null
 const isSectionId = (value: unknown): value is SectionId =>
   typeof value === 'string' && sections.some((section) => section.id === value)
 
-const activeSection = ref<SectionId>('hotkeys')
+const activeSection = ref<SectionId>('ui')
 
 onMounted(() => {
-  // 「查看详情」等入口通过 ?section= 直达目标分区；缺省保持快捷键页。
+  // 「查看详情」等入口通过 ?section= 直达目标分区；缺省显示导航首项「界面」。
   if (isSectionId(route.query.section)) activeSection.value = route.query.section
 })
 const loading = ref(true)
@@ -172,6 +172,16 @@ const themeOptions = [
 const activeThemeIndex = computed(() => {
   const index = themeOptions.findIndex((o) => o.value === themePreference.value)
   return index >= 0 ? index : 0
+})
+
+const THEME_SLIDE_BASE_MS = 100
+const THEME_SLIDE_MS_PER_STEP = 100
+const themeSlideDurationMs = ref(THEME_SLIDE_BASE_MS + THEME_SLIDE_MS_PER_STEP)
+let previousThemeIndex = activeThemeIndex.value
+watch(activeThemeIndex, (next) => {
+  themeSlideDurationMs.value =
+    THEME_SLIDE_BASE_MS + Math.max(1, Math.abs(next - previousThemeIndex)) * THEME_SLIDE_MS_PER_STEP
+  previousThemeIndex = next
 })
 
 const updateChannelOptions = computed(() => {
@@ -517,6 +527,20 @@ const installUpdate = async () => {
   }
 }
 
+const repositoryUrl = 'https://github.com/xiaofeng-iii/Glimpse'
+
+// 桌面壳的 WebView 会吞掉 target="_blank" 的新窗口请求，改交系统浏览器打开；浏览器端保留原生链接行为。
+const openRepository = async (event: MouseEvent) => {
+  if (!isDesktopShell()) return
+  event.preventDefault()
+  try {
+    const { openUrl } = await import('@tauri-apps/plugin-opener')
+    await openUrl(repositoryUrl)
+  } catch (error) {
+    logger.error('Failed to open repository link: %s', error)
+  }
+}
+
 const testAi = async () => {
   testingAi.value = true
   aiTestResult.value = null
@@ -711,8 +735,9 @@ onUnmounted(() => {
             <div class="settings-content__header-divider"></div>
           </header>
 
-          <div :inert="resetting || discardDialogOpen" class="settings-content__body min-h-0 flex-1 space-y-4 overflow-y-auto px-7 py-5">
-            <template v-if="activeSection === 'hotkeys'">
+          <div :inert="resetting || discardDialogOpen" class="settings-content__body min-h-0 flex-1 overflow-y-auto px-7 py-5">
+            <div class="settings-panel">
+              <template v-if="activeSection === 'hotkeys'">
               <div class="setting-row">
                 <div>
                   <label class="setting-label">{{ t('settings.screenshotHotkey') }}</label>
@@ -752,7 +777,7 @@ onUnmounted(() => {
                 <input v-model.number="clusterThreshold" class="setting-input" type="number" min="1" max="20" />
               </label>
 
-              <div class="rounded-lg border border-[var(--shell-line)] p-3.5">
+              <div>
                 <label class="flex cursor-pointer items-center justify-between gap-4">
                   <span>
                     <span class="setting-label">{{ t('settings.enableCluster') }}</span>
@@ -843,7 +868,7 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <div class="rounded-lg border border-[color-mix(in_srgb,var(--color-primary)_20%,transparent)] bg-[var(--color-primary-soft)] p-3.5">
+              <div class="settings-panel__card bg-[var(--color-primary-soft)]">
                 <div class="flex items-center gap-2 text-sm font-semibold text-[var(--color-primary-hover)]">
                   <CpuChipIcon class="h-5 w-5 flex-none" aria-hidden="true" />
                   {{ t('settings.localOcr') }}
@@ -860,7 +885,12 @@ onUnmounted(() => {
             <template v-else-if="activeSection === 'ui'">
               <div class="setting-row">
                 <span class="setting-label">{{ t('settings.theme') }}</span>
-                <div class="theme-switcher inline-grid grid-flow-col auto-cols-fr items-center" role="radiogroup" :aria-label="t('settings.theme')">
+                <div
+                  class="theme-switcher inline-grid grid-flow-col auto-cols-fr items-center"
+                  role="radiogroup"
+                  :aria-label="t('settings.theme')"
+                  :style="{ '--segment-slide-duration': `${themeSlideDurationMs}ms` }"
+                >
                   <span
                     class="theme-switcher__thumb"
                     :style="{ transform: `translateX(calc(${activeThemeIndex} * (100% + var(--theme-segment-inset))))` }"
@@ -870,15 +900,30 @@ onUnmounted(() => {
                     v-for="option in themeOptions"
                     :key="option.value"
                     type="button"
-                    class="theme-switcher__button text-xs"
-                    :class="themePreference === option.value
-                      ? 'text-[var(--shell-ink)] font-medium'
-                      : 'text-[var(--shell-muted)] font-medium hover:text-[var(--shell-ink)]'"
+                    class="theme-switcher__button text-xs font-medium text-[var(--shell-muted)] hover:text-[var(--shell-ink)]"
                     :aria-pressed="themePreference === option.value"
                     @click="themePreference = option.value"
                   >
                     {{ t(option.labelKey) }}
                   </button>
+                  <span
+                    class="theme-switcher__ink"
+                    :style="{ transform: `translateX(calc(${activeThemeIndex} * (100% + var(--theme-segment-inset))))` }"
+                    aria-hidden="true"
+                  >
+                    <span
+                      class="theme-switcher__ink-row"
+                      :style="{ transform: `translateX(calc(${-activeThemeIndex} * ((100% + var(--theme-segment-inset)) / 3)))` }"
+                    >
+                      <span
+                        v-for="option in themeOptions"
+                        :key="option.value"
+                        class="theme-switcher__ink-label text-xs font-medium"
+                      >
+                        {{ t(option.labelKey) }}
+                      </span>
+                    </span>
+                  </span>
                 </div>
               </div>
               <div class="setting-row">
@@ -909,49 +954,43 @@ onUnmounted(() => {
             </template>
 
             <template v-else-if="activeSection === 'updates'">
-              <div class="maintenance-card space-y-4">
+              <div class="setting-row">
                 <div>
-                  <h3 class="setting-label">{{ t('settings.updateVersion') }}</h3>
-                  <p class="setting-help">
-                    <UpdateNotesPopover v-if="currentVersion" v-model:open="currentNotesOpen" :label="`${t('settings.updateVersion')} ${currentVersion}`">
-                      <template #trigger><button type="button" class="version-notes-trigger">{{ currentVersion }}</button></template>
-                      <UpdateNotesContent :notes="updatesStore.currentNotes" :loading="updatesStore.currentNotesLoading" :error="updatesStore.currentNotesError ? t(updatesStore.currentNotesError) : ''" />
-                    </UpdateNotesPopover>
-                    <template v-else>{{ t('settings.updateDesktopOnly') }}</template>
-                  </p>
+                  <label id="settings-update-channel-label" for="settings-update-channel" class="setting-label">{{ t('settings.updateChannel') }}</label>
+                  <p class="setting-help">{{ t('settings.updateChannelHint') }}</p>
                 </div>
-                <div class="setting-row">
-                  <div>
-                    <label id="settings-update-channel-label" for="settings-update-channel" class="setting-label">{{ t('settings.updateChannel') }}</label>
-                    <p class="setting-help">{{ t('settings.updateChannelHint') }}</p>
-                  </div>
-                  <AppSelect
-                    id="settings-update-channel"
-                    v-model="updateChannel"
-                    aria-labelledby="settings-update-channel-label"
-                    :options="updateChannelOptions"
-                    :disabled="installingUpdate"
-                  />
+                <AppSelect
+                  id="settings-update-channel"
+                  v-model="updateChannel"
+                  aria-labelledby="settings-update-channel-label"
+                  :options="updateChannelOptions"
+                  :disabled="installingUpdate"
+                />
+              </div>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">{{ t('settings.updateCheckLabel') }}</span>
+                  <p v-if="!isDesktopShell()" class="setting-help">{{ t('settings.updateDesktopOnly') }}</p>
                 </div>
-                <div class="flex flex-wrap items-center gap-3">
-                  <button type="button" class="btn-secondary" :disabled="!isDesktopShell() || checkingUpdate || installingUpdate" @click="checkForUpdate">
-                    {{ checkingUpdate ? t('settings.updateChecking') : t('settings.updateCheck') }}
-                  </button>
+                <div class="flex flex-wrap items-center justify-end gap-3">
                   <p v-if="installFailed" role="alert" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateRetryCheck') }}</p>
                   <p v-if="installingUpdate" role="status" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateInstalling') }}</p>
-                </div>
-                <div v-if="availableUpdate" class="rounded-lg border border-[var(--shell-line)] p-3.5">
-                  <div class="flex items-center gap-2">
-                    <p class="setting-label">{{ t('settings.updateAvailable', { version: availableUpdate.version }) }}</p>
-                    <UpdateNotesPopover v-model:open="targetNotesOpen" :label="t('settings.updateAvailable', { version: availableUpdate.version })">
-                      <template #trigger><button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--shell-muted)]" :aria-label="t('settings.notesView')" :disabled="installingUpdate"><span aria-hidden="true">›</span></button></template>
-                      <UpdateNotesContent :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate.notes ?? '' : undefined" />
-                    </UpdateNotesPopover>
-                  </div>
-                  <button type="button" class="btn-primary mt-3" :disabled="installingUpdate || checkingUpdate" @click="installUpdate">
-                    {{ t('settings.updateInstall') }}
+                  <button type="button" class="btn-secondary btn-sm" :disabled="!isDesktopShell() || checkingUpdate || installingUpdate" @click="checkForUpdate">
+                    {{ checkingUpdate ? t('settings.updateChecking') : t('settings.updateCheck') }}
                   </button>
                 </div>
+              </div>
+              <div v-if="availableUpdate" class="settings-panel__card bg-[var(--color-surface-subtle)]">
+                <div class="flex items-center gap-2">
+                  <p class="setting-label">{{ t('settings.updateAvailable', { version: availableUpdate.version }) }}</p>
+                  <UpdateNotesPopover v-model:open="targetNotesOpen" :label="t('settings.updateAvailable', { version: availableUpdate.version })">
+                    <template #trigger><button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--shell-muted)]" :aria-label="t('settings.notesView')" :disabled="installingUpdate"><span aria-hidden="true">›</span></button></template>
+                    <UpdateNotesContent :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate.notes ?? '' : undefined" />
+                  </UpdateNotesPopover>
+                </div>
+                <button type="button" class="btn-primary btn-sm mt-3" :disabled="installingUpdate || checkingUpdate" @click="installUpdate">
+                  {{ t('settings.updateInstall') }}
+                </button>
               </div>
             </template>
 
@@ -1020,6 +1059,16 @@ onUnmounted(() => {
                 </div>
               </div>
             </template>
+            </div>
+            <div class="settings-meta">
+              <UpdateNotesPopover v-if="currentVersion" v-model:open="currentNotesOpen" :label="`${t('settings.updateVersion')} ${currentVersion}`">
+                <template #trigger><button type="button" class="version-notes-trigger">Glimpse v{{ currentVersion }}</button></template>
+                <UpdateNotesContent :notes="updatesStore.currentNotes" :loading="updatesStore.currentNotesLoading" :error="updatesStore.currentNotesError ? t(updatesStore.currentNotesError) : ''" />
+              </UpdateNotesPopover>
+              <span v-else class="settings-meta__version">Glimpse</span>
+              <span class="settings-meta__dot" aria-hidden="true">·</span>
+              <a class="settings-meta__link" :href="repositoryUrl" target="_blank" rel="noreferrer" @click="openRepository">GitHub</a>
+            </div>
           </div>
 
           <div class="settings-content__footer flex-none px-7 py-3">
@@ -1073,14 +1122,15 @@ onUnmounted(() => {
   color: inherit;
   font: inherit;
   letter-spacing: inherit;
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
   cursor: pointer;
-  transition: color 140ms ease;
+  transition: color 400ms ease-out, text-decoration-color 400ms ease-out;
 }
 .version-notes-trigger:hover {
   color: var(--color-primary-hover);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration-color: currentColor;
 }
 .settings-layout {
   display: grid;
@@ -1111,6 +1161,15 @@ onUnmounted(() => {
   padding: .375rem;
 }
 
+/* 隐藏内容区滚动条：滚动条出现时会占走宽度，让面板与标题分隔线错位。 */
+.settings-content__body {
+  scrollbar-width: none;
+}
+
+.settings-content__body::-webkit-scrollbar {
+  display: none;
+}
+
 .settings-content__footer {
   display: flex;
   align-items: center;
@@ -1134,6 +1193,35 @@ onUnmounted(() => {
   opacity: 1;
   color: var(--color-danger);
   text-decoration: underline;
+}
+
+/* 面板下方的版本与仓库元信息行：居中低对比，悬浮缓慢亮起，所有分区共用。 */
+.settings-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  margin-top: 1rem;
+  font-size: .75rem;
+  line-height: var(--line-height-12);
+  color: color-mix(in srgb, var(--shell-muted) 65%, transparent);
+}
+
+.settings-meta__dot {
+  opacity: .7;
+}
+
+.settings-meta__link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: color 400ms ease-out, text-decoration-color 400ms ease-out;
+}
+
+.settings-meta__link:hover {
+  color: var(--color-primary-hover);
+  text-decoration-color: currentColor;
 }
 
 .settings-reset-link:disabled {
@@ -1177,6 +1265,37 @@ onUnmounted(() => {
   grid-template-columns: minmax(160px, 200px) minmax(0, 1fr);
   align-items: center;
   gap: 1rem;
+}
+
+/* 右侧操作元素统一贴到行右缘，对齐靠结构（固定标签列 + 统一右缘）而非分隔线，
+   避免行底线与控件描边撞色造成的"满屏是线"。 */
+.setting-row > :last-child {
+  justify-self: end;
+}
+
+/* 设置项容器：低对比度细线包裹整组设置项，项间用内缩分隔线分开。
+   分隔线不贯通容器两端，靠容器左右内边距实现。 */
+.settings-panel {
+  --settings-panel-line: color-mix(in srgb, var(--shell-line) 55%, transparent);
+  border: 1px solid var(--settings-panel-line);
+  border-radius: var(--radius-xl);
+  padding-inline: 1rem;
+}
+
+.settings-panel > * {
+  padding-block: .75rem;
+}
+
+.settings-panel > * + * {
+  border-top: 1px solid var(--settings-panel-line);
+}
+
+/* 面板内的有色信息块：留出与相邻行及容器边缘的呼吸距离，不参与行分隔线。 */
+.settings-panel > .settings-panel__card {
+  margin-block: .75rem;
+  border-top: 0;
+  border-radius: var(--radius-lg);
+  padding: .875rem 1rem;
 }
 
 .setting-label {
@@ -1233,10 +1352,11 @@ onUnmounted(() => {
   cursor: default;
 }
 
-/* 扁平化三段式主题切换器：保持线框浅底外观 + 独立平移滑块动效 */
+/* 扁平化三段式主题切换器：保持线框浅底外观 + 独立平移滑块动效与遮罩文字变色 */
 .theme-switcher {
   --theme-segment-inset: 2px;
   --theme-segment-radius: calc(var(--radius-md) - var(--theme-segment-inset));
+  --segment-slide-easing: cubic-bezier(0.33, 1, 0.68, 1);
   position: relative;
   width: 10.5rem;
   height: 1.875rem;
@@ -1244,7 +1364,7 @@ onUnmounted(() => {
   padding: var(--theme-segment-inset);
   border: 1px solid var(--shell-line);
   border-radius: var(--radius-md);
-  background: var(--shell-control-bg);
+  background: var(--color-surface-subtle);
 }
 
 .theme-switcher__thumb {
@@ -1255,9 +1375,9 @@ onUnmounted(() => {
   width: calc((100% - var(--theme-segment-inset) * 4) / 3);
   border-radius: var(--theme-segment-radius);
   background: var(--color-surface-raised, var(--shell-card));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .04);
+  box-shadow: 0 0 6px rgba(0, 0, 0, .14);
   will-change: transform;
-  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--segment-slide-duration, 300ms) var(--segment-slide-easing);
 }
 
 .theme-switcher__button {
@@ -1267,7 +1387,6 @@ onUnmounted(() => {
   user-select: none;
   cursor: pointer;
   outline: none;
-  transition: color 200ms ease;
 }
 
 .theme-switcher__button:focus-visible {
@@ -1275,15 +1394,53 @@ onUnmounted(() => {
   outline-offset: 1px;
 }
 
+/* 遮罩窗：与滑块同几何同平移，窗口内是选中文字副本；
+   反向平移保持与底层文字完全对齐，滑动中文字随滑块边缘即时切变颜色。 */
+.theme-switcher__ink {
+  position: absolute;
+  top: var(--theme-segment-inset);
+  bottom: var(--theme-segment-inset);
+  left: var(--theme-segment-inset);
+  width: calc((100% - var(--theme-segment-inset) * 4) / 3);
+  overflow: hidden;
+  border-radius: var(--theme-segment-radius);
+  pointer-events: none;
+  will-change: transform;
+  transition: transform var(--segment-slide-duration, 300ms) var(--segment-slide-easing);
+}
+
+.theme-switcher__ink-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--theme-segment-inset);
+  width: calc(300% + var(--theme-segment-inset) * 2);
+  height: 100%;
+  will-change: transform;
+  transition: transform var(--segment-slide-duration, 300ms) var(--segment-slide-easing);
+}
+
+.theme-switcher__ink-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  color: var(--shell-ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .theme-switcher__thumb,
-  .theme-switcher__button {
+  .theme-switcher__ink,
+  .theme-switcher__ink-row {
     transition: none;
   }
 }
 
 :root[data-theme='dark'] .theme-switcher__thumb {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  background: var(--color-surface-hover);
+  box-shadow: 0 0 8px rgba(0, 0, 0, .45);
 }
 
 .settings-content :deep(.btn-primary) {
@@ -1332,10 +1489,15 @@ onUnmounted(() => {
   text-shadow: none;
 }
 
+/* 维护分区条目：作为 .settings-panel 的直接子项，视觉分组由容器与分隔线承担。 */
 .maintenance-card {
-  border: 1px solid var(--shell-line);
+  min-width: 0;
+}
+
+.updates-panel__card {
   border-radius: var(--radius-lg);
-  padding: .875rem;
+  background: var(--color-surface-subtle);
+  padding: .875rem 1rem;
 }
 
 @media (max-width: 900px) {
@@ -1370,6 +1532,10 @@ onUnmounted(() => {
   .setting-row {
     grid-template-columns: 1fr;
     gap: .75rem;
+  }
+
+  .setting-row > :last-child {
+    justify-self: start;
   }
 }
 </style>
