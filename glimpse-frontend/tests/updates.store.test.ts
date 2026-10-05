@@ -98,4 +98,35 @@ describe('updates store', () => {
     expect(store.availableUpdate).toBeNull()
     expect(store.checking).toBe(false)
   })
+
+  it('serves the fake dev-channel update without calling the desktop shell', async () => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.4.1')
+    store.setDevChannel(true)
+
+    const target = await store.checkForUpdate()
+
+    expect(apiMocks.invoke).not.toHaveBeenCalled()
+    expect(target?.version).toBe('1.0.0')
+    expect(store.showAvailableBadge).toBe(true)
+    await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
+    expect(store.updateNotes?.sections.features).toContain('记忆墙支持自定义排序')
+    expect(store.updateNotes?.sections.features).toContain('新增记忆连拍合并开关')
+    // 被 1.0.0 正式版覆盖的预览条目按截断规则剔除，不该混进聚合结果。
+    expect(store.updateNotes?.sections.features).not.toContain('仅预览版测试条目（聚合时应被剔除）')
+  })
+
+  it('fails the simulated dev-channel install without touching the updater', async () => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.4.1')
+    store.setDevChannel(true)
+    await store.checkForUpdate()
+
+    const installed = await store.installUpdate()
+
+    expect(installed).toBe(false)
+    expect(apiMocks.invoke).not.toHaveBeenCalled()
+    expect(store.installFailed).toBe(true)
+    expect(store.availableUpdate).toBeNull()
+  })
 })

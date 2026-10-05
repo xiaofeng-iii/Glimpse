@@ -13,6 +13,19 @@ import {
 const logger = createLogger('stores/updates')
 
 export const LAST_RUN_VERSION_STORAGE_KEY = 'glimpse.lastRunVersion'
+// 开发假通道的标识，与 @/dev/fakeUpdateChannel 配套；生产构建里所有引用都会被 DEV 常量折叠掉。
+export const DEV_UPDATE_CHANNEL = 'dev-test'
+export const DEV_UPDATE_CHANNEL_STORAGE_KEY = 'glimpse.devUpdateChannel'
+
+// 开发通道的选择只留在 localStorage：后端会拒绝 settings.json 里的未知通道值。
+const readDevChannelEnabled = () => {
+  if (!import.meta.env.DEV) return false
+  try {
+    return window.localStorage.getItem(DEV_UPDATE_CHANNEL_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 export interface AvailableUpdate {
   version: string
@@ -62,9 +75,36 @@ export const useUpdatesStore = defineStore('updates', () => {
     () => !availableUpdate.value && justUpdated.value && !justUpdatedNotesSeen.value,
   )
 
-  const channel = computed<'stable' | 'preview'>(() =>
-    settingsStore.settings?.ui?.update_channel === 'preview' ? 'preview' : 'stable',
-  )
+  const devChannel = ref(readDevChannelEnabled())
+
+  const channel = computed<'stable' | 'preview' | 'dev-test'>(() => {
+    if (import.meta.env.DEV && devChannel.value) return DEV_UPDATE_CHANNEL
+    return settingsStore.settings?.ui?.update_channel === 'preview' ? 'preview' : 'stable'
+  })
+
+  const setDevChannel = (enabled: boolean) => {
+    if (!import.meta.env.DEV) return
+    devChannel.value = enabled
+    try {
+      if (enabled) window.localStorage.setItem(DEV_UPDATE_CHANNEL_STORAGE_KEY, '1')
+      else window.localStorage.removeItem(DEV_UPDATE_CHANNEL_STORAGE_KEY)
+    } catch {
+      // localStorage 不可用时仅本次会话生效。
+    }
+  }
+
+  // 开发通道用内存里的假索引，真实通道照旧抓 GitHub Pages。
+  const loadNotesFor = async (targetChannel: string) => {
+    if (import.meta.env.DEV && targetChannel === DEV_UPDATE_CHANNEL) {
+      const { devReleaseNotes } = await import('@/dev/fakeUpdateChannel')
+      return devReleaseNotes()
+    }
+    return loadNotes()
+  }
+
+  // dev-test 按预览语义聚合，再交给 aggregateNotes 的截断规则。
+  const aggregationChannel = (targetChannel: string): 'stable' | 'preview' =>
+    targetChannel === 'stable' ? 'stable' : 'preview'
 
   const recordCurrentVersion = (version: string) => {
     if (!version) return
@@ -80,20 +120,27 @@ export const useUpdatesStore = defineStore('updates', () => {
     if (!isDesktopShell() || checking.value || installing.value) return null
     checking.value = true
     installFailed.value = false
+    const requestedChannel = channel.value
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      const target = await invoke<AvailableUpdate | null>('check_for_update', {
-        channel: channel.value,
-      })
+      let target: AvailableUpdate | null
+      if (import.meta.env.DEV && requestedChannel === DEV_UPDATE_CHANNEL) {
+        const { devCheckForUpdate } = await import('@/dev/fakeUpdateChannel')
+        target = devCheckForUpdate(currentVersion.value)
+      } else {
+        const { invoke } = await import('@tauri-apps/api/core')
+        target = await invoke<AvailableUpdate | null>('check_for_update', {
+          channel: requestedChannel,
+        })
+      }
       availableUpdate.value = target
       if (target) {
         const generation = ++notesGeneration
         updateNotes.value = null
         updateNotesPartial.value = false
         updateNotesLoading.value = true
-        void loadNotes().then((entries) => {
+        void loadNotesFor(requestedChannel).then((entries) => {
           if (generation !== notesGeneration) return
-          updateNotes.value = aggregateNotes(entries, currentVersion.value, target.version, channel.value)
+          updateNotes.value = aggregateNotes(entries, currentVersion.value, target.version, aggregationChannel(requestedChannel))
           updateNotesPartial.value = !updateNotes.value
         }).catch(() => {
           if (generation === notesGeneration) updateNotesPartial.value = true
@@ -115,8 +162,13 @@ export const useUpdatesStore = defineStore('updates', () => {
     if (!availableUpdate.value || installing.value || checking.value) return false
     installing.value = true
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      await invoke('install_checked_update')
+      if (import.meta.env.DEV && channel.value === DEV_UPDATE_CHANNEL) {
+        const { devInstallUpdate } = await import('@/dev/fakeUpdateChannel')
+        await devInstallUpdate()
+      } else {
+        const { invoke } = await import('@tauri-apps/api/core')
+        await invoke('install_checked_update')
+      }
       return true
     } catch (error) {
       logger.error('Failed to install update: %s', error)
@@ -147,12 +199,13 @@ export const useUpdatesStore = defineStore('updates', () => {
   // 手动重新检查到新版本后调用，让顶栏浮窗展示同一份聚合说明。
   const refreshUpdateNotes = (version: string) => {
     const generation = ++notesGeneration
+    const requestedChannel = channel.value
     updateNotes.value = null
     updateNotesPartial.value = false
     updateNotesLoading.value = true
-    void loadNotes().then((entries) => {
+    void loadNotesFor(requestedChannel).then((entries) => {
       if (generation !== notesGeneration) return
-      updateNotes.value = aggregateNotes(entries, currentVersion.value, version, channel.value)
+      updateNotes.value = aggregateNotes(entries, currentVersion.value, version, aggregationChannel(requestedChannel))
       updateNotesPartial.value = !updateNotes.value
     }).catch(() => {
       if (generation === notesGeneration) updateNotesPartial.value = true
@@ -180,6 +233,8 @@ export const useUpdatesStore = defineStore('updates', () => {
     currentNotes,
     currentNotesError,
     currentNotesLoading,
+    devChannel,
+    setDevChannel,
     recordCurrentVersion,
     checkForUpdate,
     installUpdate,
