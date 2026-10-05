@@ -61,7 +61,7 @@ const indexEntries = [
 const mountedHosts: Array<{ unmount: () => void }> = []
 afterEach(() => { mountedHosts.splice(0).forEach((host) => host.unmount()) })
 
-const mountSettings = async (initialPath = '/settings') => {
+const mountSettings = async (initialPath = '/settings', prepare?: () => Promise<void> | void) => {
   const { createMemoryHistory, createRouter } = await import('vue-router')
   const router = createRouter({
     history: createMemoryHistory(),
@@ -73,6 +73,8 @@ const mountSettings = async (initialPath = '/settings') => {
   const pinia = createPinia()
   const { setActivePinia } = await import('pinia')
   setActivePinia(pinia)
+  // prepare 在组件挂载前驱动共享 store，模拟启动检测/顶栏已发生的状态。
+  if (prepare) await prepare()
   await router.push(initialPath)
   await router.isReady()
   // attachTo 让 reka-ui PopoverPortal 的 Fragment 在 autoUnmount 前被显式卸载，
@@ -278,15 +280,71 @@ describe('Settings update notes', () => {
     dialog.vm.$emit('confirm')
     await flushPromises()
     expect(dialog.props('busy')).toBe(true)
-    expect(document.body.textContent).toContain('正在下载并验证更新')
+    // 状态文案在弹窗内只出现一次（标题下方的描述行），不再描述、正文各来一份。
+    const dialogPanel = document.querySelector('[role="alertdialog"]')
+    expect(dialogPanel?.textContent?.match(/正在下载/g)).toHaveLength(1)
 
     releaseInstall()
     await flushPromises()
     expect(dialog.props('busy')).toBe(false)
     expect(wrapper.text()).toContain('安装失败，请重新检查更新后再试。')
     // 失败后已取走待安装对象，入口回到"重新检查更新"而不是残留可重复安装的按钮。
-    expect(wrapper.find('.maintenance-card .btn-primary').exists()).toBe(false)
+    expect(wrapper.find('.settings-panel__card').exists()).toBe(false)
     expect(checkButton(wrapper).attributes('disabled')).toBeUndefined()
+  })
+
+  it('installs in place from the card without opening any dialog', async () => {
+    let releaseInstall!: (value?: unknown) => void
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'check_for_update') {
+        return { version: '0.3.3-preview.20261003', notes: null }
+      }
+      if (command === 'install_checked_update') {
+        await new Promise<void>((resolve) => { releaseInstall = resolve })
+        throw new Error('download failed')
+      }
+      throw new Error(`unexpected command ${command}`)
+    })
+    const wrapper = await openUpdates(await mountSettings())
+
+    await checkButton(wrapper).trigger('click')
+    await flushPromises()
+    const dialog = wrapper.findAllComponents(ConfirmDialog).find((item) => item.vm.$attrs.id === 'update-notes')!
+    dialog.vm.$emit('cancel')
+    await flushPromises()
+
+    const installButton = wrapper.findAll('button').find((button) => button.text() === '下载并安装')!
+    await installButton.trigger('click')
+    await flushPromises()
+
+    // 点击后就地进入下载态：不再弹窗，按钮自身变为共享的「正在下载」状态。
+    expect(dialog.props('open')).toBe(false)
+    expect(wrapper.findAll('button').find((button) => button.text() === '正在下载')).toBeDefined()
+
+    releaseInstall()
+    await flushPromises()
+    expect(wrapper.text()).toContain('安装失败，请重新检查更新后再试。')
+  })
+
+  it('mirrors an install started elsewhere as 正在下载 in the updates section', async () => {
+    apiMocks.invoke.mockResolvedValue({ version: '0.3.3-preview.20261003', notes: null })
+    // 挂载前模拟启动检测已发现更新、且顶栏浮窗已发起下载。
+    const wrapper = await mountSettings('/settings', async () => {
+      const store = useUpdatesStore()
+      store.recordCurrentVersion('0.3.2')
+      await store.checkForUpdate()
+      store.installing = true
+    })
+
+    await openUpdates(wrapper)
+    await flushPromises()
+
+    const dialog = wrapper.findAllComponents(ConfirmDialog).find((item) => item.vm.$attrs.id === 'update-notes')!
+    expect(dialog.props('open')).toBe(false)
+    expect(wrapper.text()).toContain('发现新版本 0.3.3-preview.20261003')
+    const installButton = wrapper.findAll('button').find((button) => button.text() === '正在下载')!
+    expect(installButton.attributes('disabled')).toBeDefined()
+    expect(checkButton(wrapper).attributes('disabled')).toBeDefined()
   })
 
   it('does not auto-check on normal entry; detection waits for the manual button', async () => {

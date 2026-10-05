@@ -117,7 +117,6 @@ const lastRealChannel = ref<'stable' | 'preview'>('stable')
 const currentVersion = ref('')
 const availableUpdate = ref<{ version: string; notes: string | null } | null>(null)
 const checkingUpdate = ref(false)
-const installingUpdate = ref(false)
 const updateDialogOpen = ref(false)
 const currentNotesOpen = ref(false)
 const targetNotesOpen = ref(false)
@@ -443,7 +442,7 @@ const handleSaveAi = async () => {
 // 检查更新的核心流程，手动点击与进入设置页自动检测共用。
 // notify/silent 控制反馈：手动点击要给"已是最新/失败"提示并弹窗，自动检测静默、只把卡片摆上。
 const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
-  if (!isDesktopShell() || checkingUpdate.value || installingUpdate.value) return
+  if (!isDesktopShell() || checkingUpdate.value || updatesStore.installing) return
   checkingUpdate.value = true
   availableUpdate.value = null
   installFailed.value = false
@@ -489,8 +488,8 @@ const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
   }
 }
 
-// 从标题栏「查看详情」进入时，启动检测已把更新写进共享 store：
-// 直接同步到本地展示更新卡片，不重新检测、不弹模态。其余进入路径不自动检测。
+// 把共享 store 已发现的更新同步到本地展示：不重新检测，任何进入路径都执行，
+// 这样顶栏发起的下载在进行中时，设置页也能读到同一份 installing 状态。
 const adoptStoreUpdate = () => {
   if (!updatesStore.availableUpdate) return
   availableUpdate.value = updatesStore.availableUpdate
@@ -501,29 +500,18 @@ const adoptStoreUpdate = () => {
 
 const checkForUpdate = () => runUpdateCheck({ silent: false })
 
+// 安装状态统一存放在共享 store：设置页卡片、更新弹窗与顶栏浮窗读同一份 installing，
+// 任何一处发起下载，其余位置同步显示「正在下载」。这里只负责失败后的页面内收尾。
 const installUpdate = async () => {
-  if (!availableUpdate.value || installingUpdate.value || checkingUpdate.value) return
+  if (!availableUpdate.value || updatesStore.installing || updatesStore.checking) return
   targetNotesOpen.value = false
   currentNotesOpen.value = false
-  updateDialogOpen.value = true
-  installingUpdate.value = true
-  try {
-    if (import.meta.env.DEV && updateChannel.value === DEV_UPDATE_CHANNEL) {
-      const { devInstallUpdate } = await import('@/dev/fakeUpdateChannel')
-      await devInstallUpdate()
-    } else {
-      const { invoke } = await import('@tauri-apps/api/core')
-      await invoke('install_checked_update')
-    }
-  } catch (error) {
-    logger.error('Failed to install update: %s', error)
+  const ok = await updatesStore.installUpdate()
+  if (!ok) {
+    updateDialogOpen.value = false
     notifications.show(t('settings.updateInstallFailed'), 'error')
     availableUpdate.value = null
-    updatesStore.availableUpdate = null
     installFailed.value = true
-    updateDialogOpen.value = false
-  } finally {
-    installingUpdate.value = false
   }
 }
 
@@ -651,7 +639,9 @@ const canLeave = async () => {
   return pendingDiscardPromise
 }
 
-onBeforeRouteLeave(async () => installingUpdate.value ? false : canLeave())
+// 下载安装由全局 store 承载、完成时会整体重启应用，不依赖设置页存续，
+// 因此安装期间不再拦截离开页面（与顶栏发起下载后可自由导航保持一致）。
+onBeforeRouteLeave(async () => canLeave())
 
 onMounted(async () => {
   unregisterGuard = unsavedChanges.register(canLeave)
@@ -668,12 +658,9 @@ onMounted(async () => {
   if (currentVersion.value) {
     updatesStore.recordCurrentVersion(currentVersion.value)
   }
-  // 默认进入不自动检测：检测由用户点「检查更新」触发。
-  // 唯独从标题栏「查看详情」（?section=updates 且 store 已有已发现更新）进入时，
-  // 直接展示已发现的新版本。
-  if (route.query.section === 'updates') {
-    adoptStoreUpdate()
-  }
+  // 默认进入不自动检测：检测由用户点「检查更新」或启动流程触发；
+  // 但共享 store 里已发现的更新（含进行中的下载）总是同步进来展示。
+  adoptStoreUpdate()
   scheduleMaintenancePoll()
 })
 
@@ -687,9 +674,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <ConfirmDialog id="update-notes" :open="updateDialogOpen" :title="t('settings.updateAvailable', { version: availableUpdate?.version ?? '' })" :description="installingUpdate ? t('settings.updateInstalling') : ''" :confirm-label="t('settings.updateNow')" :cancel-label="t('settings.updateLater')" :busy="installingUpdate" hide-icon @cancel="updateDialogOpen = false" @confirm="installUpdate">
-    <p v-if="installingUpdate" role="status" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateInstalling') }}</p>
-    <UpdateNotesContent v-else :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate?.notes ?? '' : undefined" />
+  <ConfirmDialog id="update-notes" :open="updateDialogOpen" :title="t('settings.updateAvailable', { version: availableUpdate?.version ?? '' })" :description="updatesStore.installing ? t('settings.updateInstalling') : ''" :confirm-label="t('settings.updateNow')" :cancel-label="t('settings.updateLater')" :busy="updatesStore.installing" hide-icon @cancel="updateDialogOpen = false" @confirm="installUpdate">
+    <UpdateNotesContent v-if="!updatesStore.installing" :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate?.notes ?? '' : undefined" />
   </ConfirmDialog>
   <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-4 sm:p-5">
     <div class="mx-auto flex h-full min-h-0 w-full max-w-[1020px] flex-col">
@@ -964,7 +950,7 @@ onUnmounted(() => {
                   v-model="updateChannel"
                   aria-labelledby="settings-update-channel-label"
                   :options="updateChannelOptions"
-                  :disabled="installingUpdate"
+                  :disabled="updatesStore.installing"
                 />
               </div>
               <div class="setting-row">
@@ -974,8 +960,7 @@ onUnmounted(() => {
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-3">
                   <p v-if="installFailed" role="alert" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateRetryCheck') }}</p>
-                  <p v-if="installingUpdate" role="status" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateInstalling') }}</p>
-                  <button type="button" class="btn-secondary btn-sm" :disabled="!isDesktopShell() || checkingUpdate || installingUpdate" @click="checkForUpdate">
+                  <button type="button" class="btn-secondary btn-sm" :disabled="!isDesktopShell() || checkingUpdate || updatesStore.installing" @click="checkForUpdate">
                     {{ checkingUpdate ? t('settings.updateChecking') : t('settings.updateCheck') }}
                   </button>
                 </div>
@@ -984,12 +969,12 @@ onUnmounted(() => {
                 <div class="flex items-center gap-2">
                   <p class="setting-label">{{ t('settings.updateAvailable', { version: availableUpdate.version }) }}</p>
                   <UpdateNotesPopover v-model:open="targetNotesOpen" :label="t('settings.updateAvailable', { version: availableUpdate.version })">
-                    <template #trigger><button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--shell-muted)]" :aria-label="t('settings.notesView')" :disabled="installingUpdate"><span aria-hidden="true">›</span></button></template>
+                    <template #trigger><button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--shell-muted)]" :aria-label="t('settings.notesView')" :disabled="updatesStore.installing"><span aria-hidden="true">›</span></button></template>
                     <UpdateNotesContent :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate.notes ?? '' : undefined" />
                   </UpdateNotesPopover>
                 </div>
-                <button type="button" class="btn-primary btn-sm mt-3" :disabled="installingUpdate || checkingUpdate" @click="installUpdate">
-                  {{ t('settings.updateInstall') }}
+                <button type="button" class="btn-primary btn-sm mt-3" :disabled="updatesStore.installing || checkingUpdate" @click="installUpdate">
+                  {{ updatesStore.installing ? t('settings.updateInstalling') : t('settings.updateInstall') }}
                 </button>
               </div>
             </template>
