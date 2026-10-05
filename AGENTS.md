@@ -56,6 +56,13 @@ The project is developed on Windows with a Tauri/Vue desktop shell and a Python 
   Archive superseded historical material under `docs/archive/` and label it
   clearly.
 
+## Frontend UI
+
+写或改任何前端 UI（组件、页面、控件样式）之前，先过
+`docs/agents/ui-checklist.md`（动手前核对清单）与
+`docs/agents/ui-components.md`（组件选型速查表）。判断依据以根目录
+`DESIGN.md` 为准，数值以 `glimpse-frontend/src/styles/main.css` 为唯一事实源。
+
 ## Runtime Entry Points
 
 - `main.py`: default source launcher. Loads `.env`, points Tauri at the current Python interpreter, and starts the Vue + Tauri desktop shell.

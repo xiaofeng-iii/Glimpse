@@ -9,7 +9,9 @@
 规则仍以根目录 `AGENTS.md` 为准。
 
 界面视觉身份、设计 token、应用规则和评审标准统一维护在根目录
-[`DESIGN.md`](../DESIGN.md)。
+[`DESIGN.md`](../DESIGN.md)。前端 UI 动手前的核对清单与组件选型速查见
+[`agents/ui-checklist.md`](./agents/ui-checklist.md) 与
+[`agents/ui-components.md`](./agents/ui-components.md)。
 
 ## 1. 产品目标
 
