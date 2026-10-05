@@ -6,6 +6,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import Settings from '@/views/Settings.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { useUpdatesStore } from '@/stores/updates'
 
 const appStyles = readFileSync(resolve(process.cwd(), 'src/styles/main.css'), 'utf8')
 
@@ -58,7 +59,7 @@ const indexEntries = [
 const mountedHosts: Array<{ unmount: () => void }> = []
 afterEach(() => { mountedHosts.splice(0).forEach((host) => host.unmount()) })
 
-const mountSettings = async () => {
+const mountSettings = async (initialPath = '/settings') => {
   const { createMemoryHistory, createRouter } = await import('vue-router')
   const router = createRouter({
     history: createMemoryHistory(),
@@ -67,13 +68,16 @@ const mountSettings = async () => {
       { path: '/settings', component: Settings },
     ],
   })
-  await router.push('/settings')
+  const pinia = createPinia()
+  const { setActivePinia } = await import('pinia')
+  setActivePinia(pinia)
+  await router.push(initialPath)
   await router.isReady()
   // attachTo 让 reka-ui PopoverPortal 的 Fragment 在 autoUnmount 前被显式卸载，
   // 否则 jsdom 下 teardown 会因 nextSibling 为 null 崩溃并污染本文件其余用例。
   const host = mount({ template: '<router-view />' }, {
     attachTo: document.body,
-    global: { plugins: [createPinia(), router] },
+    global: { plugins: [pinia, router] },
   })
   mountedHosts.push(host)
   await flushPromises()
@@ -98,6 +102,7 @@ describe('Settings update notes', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.stubGlobal('fetch', apiMocks.fetchIndex)
+    window.localStorage.clear()
     apiMocks.getSettings.mockResolvedValue({
       hotkeys: { screenshot: '<ctrl>+<shift>+g' },
       screenshot: {},
@@ -198,6 +203,35 @@ describe('Settings update notes', () => {
     expect(document.body.textContent).toContain('预览新能力')
   })
 
+  it('offers the dev channel and never writes it into settings', async () => {
+    window.localStorage.setItem('glimpse.devUpdateChannel', '1')
+    const wrapper = await openUpdates(await mountSettings())
+    await flushPromises()
+
+    expect(wrapper.get('#settings-update-channel').text()).toContain('开发测试')
+    expect(apiMocks.updateSettings).not.toHaveBeenCalled()
+    const payloads = apiMocks.updateSettings.mock.calls.map(([payload]) => JSON.stringify(payload))
+    expect(payloads.some((payload) => payload.includes('dev-test'))).toBe(false)
+  })
+
+  it('checks the dev channel in place: fake 1.0.0 with aggregated notes', async () => {
+    window.localStorage.setItem('glimpse.devUpdateChannel', '1')
+    const wrapper = await openUpdates(await mountSettings())
+
+    await checkButton(wrapper).trigger('click')
+    const dialog = wrapper.findAllComponents(ConfirmDialog).find((item) => item.vm.$attrs.id === 'update-notes')!
+    // 开发通道走动态导入，等对话框真正打开再断言内容。
+    await vi.waitFor(() => expect(dialog.props('open')).toBe(true))
+    await flushPromises()
+
+    expect(apiMocks.invoke).not.toHaveBeenCalled()
+    expect(dialog.props('title')).toContain('1.0.0')
+    const bodyText = document.body.textContent ?? ''
+    expect(bodyText).toContain('记忆墙支持自定义排序')
+    expect(bodyText).toContain('新增记忆连拍合并开关')
+    expect(bodyText).not.toContain('仅预览版测试条目（聚合时应被剔除）')
+  })
+
   it('turns the dialog busy in place when installing and resets after failure', async () => {
     let releaseInstall!: (value?: unknown) => void
     apiMocks.invoke.mockImplementation(async (command: string) => {
@@ -228,5 +262,48 @@ describe('Settings update notes', () => {
     // 失败后已取走待安装对象，入口回到"重新检查更新"而不是残留可重复安装的按钮。
     expect(wrapper.find('.maintenance-card .btn-primary').exists()).toBe(false)
     expect(checkButton(wrapper).attributes('disabled')).toBeUndefined()
+  })
+
+  it('does not auto-check on normal entry; detection waits for the manual button', async () => {
+    // 普通进入设置页不发起检测，更新卡片不出现，直到用户点「检查更新」。
+    apiMocks.invoke.mockResolvedValue({ version: '0.3.3-preview.20261003', notes: null })
+    const wrapper = await openUpdates(await mountSettings())
+    await flushPromises()
+
+    expect(apiMocks.invoke).not.toHaveBeenCalledWith('check_for_update', expect.anything())
+    expect(wrapper.text()).not.toContain('发现新版本')
+
+    await checkButton(wrapper).trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('发现新版本 0.3.3-preview.20261003'))
+  })
+
+  it('shows the already-found update directly when entering via 查看详情', async () => {
+    // 标题栏「查看详情」带入 ?section=updates，且启动检测已把更新写进共享 store：
+    // 直接展示，不重新检测、不弹模态。
+    apiMocks.invoke.mockResolvedValue({ version: '0.3.3-preview.20261003', notes: null })
+    const wrapper = await mountSettings('/settings?section=updates')
+    // 在组件同一个 pinia 实例上模拟启动检测已发现更新。
+    const updatesStore = useUpdatesStore()
+    updatesStore.recordCurrentVersion('0.3.2')
+    await updatesStore.checkForUpdate()
+    await vi.waitFor(() => expect(updatesStore.updateNotesLoading).toBe(false))
+    // adoptStoreUpdate 在 onMounted 已跑过；这里直接驱动一次同步以验证展示路径。
+    ;(wrapper.vm as unknown as { adoptStoreUpdate?: () => void }).adoptStoreUpdate?.()
+
+    await vi.waitFor(() => expect(wrapper.text()).toContain('发现新版本 0.3.3-preview.20261003'))
+    const dialog = wrapper.findAllComponents(ConfirmDialog).find((item) => item.vm.$attrs.id === 'update-notes')!
+    expect(dialog.props('open')).toBe(false)
+  })
+
+  it('stays silent when the manual check finds nothing new', async () => {
+    // 手动检测没有新版本时给"已是最新"提示但不弹窗。
+    apiMocks.invoke.mockResolvedValue(null)
+    const wrapper = await openUpdates(await mountSettings())
+    await checkButton(wrapper).trigger('click')
+    await flushPromises()
+
+    const dialog = wrapper.findAllComponents(ConfirmDialog).find((item) => item.vm.$attrs.id === 'update-notes')!
+    expect(dialog.props('open')).toBe(false)
+    expect(wrapper.text()).not.toContain('发现新版本')
   })
 })

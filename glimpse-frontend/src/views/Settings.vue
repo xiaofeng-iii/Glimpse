@@ -24,7 +24,7 @@ import {
 import { useNotificationStore } from '@/stores/notification'
 import { useSettingsStore } from '@/stores/settings'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
-import { useUpdatesStore } from '@/stores/updates'
+import { DEV_UPDATE_CHANNEL, useUpdatesStore } from '@/stores/updates'
 import {
   applyThemePreference,
   normalizeThemePreference,
@@ -112,7 +112,8 @@ const aiTimeout = ref(60)
 const themePreference = ref<ThemePreference>('light')
 const language = ref<LanguagePreference>('zh-CN')
 const closeAction = ref<'ask' | 'minimize' | 'exit'>('ask')
-const updateChannel = ref<'stable' | 'preview'>('stable')
+const updateChannel = ref<'stable' | 'preview' | 'dev-test'>('stable')
+const lastRealChannel = ref<'stable' | 'preview'>('stable')
 const currentVersion = ref('')
 const availableUpdate = ref<{ version: string; notes: string | null } | null>(null)
 const checkingUpdate = ref(false)
@@ -125,13 +126,34 @@ const updateNotesLoading = ref(false)
 const updateNotesPartial = ref(false)
 const installFailed = ref(false)
 const loadNotes = createNotesLoader()
+// 开发通道用内存里的假索引，真实通道照旧抓 GitHub Pages。
+const loadNotesForChannel = async (channel: string) => {
+  if (import.meta.env.DEV && channel === DEV_UPDATE_CHANNEL) {
+    const { devReleaseNotes } = await import('@/dev/fakeUpdateChannel')
+    return devReleaseNotes()
+  }
+  return loadNotes()
+}
+// dev-test 按预览语义聚合，再交给 aggregateNotes 的截断规则。
+const aggregationChannel = (channel: string): 'stable' | 'preview' =>
+  channel === 'stable' ? 'stable' : 'preview'
 let updateGeneration = 0
 let disposed = false
+// 加载/回填设置触发的 updateChannel 变化是程序化的，不代表用户切换通道：
+// 此时不得清空启动检测（顶栏）已发现的更新。仅用户手动切换时才清空。
+let populatingSettings = false
 watch(currentNotesOpen, (open) => {
   if (!open) return
   updatesStore.loadCurrentNotes()
 })
-watch(updateChannel, () => {
+// flush: 'sync' 让回调在 updateChannel 赋值时同步触发，populatingSettings 豁免才来得及生效
+// （默认 post 会在 populateForm 复位标志后才回调，豁免落空）。
+watch(updateChannel, (value) => {
+  if (import.meta.env.DEV) {
+    updatesStore.setDevChannel(value === DEV_UPDATE_CHANNEL)
+    if (value !== DEV_UPDATE_CHANNEL) lastRealChannel.value = value
+  }
+  if (populatingSettings) return
   updateGeneration++
   availableUpdate.value = null
   updatesStore.availableUpdate = null
@@ -139,7 +161,7 @@ watch(updateChannel, () => {
   updateDialogOpen.value = false
   targetNotesOpen.value = false
   installFailed.value = false
-})
+}, { flush: 'sync' })
 watch(activeSection, () => { currentNotesOpen.value = false; targetNotesOpen.value = false })
 
 const themeOptions = [
@@ -150,6 +172,20 @@ const themeOptions = [
 const activeThemeIndex = computed(() => {
   const index = themeOptions.findIndex((o) => o.value === themePreference.value)
   return index >= 0 ? index : 0
+})
+
+const updateChannelOptions = computed(() => {
+  const options = [
+    { value: 'stable', label: t('settings.updateStable') },
+    { value: 'preview', label: t('settings.updatePreview') },
+  ]
+  if (import.meta.env.DEV) {
+    options.push({
+      value: DEV_UPDATE_CHANNEL,
+      label: language.value === 'en-US' ? 'Dev test' : '开发测试',
+    })
+  }
+  return options
 })
 
 const testingAi = ref(false)
@@ -166,6 +202,12 @@ let maintenanceTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const currentSection = computed(() => sections.find((section) => section.id === activeSection.value) ?? sections[0])
 const maintenanceRunning = computed(() => Boolean(indexStatus.value?.running || ocrStatus.value?.running))
+// 开发通道不写进 settings.json：后端只接受 stable/preview。
+const persistedUpdateChannel = computed(() =>
+  import.meta.env.DEV && updateChannel.value === DEV_UPDATE_CHANNEL
+    ? lastRealChannel.value
+    : updateChannel.value === 'preview' ? 'preview' : 'stable',
+)
 const ordinarySettings = computed(() => ({
   hotkeys: { screenshot: screenshotHotkey.value },
   screenshot: {
@@ -183,7 +225,7 @@ const ordinarySettings = computed(() => ({
     theme: themePreference.value,
     language: language.value,
     close_action: closeAction.value,
-    update_channel: updateChannel.value,
+    update_channel: persistedUpdateChannel.value,
   },
 }))
 const aiSettings = computed(() => ({
@@ -281,27 +323,35 @@ const recordHotkey = (event: KeyboardEvent) => {
 const populateForm = () => {
   const settings = settingsStore.settings
   if (!settings) return
-  screenshotHotkey.value = settings.hotkeys?.screenshot ?? ''
-  captureLimitWindowSeconds.value = settings.screenshot?.capture_limit_window_seconds
-    ?? settings.screenshot?.debounce_interval
-    ?? 5
-  clusterThreshold.value = settings.screenshot?.cluster_threshold ?? 2
-  maxCaptures.value = settings.screenshot?.max_captures_per_window ?? 10
-  clusterMode.value = Boolean(settings.cluster?.cluster_mode)
-  clusterAutoSubmit.value = settings.cluster?.cluster_auto_submit ?? true
-  clusterMaxImages.value = settings.cluster?.cluster_max_images ?? 10
-  clusterTimeout.value = settings.cluster?.cluster_timeout ?? 10
-  aiApiKey.value = settings.ai?.api_key ?? ''
-  aiBaseUrl.value = settings.ai?.base_url ?? 'https://api.openai.com/v1'
-  aiModel.value = settings.ai?.model ?? 'gpt-4o-mini'
-  aiTimeout.value = settings.ai?.timeout ?? 60
-  themePreference.value = normalizeThemePreference(settings.ui?.theme)
-  language.value = normalizeLanguagePreference(settings.ui?.language)
-  closeAction.value = settings.ui?.close_action ?? 'ask'
-  updateChannel.value = settings.ui?.update_channel === 'preview' ? 'preview' : 'stable'
-  availableUpdate.value = null
-  savedSnapshot.value = formSnapshot.value
-  savedAiSnapshot.value = aiSnapshot.value
+  populatingSettings = true
+  try {
+    screenshotHotkey.value = settings.hotkeys?.screenshot ?? ''
+    captureLimitWindowSeconds.value = settings.screenshot?.capture_limit_window_seconds
+      ?? settings.screenshot?.debounce_interval
+      ?? 5
+    clusterThreshold.value = settings.screenshot?.cluster_threshold ?? 2
+    maxCaptures.value = settings.screenshot?.max_captures_per_window ?? 10
+    clusterMode.value = Boolean(settings.cluster?.cluster_mode)
+    clusterAutoSubmit.value = settings.cluster?.cluster_auto_submit ?? true
+    clusterMaxImages.value = settings.cluster?.cluster_max_images ?? 10
+    clusterTimeout.value = settings.cluster?.cluster_timeout ?? 10
+    aiApiKey.value = settings.ai?.api_key ?? ''
+    aiBaseUrl.value = settings.ai?.base_url ?? 'https://api.openai.com/v1'
+    aiModel.value = settings.ai?.model ?? 'gpt-4o-mini'
+    aiTimeout.value = settings.ai?.timeout ?? 60
+    themePreference.value = normalizeThemePreference(settings.ui?.theme)
+    language.value = normalizeLanguagePreference(settings.ui?.language)
+    closeAction.value = settings.ui?.close_action ?? 'ask'
+    lastRealChannel.value = settings.ui?.update_channel === 'preview' ? 'preview' : 'stable'
+    updateChannel.value = import.meta.env.DEV && updatesStore.devChannel
+      ? DEV_UPDATE_CHANNEL
+      : lastRealChannel.value
+    availableUpdate.value = null
+    savedSnapshot.value = formSnapshot.value
+    savedAiSnapshot.value = aiSnapshot.value
+  } finally {
+    populatingSettings = false
+  }
 }
 
 const loadSettings = async () => {
@@ -380,7 +430,9 @@ const handleSaveAi = async () => {
   }
 }
 
-const checkForUpdate = async () => {
+// 检查更新的核心流程，手动点击与进入设置页自动检测共用。
+// notify/silent 控制反馈：手动点击要给"已是最新/失败"提示并弹窗，自动检测静默、只把卡片摆上。
+const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
   if (!isDesktopShell() || checkingUpdate.value || installingUpdate.value) return
   checkingUpdate.value = true
   availableUpdate.value = null
@@ -389,36 +441,55 @@ const checkForUpdate = async () => {
   const generation = ++updateGeneration
   const channel = updateChannel.value
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const target = await invoke<{ version: string; notes: string | null } | null>('check_for_update', { channel })
+    let target: { version: string; notes: string | null } | null
+    if (import.meta.env.DEV && channel === DEV_UPDATE_CHANNEL) {
+      const { devCheckForUpdate } = await import('@/dev/fakeUpdateChannel')
+      target = devCheckForUpdate(currentVersion.value)
+    } else {
+      const { invoke } = await import('@tauri-apps/api/core')
+      target = await invoke<{ version: string; notes: string | null } | null>('check_for_update', { channel })
+    }
     if (disposed || generation !== updateGeneration) return
     availableUpdate.value = target
     updatesStore.availableUpdate = target
     if (target) updatesStore.refreshUpdateNotes(target.version)
-    if (!target) notifications.show(t('settings.updateCurrent'), 'info')
-    else {
-      updateNotes.value = null
-      updateNotesPartial.value = false
-      updateNotesLoading.value = true
-      currentNotesOpen.value = false
-      updateDialogOpen.value = true
-      void loadNotes().then((entries) => {
-        if (disposed || generation !== updateGeneration) return
-        updateNotes.value = aggregateNotes(entries, currentVersion.value, target.version, channel)
-        updateNotesPartial.value = !updateNotes.value
-      }).catch(() => {
-        if (!disposed && generation === updateGeneration) updateNotesPartial.value = true
-      }).finally(() => {
-        if (!disposed && generation === updateGeneration) updateNotesLoading.value = false
-      })
+    if (!target) {
+      if (!silent) notifications.show(t('settings.updateCurrent'), 'info')
+      return
     }
+    updateNotes.value = null
+    updateNotesPartial.value = false
+    updateNotesLoading.value = true
+    currentNotesOpen.value = false
+    if (!silent) updateDialogOpen.value = true
+    void loadNotesForChannel(channel).then((entries) => {
+      if (disposed || generation !== updateGeneration) return
+      updateNotes.value = aggregateNotes(entries, currentVersion.value, target.version, aggregationChannel(channel))
+      updateNotesPartial.value = !updateNotes.value
+    }).catch(() => {
+      if (!disposed && generation === updateGeneration) updateNotesPartial.value = true
+    }).finally(() => {
+      if (!disposed && generation === updateGeneration) updateNotesLoading.value = false
+    })
   } catch (error) {
     logger.error('Failed to check for updates: %s', error)
-    if (!disposed && generation === updateGeneration) notifications.show(t('settings.updateCheckFailed'), 'error')
+    if (!silent && !disposed && generation === updateGeneration) notifications.show(t('settings.updateCheckFailed'), 'error')
   } finally {
     checkingUpdate.value = false
   }
 }
+
+// 从标题栏「查看详情」进入时，启动检测已把更新写进共享 store：
+// 直接同步到本地展示更新卡片，不重新检测、不弹模态。其余进入路径不自动检测。
+const adoptStoreUpdate = () => {
+  if (!updatesStore.availableUpdate) return
+  availableUpdate.value = updatesStore.availableUpdate
+  updateNotes.value = updatesStore.updateNotes
+  updateNotesPartial.value = updatesStore.updateNotesPartial
+  updateNotesLoading.value = updatesStore.updateNotesLoading
+}
+
+const checkForUpdate = () => runUpdateCheck({ silent: false })
 
 const installUpdate = async () => {
   if (!availableUpdate.value || installingUpdate.value || checkingUpdate.value) return
@@ -427,8 +498,13 @@ const installUpdate = async () => {
   updateDialogOpen.value = true
   installingUpdate.value = true
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    await invoke('install_checked_update')
+    if (import.meta.env.DEV && updateChannel.value === DEV_UPDATE_CHANNEL) {
+      const { devInstallUpdate } = await import('@/dev/fakeUpdateChannel')
+      await devInstallUpdate()
+    } else {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke('install_checked_update')
+    }
   } catch (error) {
     logger.error('Failed to install update: %s', error)
     notifications.show(t('settings.updateInstallFailed'), 'error')
@@ -568,12 +644,11 @@ onMounted(async () => {
   if (currentVersion.value) {
     updatesStore.recordCurrentVersion(currentVersion.value)
   }
-  // 启动检测已发现新版本时直接弹出更新对话框，复用同一份聚合说明。
-  if (updatesStore.availableUpdate) {
-    availableUpdate.value = updatesStore.availableUpdate
-    updateNotes.value = updatesStore.updateNotes
-    updateNotesPartial.value = updatesStore.updateNotesPartial
-    updateDialogOpen.value = true
+  // 默认进入不自动检测：检测由用户点「检查更新」触发。
+  // 唯独从标题栏「查看详情」（?section=updates 且 store 已有已发现更新）进入时，
+  // 直接展示已发现的新版本。
+  if (route.query.section === 'updates') {
+    adoptStoreUpdate()
   }
   scheduleMaintenancePoll()
 })
@@ -588,7 +663,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <ConfirmDialog id="update-notes" :open="updateDialogOpen" :title="t('settings.updateAvailable', { version: availableUpdate?.version ?? '' })" :description="installingUpdate ? t('settings.updateInstalling') : ''" :confirm-label="t('settings.updateNow')" :cancel-label="t('settings.updateLater')" :busy="installingUpdate" @cancel="updateDialogOpen = false" @confirm="installUpdate">
+  <ConfirmDialog id="update-notes" :open="updateDialogOpen" :title="t('settings.updateAvailable', { version: availableUpdate?.version ?? '' })" :description="installingUpdate ? t('settings.updateInstalling') : ''" :confirm-label="t('settings.updateNow')" :cancel-label="t('settings.updateLater')" :busy="installingUpdate" hide-icon @cancel="updateDialogOpen = false" @confirm="installUpdate">
     <p v-if="installingUpdate" role="status" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateInstalling') }}</p>
     <UpdateNotesContent v-else :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate?.notes ?? '' : undefined" />
   </ConfirmDialog>
@@ -854,10 +929,7 @@ onUnmounted(() => {
                     id="settings-update-channel"
                     v-model="updateChannel"
                     aria-labelledby="settings-update-channel-label"
-                    :options="[
-                      { value: 'stable', label: t('settings.updateStable') },
-                      { value: 'preview', label: t('settings.updatePreview') },
-                    ]"
+                    :options="updateChannelOptions"
                     :disabled="installingUpdate"
                   />
                 </div>
