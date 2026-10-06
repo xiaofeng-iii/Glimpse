@@ -23,10 +23,12 @@ import AddTextMemoryDialog from '@/components/AddTextMemoryDialog.vue'
 import ClusterBar from '@/components/ClusterBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import MemoryContextMenu from '@/components/MemoryContextMenu.vue'
+import MemoryFiltersControl from '@/components/MemoryFilters.vue'
 import MemoryInspector from '@/components/MemoryInspector.vue'
 import SideDecorPanel from '@/components/SideDecorPanel.vue'
 import MemoryWall from '@/components/MemoryWall.vue'
 import SearchToolbar from '@/components/SearchToolbar.vue'
+import WallLayoutSwitcher from '@/components/WallLayoutSwitcher.vue'
 
 type SearchToolbarExpose = {
   focus: () => void
@@ -63,6 +65,28 @@ const screenshotShortcutLabel = ref('Ctrl+Shift+G')
 const wideLayout = ref(window.innerWidth >= 1180)
 const dockedLayout = ref(window.innerWidth >= 820)
 const isDesktop = isDesktopShell()
+// 浮条下方控件行的吸顶与紧凑态：布局/筛选控件已从墙头部上移到这里，
+// 三级吸顶（浮条 → 控件行 → 墙头标题）的 top 由脚本按实测高度级联写入。
+const homePaneElement = ref<HTMLElement | null>(null)
+const controlsBarElement = ref<HTMLElement | null>(null)
+const controlsBarCompact = ref(false)
+let stickyMetricsRaf = 0
+let stickyResizeObserver: ResizeObserver | null = null
+
+const searching = computed(() => Boolean(memoriesStore.searchQuery?.trim()))
+
+const scheduleStickyMetrics = () => {
+  if (stickyMetricsRaf) return
+  stickyMetricsRaf = window.requestAnimationFrame(() => {
+    stickyMetricsRaf = 0
+    const pane = homePaneElement.value
+    const bar = controlsBarElement.value
+    const toolbar = pane?.querySelector<HTMLElement>('.search-toolbar')
+    if (!pane || !toolbar || !bar) return
+    const toolbarHeight = toolbar.getBoundingClientRect().height
+    pane.style.setProperty('--home-controls-sticky-top', `${toolbarHeight}px`)
+  })
+}
 let semanticWarmupTimer: ReturnType<typeof window.setTimeout> | null = null
 let unmounted = false
 
@@ -442,6 +466,14 @@ onMounted(async () => {
   window.addEventListener('glimpse:focus-search', handleFocusSearchEvent)
   window.addEventListener('glimpse:shortcut-screenshot', handleShortcutCapture)
 
+  scheduleStickyMetrics()
+  if ('ResizeObserver' in window) {
+    stickyResizeObserver = new ResizeObserver(scheduleStickyMetrics)
+    const toolbar = homePaneElement.value?.querySelector<HTMLElement>('.search-toolbar')
+    if (toolbar) stickyResizeObserver.observe(toolbar)
+    if (controlsBarElement.value) stickyResizeObserver.observe(controlsBarElement.value)
+  }
+
   await whenBackendRuntimeReady()
   if (!(await waitForBackend())) return
   await Promise.all([loadUiSettings(), loadMemories()])
@@ -453,6 +485,8 @@ onUnmounted(() => {
   unmounted = true
   if (semanticWarmupTimer) window.clearTimeout(semanticWarmupTimer)
   if (scrollbarIdleTimer) window.clearTimeout(scrollbarIdleTimer)
+  if (stickyMetricsRaf) window.cancelAnimationFrame(stickyMetricsRaf)
+  stickyResizeObserver?.disconnect()
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('glimpse:focus-search', handleFocusSearchEvent)
@@ -465,6 +499,7 @@ onUnmounted(() => {
   <main class="relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--shell-window-bg)]">
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
       <div
+        ref="homePaneElement"
         class="home-memory-pane min-w-0 flex-1 overflow-y-auto"
         :class="{ 'is-scrolling': paneScrollbarActive }"
         @scroll.passive="markPaneScrollbarActive"
@@ -484,6 +519,32 @@ onUnmounted(() => {
           @refresh="handleRefresh"
           @debug-panel-change="showSearchDebug = $event"
         />
+
+        <!-- 计数与布局/筛选控件同一行：吸顶在搜索浮条正下方，左计数、右控件贴齐浮条
+             两缘。整行 pointer-events 穿透，滚动时除两个控件外直接命中其下卡片；
+             滚动越顶进入紧凑态：计数淡出、分割线隐去、控件切换浮起背板。 -->
+        <div
+          ref="controlsBarElement"
+          class="home-controls-bar"
+          :class="{ 'home-controls-bar--compact': controlsBarCompact }"
+        >
+          <h1 class="home-controls-bar__count text-base font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">
+            {{
+              searching && !memoriesStore.isLoading
+                ? t('memory.searchCount', { count: memoriesStore.memories.length })
+                : t('memory.count', { count: memoriesStore.total })
+            }}
+          </h1>
+          <div class="home-controls-bar__inner">
+            <WallLayoutSwitcher :disabled="searching" :compact="controlsBarCompact" />
+            <MemoryFiltersControl
+              :model-value="memoriesStore.activeFilters"
+              :loading="memoriesStore.isLoading"
+              :compact="controlsBarCompact"
+              @apply="handleApplyFilters"
+            />
+          </div>
+        </div>
 
         <ClusterBar
           v-if="clusterStore.isCollecting"
@@ -511,6 +572,7 @@ onUnmounted(() => {
           @capture="handleScreenshot()"
           @add-memory="openTextMemoryDialog"
           @apply-filters="handleApplyFilters"
+          @scroll-state="controlsBarCompact = $event"
         />
       </div>
 
@@ -586,6 +648,54 @@ onUnmounted(() => {
   scrollbar-gutter: stable;
   container-name: memory-pane;
   container-type: inline-size;
+}
+
+/* 计数 + 布局/筛选控件行：吸顶在搜索浮条正下方，与浮条同级 z-index（浮条磨砂尾巴
+   只模糊其身后内容，不盖住控件行）。水平 inset 与浮条一致，计数与控件分别贴齐
+   浮条两缘。整行点击穿透，只有右侧控件接收指针——滚动时可直接点其下滑过的卡片。 */
+.home-controls-bar {
+  position: sticky;
+  z-index: var(--z-sticky);
+  top: var(--home-controls-sticky-top, 5rem);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 1.25rem;
+  pointer-events: none;
+}
+
+.home-controls-bar__count {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.home-controls-bar__inner {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: auto;
+}
+
+/* 紧凑态（滚动越顶）：计数淡出上移，分割线隐去，内容从行下滑过。 */
+.home-controls-bar--compact .home-controls-bar__count {
+  transform: translateY(-0.25rem);
+  opacity: 0;
+}
+
+.home-controls-bar::after {
+  content: '';
+  position: absolute;
+  right: 1.25rem;
+  bottom: 0;
+  left: 1.25rem;
+  height: 1px;
+  background: color-mix(in srgb, var(--shell-line) 72%, transparent);
+  transition: opacity 160ms ease;
+}
+
+.home-controls-bar--compact::after {
+  opacity: 0;
 }
 
 /* 记忆墙滚动条仅在滚动进行时浮现，停止约 0.8 秒后隐回：常驻拇指会在记忆墙与

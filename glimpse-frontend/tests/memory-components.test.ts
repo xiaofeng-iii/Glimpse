@@ -398,13 +398,11 @@ describe('memory components', () => {
     expect(emptyCapture.text()).toContain('截图')
   })
 
-  it('compacts the filter as soon as the memory wall scrolls upward', async () => {
+  it('reports scroll state as soon as the memory wall scrolls upward', async () => {
     const pane = document.createElement('div')
     pane.className = 'home-memory-pane'
-    const toolbar = document.createElement('div')
-    toolbar.className = 'search-toolbar'
     const host = document.createElement('div')
-    pane.append(toolbar, host)
+    pane.append(host)
     document.body.append(pane)
 
     const wrapper = mount(MemoryWall, {
@@ -412,17 +410,13 @@ describe('memory components', () => {
       attachTo: host,
     })
     await wrapper.vm.$nextTick()
-    const header = wrapper.get('.memory-wall__header').element
-    vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ height: 80 }))
-    vi.spyOn(pane, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ height: 600 }))
-    vi.spyOn(header, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ y: 160, height: 32 }))
 
     pane.scrollTop = 24
     pane.dispatchEvent(new Event('scroll'))
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('.memory-wall__header').classes()).toContain('memory-wall__header--compact')
-    expect(wrapper.get('.memory-filters').classes()).toContain('memory-filters--compact')
+    // 计数与控件行已上移到 Home：紧凑信号通过 scroll-state 交给控件行
+    expect(wrapper.emitted('scroll-state')?.at(-1)).toEqual([true])
   })
 
   it('applies a calendar day through the extensible memory filter panel', async () => {
