@@ -60,14 +60,14 @@ const installNow = async () => {
       :partial="updates.updateNotesPartial"
       :raw="updates.updateNotesPartial ? updates.availableUpdate.notes ?? '' : undefined"
     />
-    <div class="mt-4 flex items-center gap-2.5">
-      <button type="button" class="btn-secondary btn-sm" :disabled="updates.installing" @click="viewDetails">
+    <template #footer>
+      <button type="button" class="btn-secondary" :disabled="updates.installing" @click="viewDetails">
         {{ t('updates.viewDetails') }}
       </button>
-      <button type="button" class="btn-primary btn-sm" :disabled="updates.installing" @click="installNow">
+      <button type="button" class="btn-primary" :disabled="updates.installing" @click="installNow">
         {{ updates.installing ? t('settings.updateInstalling') : t('settings.updateNow') }}
       </button>
-    </div>
+    </template>
   </UpdateNotesPopover>
 
   <UpdateNotesPopover

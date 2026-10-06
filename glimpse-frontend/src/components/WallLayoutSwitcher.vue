@@ -50,29 +50,30 @@ const choose = (mode: WallLayoutMode) => {
 <style scoped>
 .wall-layout-switcher {
   display: inline-flex;
+  height: var(--control-h-md);
   align-items: center;
   gap: 2px;
   padding: 2px;
-  border: 1px solid color-mix(in srgb, var(--shell-line) 70%, transparent);
+  border: none;
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--shell-window-bg) 70%, transparent);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  transition: box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease;
+  background: rgba(15, 23, 42, 0.07);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: box-shadow 160ms ease, background-color 160ms ease;
 }
 
 .wall-layout-switcher--compact {
-  border-color: color-mix(in srgb, var(--shell-line) 70%, transparent);
-  background: color-mix(in srgb, var(--shell-window-bg) 70%, transparent);
+  border: none;
+  background: rgba(15, 23, 42, 0.07);
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .wall-layout-switcher__option {
   display: inline-flex;
   width: 1.75rem;
-  height: 1.625rem;
+  height: 100%;
   min-height: 0;
   align-items: center;
   justify-content: center;
@@ -87,22 +88,30 @@ const choose = (mode: WallLayoutMode) => {
 
 .wall-layout-switcher__option:hover:not(:disabled):not(.wall-layout-switcher__option--active) {
   color: var(--shell-ink);
-  background: var(--shell-control-hover);
+  background: rgba(15, 23, 42, 0.06);
 }
 
 .wall-layout-switcher__option--active {
   color: var(--shell-ink);
   background: var(--color-surface-raised, var(--shell-card));
-  box-shadow: 0 0 6px rgba(0, 0, 0, .12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .1), 0 1px 2px rgba(0, 0, 0, .06);
 }
 
-:root[data-theme='dark'] .wall-layout-switcher__option--active {
-  background: var(--shell-control-hover);
-  box-shadow: 0 0 8px rgba(0, 0, 0, .45);
+:root[data-theme='dark'] .wall-layout-switcher {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme='dark'] .wall-layout-switcher--compact {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 :root[data-theme='dark'] .wall-layout-switcher__option:hover:not(:disabled):not(.wall-layout-switcher__option--active) {
-  background: var(--color-surface-raised, var(--shell-card));
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme='dark'] .wall-layout-switcher__option--active {
+  background: var(--color-surface-hover);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
 }
 
 .wall-layout-switcher__option:focus-visible {

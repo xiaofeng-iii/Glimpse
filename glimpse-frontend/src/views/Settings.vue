@@ -120,9 +120,9 @@ const checkingUpdate = ref(false)
 const updateDialogOpen = ref(false)
 const currentNotesOpen = ref(false)
 const targetNotesOpen = ref(false)
-const updateNotes = ref<Notes | null>(null)
-const updateNotesLoading = ref(false)
-const updateNotesPartial = ref(false)
+const updateNotes = computed(() => updatesStore.updateNotes)
+const updateNotesLoading = computed(() => updatesStore.updateNotesLoading)
+const updateNotesPartial = computed(() => updatesStore.updateNotesPartial)
 const installFailed = ref(false)
 const loadNotes = createNotesLoader()
 // 开发通道用内存里的假索引，真实通道照旧抓 GitHub Pages。
@@ -156,7 +156,6 @@ watch(updateChannel, (value) => {
   updateGeneration++
   availableUpdate.value = null
   updatesStore.availableUpdate = null
-  updateNotes.value = null
   updateDialogOpen.value = false
   targetNotesOpen.value = false
   installFailed.value = false
@@ -466,20 +465,8 @@ const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
       if (!silent) notifications.show(t('settings.updateCurrent'), 'info')
       return
     }
-    updateNotes.value = null
-    updateNotesPartial.value = false
-    updateNotesLoading.value = true
     currentNotesOpen.value = false
     if (!silent) updateDialogOpen.value = true
-    void loadNotesForChannel(channel).then((entries) => {
-      if (disposed || generation !== updateGeneration) return
-      updateNotes.value = aggregateNotes(entries, currentVersion.value, target.version, aggregationChannel(channel))
-      updateNotesPartial.value = !updateNotes.value
-    }).catch(() => {
-      if (!disposed && generation === updateGeneration) updateNotesPartial.value = true
-    }).finally(() => {
-      if (!disposed && generation === updateGeneration) updateNotesLoading.value = false
-    })
   } catch (error) {
     logger.error('Failed to check for updates: %s', error)
     if (!silent && !disposed && generation === updateGeneration) notifications.show(t('settings.updateCheckFailed'), 'error')
@@ -493,9 +480,6 @@ const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
 const adoptStoreUpdate = () => {
   if (!updatesStore.availableUpdate) return
   availableUpdate.value = updatesStore.availableUpdate
-  updateNotes.value = updatesStore.updateNotes
-  updateNotesPartial.value = updatesStore.updateNotesPartial
-  updateNotesLoading.value = updatesStore.updateNotesLoading
 }
 
 const checkForUpdate = () => runUpdateCheck({ silent: false })
@@ -695,7 +679,7 @@ onUnmounted(() => {
               v-for="section in group.sections"
               :key="section.id"
               type="button"
-              class="flex min-h-8 w-full items-center gap-2.5 rounded-lg px-3 py-1 text-left text-sm font-medium transition"
+              class="flex h-[var(--control-h-md)] min-h-[var(--control-h-md)] w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 text-left text-[0.8125rem] font-normal transition"
               :class="activeSection === section.id
                 ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
                 : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
@@ -960,7 +944,7 @@ onUnmounted(() => {
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-3">
                   <p v-if="installFailed" role="alert" class="text-sm text-[var(--shell-muted)]">{{ t('settings.updateRetryCheck') }}</p>
-                  <button type="button" class="btn-secondary btn-sm" :disabled="!isDesktopShell() || checkingUpdate || updatesStore.installing" @click="checkForUpdate">
+                  <button type="button" class="btn-secondary" :disabled="!isDesktopShell() || checkingUpdate || updatesStore.installing" @click="checkForUpdate">
                     {{ checkingUpdate ? t('settings.updateChecking') : t('settings.updateCheck') }}
                   </button>
                 </div>
@@ -973,7 +957,7 @@ onUnmounted(() => {
                     <UpdateNotesContent :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate.notes ?? '' : undefined" />
                   </UpdateNotesPopover>
                 </div>
-                <button type="button" class="btn-primary btn-sm mt-3" :disabled="updatesStore.installing || checkingUpdate" @click="installUpdate">
+                <button type="button" class="btn-primary mt-3" :disabled="updatesStore.installing || checkingUpdate" @click="installUpdate">
                   {{ updatesStore.installing ? t('settings.updateInstalling') : t('settings.updateInstall') }}
                 </button>
               </div>
@@ -1303,11 +1287,12 @@ onUnmounted(() => {
 .setting-readonly {
   width: 100%;
   max-width: 320px;
-  min-height: 1.875rem;
+  height: var(--control-h-md);
+  min-height: var(--control-h-md);
   border: 1px solid var(--shell-line);
   border-radius: var(--radius-md);
   background: var(--shell-control-bg);
-  padding: .2rem .55rem;
+  padding: 0 .65rem;
   font-size: .8125rem;
   color: var(--shell-ink);
   outline: none;
@@ -1344,7 +1329,7 @@ onUnmounted(() => {
   --segment-slide-easing: cubic-bezier(0.33, 1, 0.68, 1);
   position: relative;
   width: 10.5rem;
-  height: 1.875rem;
+  height: var(--control-h-md);
   gap: var(--theme-segment-inset);
   padding: var(--theme-segment-inset);
   border: 1px solid var(--shell-line);
@@ -1429,47 +1414,27 @@ onUnmounted(() => {
 }
 
 .settings-content :deep(.btn-primary) {
-  min-height: 1.75rem;
-  padding: .15rem .65rem;
-  font-size: .75rem;
+  min-height: var(--control-h-md);
+  height: var(--control-h-md);
+  padding: 0 .75rem;
+  font-size: .8125rem;
   font-weight: 400;
-  line-height: var(--line-height-12);
+  line-height: var(--line-height-14);
   color: #ffffff;
   text-shadow: none;
 }
 
-.settings-content :deep(.btn-secondary) {
-  min-height: 1.75rem;
-  padding: .15rem .65rem;
-  font-size: .75rem;
-  font-weight: 400;
-  line-height: var(--line-height-12);
-  color: #111827;
-  text-shadow: none;
-  border: none;
-  background: var(--color-surface-hover);
-}
-
-.settings-content :deep(.btn-secondary:hover:not(:disabled)) {
-  background: color-mix(in srgb, var(--color-surface-hover) 70%, var(--color-border-strong));
-  color: #111827;
-}
-
 .settings-content :deep(.btn-ghost-danger) {
-  min-height: 1.75rem;
-  padding: .15rem .65rem;
-  font-size: .75rem;
+  min-height: var(--control-h-md);
+  height: var(--control-h-md);
+  padding: 0 .75rem;
+  font-size: .8125rem;
   font-weight: 400;
-  line-height: var(--line-height-12);
+  line-height: var(--line-height-14);
   text-shadow: none;
 }
 
 :root[data-theme='dark'] .settings-content :deep(.btn-primary) {
-  color: #ffffff;
-  text-shadow: none;
-}
-
-:root[data-theme='dark'] .settings-content :deep(.btn-secondary) {
   color: #ffffff;
   text-shadow: none;
 }
