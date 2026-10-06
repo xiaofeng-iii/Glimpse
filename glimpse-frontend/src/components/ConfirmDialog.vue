@@ -145,23 +145,23 @@ onBeforeUnmount(() => {
           </div>
           <button
             type="button"
-            class="inline-flex h-8 w-8 min-h-0 items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+            class="inline-flex h-[var(--control-h-md)] w-[var(--control-h-md)] min-h-[var(--control-h-md)] flex-none items-center justify-center rounded-[var(--radius-md)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
             :aria-label="cancelLabel"
             :disabled="busy"
             @click="cancel"
           >
-            <XMarkIcon class="h-4 w-4" aria-hidden="true" />
+            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
 
         <div v-if="$slots.default" class="confirm-dialog__body mt-4 max-h-[50dvh] overflow-y-auto overflow-x-hidden"><slot /></div>
-        <div class="mt-5 flex justify-end gap-2.5">
-          <button ref="cancelButton" type="button" class="btn-secondary btn-sm" :disabled="busy" @click="cancel">
+        <div class="mt-4 flex justify-end gap-2.5">
+          <button ref="cancelButton" type="button" class="btn-secondary" :disabled="busy" @click="cancel">
             {{ cancelLabel }}
           </button>
           <button
             type="button"
-            class="btn-sm text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+            class="text-white transition disabled:cursor-not-allowed disabled:opacity-60"
             :class="[destructive ? 'btn-danger' : 'btn-primary']"
             :disabled="busy"
             @click="emit('confirm')"

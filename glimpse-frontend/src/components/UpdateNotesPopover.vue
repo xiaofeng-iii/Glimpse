@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from 'reka-ui'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { t } from '@/utils/i18n'
 defineProps<{ label: string }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -18,10 +19,11 @@ function restoreFocus(event: Event) {
         <div class="notes-popover__header">
           <h2 class="text-sm font-semibold text-[var(--shell-ink)]">{{ label }}</h2>
           <button type="button" class="notes-popover__close" :aria-label="t('settings.notesClose')" @click="open = false">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1.5 1.5l9 9m0-9l-9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
         <div class="notes-popover__body px-4 pb-4"><slot /></div>
+        <div v-if="$slots.footer" class="notes-popover__footer"><slot name="footer" /></div>
       </PopoverContent>
     </PopoverPortal>
   </PopoverRoot>
@@ -64,9 +66,9 @@ function restoreFocus(event: Event) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: .75rem;
+  gap: .5rem;
   flex: none;
-  padding: .75rem 1rem .375rem;
+  padding: .5rem 1rem .25rem;
 }
 
 .notes-popover__body {
@@ -80,15 +82,26 @@ function restoreFocus(event: Event) {
   display: none;
 }
 
+/* 操作按钮常驻浮窗底部，不随超长正文滚动；仅当调用方提供 footer 插槽时出现。 */
+.notes-popover__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .5rem;
+  flex: none;
+  padding: .5rem 1rem;
+}
+
 .notes-popover__close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  min-height: var(--control-h-md);
   flex: none;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--color-text-muted);
   background: transparent;
   cursor: pointer;

@@ -231,7 +231,7 @@ onUnmounted(() => {
             :aria-label="t('action.close')"
             @click="close(true)"
           >
-            <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
 
@@ -318,15 +318,17 @@ onUnmounted(() => {
 
 .memory-filters__trigger {
   display: inline-flex;
-  height: 2rem;
+  height: var(--control-h-md);
   min-height: 0;
   align-items: center;
   gap: 0.35rem;
-  padding: 0 0.55rem;
-  border: 1px solid transparent;
+  padding: 0 0.65rem;
+  border: none;
   border-radius: var(--radius-md);
   color: var(--shell-ink);
-  background: transparent;
+  background: rgba(15, 23, 42, 0.07);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
   font-size: 0.8125rem;
   font-weight: 400;
@@ -335,7 +337,6 @@ onUnmounted(() => {
     padding 160ms ease,
     color 160ms ease,
     background-color 160ms ease,
-    border-color 160ms ease,
     box-shadow 160ms ease;
 }
 
@@ -353,11 +354,11 @@ onUnmounted(() => {
 .memory-filters--compact .memory-filters__trigger {
   gap: 0;
   padding-inline: 0.5rem;
-  border-color: color-mix(in srgb, var(--shell-line) 70%, transparent);
-  background: color-mix(in srgb, var(--shell-window-bg) 70%, transparent);
+  border: none;
+  background: rgba(15, 23, 42, 0.07);
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .memory-filters--compact .memory-filters__trigger-label {
@@ -367,13 +368,24 @@ onUnmounted(() => {
 }
 
 .memory-filters__trigger:hover {
-  border-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
-  background: var(--color-primary-soft);
+  background: rgba(15, 23, 42, 0.12);
+  color: var(--shell-ink);
 }
 
 .memory-filters--compact .memory-filters__trigger:hover {
-  border-color: color-mix(in srgb, var(--color-primary) 24%, transparent);
-  background: color-mix(in srgb, var(--shell-window-bg) 70%, transparent);
+  background: rgba(15, 23, 42, 0.12);
+}
+
+:global(:root[data-theme='dark']) .memory-filters__trigger {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:global(:root[data-theme='dark']) .memory-filters--compact .memory-filters__trigger {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:global(:root[data-theme='dark']) .memory-filters__trigger:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .memory-filters__trigger-icon {

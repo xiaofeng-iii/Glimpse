@@ -238,7 +238,7 @@ const preventOutsideDismiss = (event: Event) => {
             :disabled="busy"
             @click="requestCancel"
           >
-            <XMarkIcon class="h-4 w-4" aria-hidden="true" />
+            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </header>
 

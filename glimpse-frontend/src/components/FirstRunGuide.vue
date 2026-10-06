@@ -180,7 +180,7 @@ onBeforeUnmount(() => {
             :aria-label="t('onboarding.dismiss')"
             @click="finish"
           >
-            <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
 

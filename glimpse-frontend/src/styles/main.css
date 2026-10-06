@@ -23,8 +23,8 @@
   --color-text-muted: #66738a;
   --color-border: #d5dbe7;
   --color-border-strong: #b7c1d4;
-  --color-primary: #3b56c9;
-  --color-primary-hover: #3048ab;
+  --color-primary: #5287ea;
+  --color-primary-hover: #4376d6;
   --color-primary-soft: #edf0fa;
   --color-on-primary: #ffffff;
   --color-accent: #d9601c;
@@ -34,7 +34,7 @@
   --color-warning: #d97706;
   --color-danger: #d92d20;
   --color-danger-soft: #fff0ee;
-  --color-focus: #3b56c9;
+  --color-focus: #5287ea;
   --color-overlay: rgba(27, 37, 57, 0.4);
   --shadow-card: 0 1px 2px rgba(26, 38, 64, 0.08), 0 6px 16px rgba(26, 38, 64, 0.1);
   --shadow-modal: 0 20px 56px rgba(24, 34, 56, 0.18);
@@ -76,8 +76,8 @@
   --shell-control-hover: var(--color-surface-hover);
   --shell-primary-start: var(--color-primary);
   --shell-primary-end: var(--color-primary);
-  --shell-primary-shadow: rgba(59, 86, 201, 0.14);
-  --shell-primary-shadow-hover: rgba(59, 86, 201, 0.2);
+  --shell-primary-shadow: rgba(82, 135, 234, 0.18);
+  --shell-primary-shadow-hover: rgba(82, 135, 234, 0.26);
   --shell-scrollbar-thumb: rgba(95, 109, 134, 0.32);
   --shell-scrollbar-thumb-hover: rgba(95, 109, 134, 0.5);
 }
@@ -497,14 +497,15 @@ button {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  height: var(--control-h-md);
   min-height: var(--control-h-md);
-  padding: 0.375rem 1rem;
+  padding: 0 1rem;
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
   color: #fff;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.8125rem;
+  font-weight: 400;
   line-height: var(--line-height-14);
   transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
   background: var(--color-primary);
@@ -560,16 +561,17 @@ button {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  height: var(--control-h-md);
   min-height: var(--control-h-md);
-  padding: 0.375rem 0.9rem;
-  background: var(--shell-control-bg);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
+  padding: 0 0.9rem;
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  border: none;
   border-radius: var(--radius-md);
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.8125rem;
+  font-weight: 400;
   line-height: var(--line-height-14);
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  transition: background-color 0.16s ease, color 0.16s ease;
   cursor: pointer;
 }
 
@@ -580,10 +582,14 @@ button {
   flex: 0 0 auto;
 }
 
-.btn-secondary:hover {
-  background: var(--shell-control-hover);
-  border-color: var(--color-border-strong);
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-surface-hover);
   color: var(--color-text);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .btn-danger {
@@ -591,14 +597,15 @@ button {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  height: var(--control-h-md);
   min-height: var(--control-h-md);
-  padding: 0.375rem 0.9rem;
+  padding: 0 0.9rem;
   border: none;
   border-radius: var(--radius-md);
   background: var(--color-danger);
   color: #fff;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.8125rem;
+  font-weight: 400;
   line-height: var(--line-height-14);
   transition: background 0.18s ease, opacity 0.18s ease;
   cursor: pointer;
@@ -619,14 +626,15 @@ button {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  height: var(--control-h-md);
   min-height: var(--control-h-md);
-  padding: 0.375rem 0.75rem;
+  padding: 0 0.75rem;
   border: none;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-danger);
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.8125rem;
+  font-weight: 400;
   line-height: var(--line-height-14);
   transition: background-color 160ms ease, color 160ms ease;
   cursor: pointer;
@@ -651,7 +659,7 @@ kbd {
    与设置区"更苗条的控件"同一策略，不拿主路径按钮的分量。 */
 .btn-sm {
   min-height: var(--control-h-sm);
-  padding: 0.25rem 0.75rem;
+  padding: 0.125rem 0.75rem;
   font-size: 0.8125rem;
   font-weight: 400;
   box-shadow: none;
@@ -832,12 +840,12 @@ kbd {
 }
 
 :root[data-theme='dark'] .btn-secondary {
-  border-color: var(--color-border);
-  color: var(--color-text-secondary);
+  color: var(--color-text);
+  background: var(--color-surface-hover);
 }
 
-:root[data-theme='dark'] .btn-secondary:hover {
-  border-color: var(--color-border-strong);
+:root[data-theme='dark'] .btn-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-surface-hover) 75%, var(--color-border-strong));
   color: var(--color-text);
 }
 
@@ -1021,7 +1029,6 @@ kbd {
   line-height: var(--line-height-14);
 }
 
-.modal-icon-button,
 .image-preview-stage__arrow {
   display: inline-flex;
   width: 2.5rem;
@@ -1044,7 +1051,6 @@ kbd {
     transform 160ms ease;
 }
 
-.modal-icon-button:hover,
 .image-preview-stage__arrow:hover {
   color: var(--color-text);
   border-color: var(--color-border-strong);

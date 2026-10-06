@@ -223,12 +223,12 @@ onUnmounted(() => {
           <button
             ref="closeButton"
             type="button"
-            class="modal-icon-button"
+            class="inline-flex h-8 w-8 min-h-0 flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
             :title="t('action.close')"
             :aria-label="t('action.close')"
             @click="previewStore.close"
           >
-            <XMarkIcon class="h-6 w-6" aria-hidden="true" />
+            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </header>
 

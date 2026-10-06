@@ -12,6 +12,7 @@ import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 import SearchToolbar from '@/components/SearchToolbar.vue'
 import SummaryEditor from '@/components/SummaryEditor.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import UpdateNotesPopover from '@/components/UpdateNotesPopover.vue'
 import OcrText from '@/components/OcrText.vue'
 import MemoryAnalysisState from '@/components/MemoryAnalysisState.vue'
 import MemoryDetail from '@/views/MemoryDetail.vue'
@@ -879,5 +880,68 @@ describe('memory components', () => {
 
     wrapper.unmount()
     origin.remove()
+  })
+})
+
+describe('窗口级关闭叉号统一规格', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  const assertUnifiedCloseGlyph = (container: ParentNode, button: Element | null) => {
+    expect(button).not.toBeNull()
+    const glyph = button?.querySelector('svg')
+    expect(glyph?.getAttribute('viewBox')).toBe('0 0 24 24')
+    expect(glyph?.getAttribute('class')).toContain('h-3.5 w-3.5')
+  }
+
+  it('图片预览关闭按钮使用 32px 无框标准按钮与 14px 叉号', async () => {
+    setLanguagePreference('zh-CN')
+    mount(ImagePreviewModal)
+    const previewStore = useImagePreviewStore()
+    const origin = document.createElement('button')
+    document.body.appendChild(origin)
+
+    previewStore.open(['image-1.png'], 0, origin)
+    await flushPromises()
+
+    const close = document.querySelector<HTMLButtonElement>('[role="dialog"] button[aria-label="关闭"]')
+    expect(close?.className).toContain('h-8 w-8')
+    expect(close?.className).not.toContain('modal-icon-button')
+    assertUnifiedCloseGlyph(document, close)
+
+    previewStore.close()
+    origin.remove()
+  })
+
+  it('筛选面板关闭按钮使用 14px 叉号', async () => {
+    setLanguagePreference('zh-CN')
+    const filters = createEmptyMemoryFilters()
+    const wrapper = mount(MemoryFilters, {
+      props: { modelValue: filters },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('.memory-filters__trigger').trigger('click')
+    assertUnifiedCloseGlyph(wrapper.element, wrapper.get('.memory-filters__close').element)
+
+    wrapper.unmount()
+  })
+
+  it('更新说明浮窗使用统一 XMarkIcon 叉号（不再用自绘 12px SVG）', async () => {
+    setLanguagePreference('zh-CN')
+    const wrapper = mount(UpdateNotesPopover, {
+      props: { label: '更新说明', open: true },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    // PopoverPortal 把内容挂到 body，从 document 上找
+    const close = document.querySelector<HTMLButtonElement>('.notes-popover__close')
+    expect(close).not.toBeNull()
+    expect(close?.querySelector('svg[viewBox="0 0 12 12"]')).toBeNull()
+    assertUnifiedCloseGlyph(document, close)
+
+    wrapper.unmount()
   })
 })
