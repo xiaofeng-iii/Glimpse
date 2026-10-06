@@ -653,7 +653,7 @@ describe('memory components', () => {
     })
 
     const editButton = wrapper.get('.summary-editor__edit-action')
-    expect(editButton.classes()).toEqual(expect.arrayContaining(['h-8', 'w-28', 'text-sm', 'font-semibold']))
+    expect(editButton.classes()).toEqual(expect.arrayContaining(['h-8', 'font-normal']))
 
     await editButton.trigger('click')
     await flushPromises()
@@ -662,7 +662,7 @@ describe('memory components', () => {
     expect(frame.attributes('style')).toContain('height: 220px')
     expect(document.activeElement).toBe(originalControl)
     for (const button of wrapper.findAll('.summary-editor__edit-action')) {
-      expect(button.classes()).toEqual(expect.arrayContaining(['h-8', 'w-28', 'text-sm', 'font-semibold']))
+      expect(button.classes()).toEqual(expect.arrayContaining(['!h-8']))
     }
 
     measuredHeight = 600

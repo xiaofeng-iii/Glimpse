@@ -155,6 +155,10 @@ const cancelEditing = () => {
   draft.value = fieldText.value
   errorMessage.value = ''
   editing.value = false
+  // 退出编辑即移出焦点：别把焦点留在已转只读的框上。
+  if (compactEditor.value && document.activeElement === compactEditor.value) {
+    compactEditor.value.blur()
+  }
 }
 
 const save = async () => {
@@ -168,6 +172,10 @@ const save = async () => {
       : await memoriesStore.updateSummary(props.memory.id, normalizedDraft.value)
     draft.value = noteMode.value ? (memory.user_text ?? '') : memory.ai_summary
     editing.value = false
+    // 同 cancelEditing：别把焦点留在已转只读的框上。
+    if (compactEditor.value && document.activeElement === compactEditor.value) {
+      compactEditor.value.blur()
+    }
     emit('saved', memory)
   } catch (error) {
     errorMessage.value = editorText('saveFailed')
@@ -240,13 +248,13 @@ defineExpose({
 </script>
 
 <template>
-  <section class="summary-editor" :aria-label="contentLabel">
+  <section class="summary-editor" :class="{ 'summary-editor--compact': compact }" :aria-label="contentLabel">
     <div class="summary-editor__header mb-2.5 flex min-h-8 items-center justify-between gap-3">
       <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ contentLabel }}</h3>
       <button
         v-if="!editing"
         type="button"
-        class="summary-editor__edit-action inline-flex h-8 w-28 flex-none items-center justify-center gap-0.5 whitespace-nowrap rounded-md border border-[var(--shell-line)] px-1 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary-soft)]"
+        class="summary-editor__edit-action inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] px-3 text-[0.8125rem] font-normal text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
         @click="startEditing"
       >
         <PencilSquareIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
@@ -255,7 +263,7 @@ defineExpose({
       <div v-else class="summary-editor__edit-actions flex flex-none items-center gap-2">
         <button
           type="button"
-          class="summary-editor__edit-action inline-flex h-8 w-28 items-center justify-center whitespace-nowrap rounded-md border border-[var(--shell-line)] bg-[var(--shell-control-bg)] px-2 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="summary-editor__edit-action btn-secondary !h-8 !min-h-8 px-2.5 text-[0.8125rem]"
           :disabled="saving"
           @click="cancelEditing"
         >
@@ -263,7 +271,7 @@ defineExpose({
         </button>
         <button
           type="button"
-          class="summary-editor__edit-action inline-flex h-8 w-28 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)] px-2 text-sm font-semibold text-white transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="summary-editor__edit-action btn-primary !h-8 !min-h-8 gap-1.5 px-3 text-[0.8125rem]"
           :disabled="!canSave"
           @click="save"
         >
@@ -378,19 +386,15 @@ defineExpose({
   container-type: inline-size;
 }
 
-.summary-editor__compact-frame--editing:focus-within,
-.summary-editor__compact-frame--scrollable:focus-within {
-  border-color: var(--color-focus);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-focus) 28%, transparent);
-}
-
 .summary-editor__compact-control:focus,
 .summary-editor__compact-control:focus-visible {
   border-color: transparent;
   box-shadow: none;
 }
 
-@container (max-width: 20rem) {
+/* 折行阈值只照顾真正挤不下的一行标题+操作的场景；
+   侧栏块化后内容宽 ~316px，标题行保持单行，不落进此查询。 */
+@container (max-width: 17.5rem) {
   .summary-editor__header {
     align-items: flex-start;
     display: grid;
@@ -406,5 +410,25 @@ defineExpose({
     width: 100%;
     justify-content: flex-end;
   }
+}
+
+/* 侧栏紧凑形态：整个编辑器成为一块 subtle 内嵌面（设置页信息卡同饰），
+   标题行与正文共享块内缩进；编辑时白底框在块内浮起。仅 compact 生效，
+   详情页的非紧凑布局不受影响。 */
+.summary-editor--compact {
+  padding: 0.625rem 0.75rem 0.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-subtle);
+}
+
+.summary-editor--compact .summary-editor__header {
+  margin-bottom: 0.375rem;
+  padding-inline: 0.75rem;
+}
+
+.summary-editor--compact .summary-editor__edit-action {
+  height: 1.75rem;
+  min-height: 1.75rem;
+  padding-inline: 0.625rem;
 }
 </style>

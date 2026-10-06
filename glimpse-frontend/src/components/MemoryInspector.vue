@@ -84,24 +84,26 @@ defineExpose({ canLeave })
 
 <template>
   <aside class="flex h-full min-h-0 w-full flex-col bg-[var(--color-surface)]">
-    <header class="flex items-start justify-between border-b border-[var(--shell-line)] px-5 py-3.5">
-      <div>
-        <h2 class="text-base font-semibold text-[var(--shell-ink)]">{{ t('memory.detail') }}</h2>
-        <time class="mt-0.5 block text-xs text-[var(--shell-muted)]" :datetime="memory.created_at">
+    <header class="flex items-center gap-3 px-5 pb-3 pt-3.5">
+      <div class="flex min-w-0 flex-1 items-baseline gap-x-2.5">
+        <h2 class="flex-none text-base font-semibold text-[var(--shell-ink)]">{{ t('memory.detail') }}</h2>
+        <time class="min-w-0 truncate text-xs text-[var(--shell-muted)]" :datetime="memory.created_at">
           {{ formatDate(memory.created_at) }}
         </time>
       </div>
       <button
         type="button"
-        class="inline-flex h-8 w-8 min-h-0 items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+        class="inline-flex h-8 w-8 min-h-0 flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
         :aria-label="t('action.close')"
         @click="emit('close')"
       >
-        <XMarkIcon class="h-4 w-4" aria-hidden="true" />
+        <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </header>
 
-    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+    <div class="memory-inspector__divider" aria-hidden="true"></div>
+
+    <div class="memory-inspector__body min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
       <MediaGallery v-if="!textMemory" :memory="memory" compact />
 
       <div
@@ -138,7 +140,7 @@ defineExpose({ canLeave })
         </button>
       </div>
 
-      <OcrText v-if="!textMemory && !analyzing && !analysisUnavailable" :text="memory.text_content" />
+      <OcrText v-if="!textMemory && !analyzing && !analysisUnavailable" :text="memory.text_content" compact />
 
       <button
         v-if="!analyzing"
@@ -165,3 +167,24 @@ defineExpose({ canLeave })
     />
   </aside>
 </template>
+
+<style scoped>
+/* 标题栏与滚动内容之间只留一道内缩低对比细线（设置页同款），
+   不再使用贯通两缘的 border-b 硬分割。 */
+.memory-inspector__divider {
+  flex: none;
+  height: 1px;
+  margin-inline: 1.25rem;
+  background: color-mix(in srgb, var(--shell-line) 55%, transparent);
+}
+
+/* 侧栏滚动条隐藏（设置页正文同策略）：滚动能力保留，滚动条不占视觉宽度，
+   避免在白卡右缘形成常驻分割线。 */
+.memory-inspector__body {
+  scrollbar-width: none;
+}
+
+.memory-inspector__body::-webkit-scrollbar {
+  display: none;
+}
+</style>
