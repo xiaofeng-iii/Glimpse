@@ -103,6 +103,7 @@ through the manual maintenance backfill; never add automatic startup backfill.
 - `Escape` clears search in the main window. It is not a configurable global hotkey.
 - AI providers are OpenAI-compatible. Provider/base URL/model/timeout settings belong under the `ai` settings section.
 - Chinese search needs fallback behavior because SQLite FTS does not tokenize Chinese reliably.
+- Declare every runtime import at development time: `npm install <pkg>@<version>` must land it in `package.json` and the lockfile (`await import()` counts too). Tauri npm packages must stay on the same major.minor as the crate pinned in `src-tauri/Cargo.lock`, not the version left over in local node_modules. Push CI (`ci.yml` + `scripts/check_dependencies.mjs`) enforces both.
 
 ## What To Ignore
 

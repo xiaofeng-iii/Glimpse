@@ -1,0 +1,41 @@
+name: Frontend checks
+
+# 推送即校验：依赖声明完整性、Tauri npm/crate 版本对齐与类型检查。
+# 规则见 docs/RELEASE.md「依赖对齐与构建失败排查」；发布构建只作最后防线。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Dependencies and typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: glimpse-frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: glimpse-frontend
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: glimpse-frontend
+        run: npx vue-tsc --noEmit
+
+      - name: Check dependency declaration and Tauri version alignment
+        run: node scripts/check_dependencies.mjs

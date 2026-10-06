@@ -10,6 +10,33 @@ Release 以及撰写面向用户的 Release 正文，都在这里维护。
 1. 用 `PyInstaller` 构建 Python 后端 sidecar
 2. 用 `Tauri` 构建 NSIS 安装包
 
+## 依赖对齐与构建失败排查
+
+依赖声明与版本对齐是**开发时**纪律，**推送时**由 CI 机械校验，发布构建只作
+最后防线。
+
+开发时：新增任何运行时导入的包，在写 import 的同时用
+`npm install <pkg>@<版本>` 落入 `package.json` 与锁文件，`await import()`
+动态导入同样要声明（完整约定见根目录 `AGENTS.md`）。Tauri 系 npm 包版本取
+`src-tauri/Cargo.lock` 锁定的 crate 版本（同 major.minor），不按本地残留或
+“最新”选；安装后检查锁文件 diff——npm 会为满足新包的依赖范围连带升级其他
+包，安装 plugin-opener@2.7.0 就曾把 @tauri-apps/api 从 2.11.0 抬到 2.12.1。
+
+推送时：`ci.yml` 工作流在每次 push 到 main 与 PR 上运行 `npm ci` →
+`vue-tsc` → `scripts/check_dependencies.mjs`（校验导入 ⊆ 声明、Tauri npm 包
+与 crate 同 minor）。本地提交前可直跑同一脚本。
+
+发布时（最后防线）：发布工作流只校验与 tag 绑定的事项——版本号同步
+（`set_version.py --check`）、Python 单元测试、完整构建（PyInstaller sidecar
+与签名的 NSIS 安装包）、sidecar 冒烟测试，外加兜底性质的 `vue-tsc` 与
+Tauri CLI 同 minor 校验。依赖缺失或版本错位不应到发布时才首次暴露。
+
+已发布版本构建失败的定位入口是 `gh run view <run-id> --log-failed`。修复走
+「tag 拉分支 → 重指 tag 重新发布 → 合并回主线」：重推 tag 后
+`gh release upload --clobber` 只补资产、不动已发布正文；主线合并保证修复
+可达、后续开发不进 tag 也不丢失。v0.4.2 曾因「动态导入未声明」与「npm 包
+版本高于 crate」连续两次构建失败，即以该流程修复并沉淀出本节规则。
+
 ## 版本号事实源
 
 应用版本只在 `glimpse-frontend/src-tauri/Cargo.toml` 的
