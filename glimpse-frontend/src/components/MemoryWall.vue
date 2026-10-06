@@ -122,12 +122,22 @@ let paneResizeObserver: ResizeObserver | null = null
 const updateContentWidth = () => {
   const wallElement = wall.value
   if (!wallElement || !scrollContainer) return
-  const inset = Number.parseFloat(
-    getComputedStyle(wallElement).getPropertyValue('--memory-wall-inline-inset'),
-  ) || 16
-  const available = scrollContainer.clientWidth - inset * 2
+  // 可用宽必须取自滚动内容块的计算后 padding（px 实测值）：内衬的自定义属性是
+  // rem 令牌，parseFloat('1rem') 只得 1，会把内衬少算 30px，在四列边界多算一列，
+  // 内容宽顶满后 margin-inline:auto 失效、网格与分割线一起贴左。
+  const scrollEl = wallElement.querySelector<HTMLElement>('.memory-wall-scroll')
+  const available = scrollEl
+    ? scrollEl.clientWidth -
+      (Number.parseFloat(getComputedStyle(scrollEl).paddingLeft) || 0) -
+      (Number.parseFloat(getComputedStyle(scrollEl).paddingRight) || 0)
+    : scrollContainer.clientWidth - 32
   const fit = Math.max(1, Math.floor((available + CARD_GAP_PX) / (CARD_WIDTH_PX + CARD_GAP_PX)))
-  const columns = props.maxColumns ? Math.min(fit, props.maxColumns) : fit
+  let columns = props.maxColumns ? Math.min(fit, props.maxColumns) : fit
+  // 防御：内容宽不得顶满可用宽，否则 section 的 width:min(100%, 内容宽) 会取到 100%，
+  // margin-inline:auto 失效，网格与分割线一起贴左。
+  while (columns > 1 && columns * CARD_WIDTH_PX + (columns - 1) * CARD_GAP_PX >= available) {
+    columns -= 1
+  }
   wallElement.style.setProperty(
     '--wall-content-width',
     `${columns * CARD_WIDTH_PX + (columns - 1) * CARD_GAP_PX}px`,
