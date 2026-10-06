@@ -42,7 +42,6 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppSelect from '@/components/AppSelect.vue'
 import UpdateNotesContent from '@/components/UpdateNotesContent.vue'
 import UpdateNotesPopover from '@/components/UpdateNotesPopover.vue'
-import { aggregateNotes, createNotesLoader, type Notes } from '@/utils/updateNotes'
 
 const logger = createLogger('views/Settings')
 const route = useRoute()
@@ -124,18 +123,6 @@ const updateNotes = computed(() => updatesStore.updateNotes)
 const updateNotesLoading = computed(() => updatesStore.updateNotesLoading)
 const updateNotesPartial = computed(() => updatesStore.updateNotesPartial)
 const installFailed = ref(false)
-const loadNotes = createNotesLoader()
-// 开发通道用内存里的假索引，真实通道照旧抓 GitHub Pages。
-const loadNotesForChannel = async (channel: string) => {
-  if (import.meta.env.DEV && channel === DEV_UPDATE_CHANNEL) {
-    const { devReleaseNotes } = await import('@/dev/fakeUpdateChannel')
-    return devReleaseNotes()
-  }
-  return loadNotes()
-}
-// dev-test 按预览语义聚合，再交给 aggregateNotes 的截断规则。
-const aggregationChannel = (channel: string): 'stable' | 'preview' =>
-  channel === 'stable' ? 'stable' : 'preview'
 let updateGeneration = 0
 let disposed = false
 // 加载/回填设置触发的 updateChannel 变化是程序化的，不代表用户切换通道：
