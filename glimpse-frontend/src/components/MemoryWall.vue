@@ -138,10 +138,10 @@ const updateContentWidth = () => {
   while (columns > 1 && columns * CARD_WIDTH_PX + (columns - 1) * CARD_GAP_PX >= available) {
     columns -= 1
   }
-  wallElement.style.setProperty(
-    '--wall-content-width',
-    `${columns * CARD_WIDTH_PX + (columns - 1) * CARD_GAP_PX}px`,
-  )
+  const width = `${columns * CARD_WIDTH_PX + (columns - 1) * CARD_GAP_PX}px`
+  wallElement.style.setProperty('--wall-content-width', width)
+  // 控件行的计数需与网格左缘对齐：内容块宽度同步写到滚动容器，供墙外引用。
+  scrollContainer.style.setProperty('--wall-content-width', width)
 }
 
 watch(() => props.maxColumns, () => void nextTick(updateContentWidth))

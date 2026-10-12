@@ -651,21 +651,27 @@ onUnmounted(() => {
 }
 
 /* 计数 + 布局/筛选控件行：吸顶在搜索浮条正下方，与浮条同级 z-index（浮条磨砂尾巴
-   只模糊其身后内容，不盖住控件行）。水平 inset 与浮条一致，计数与控件分别贴齐
-   浮条两缘。整行点击穿透，只有右侧控件接收指针——滚动时可直接点其下滑过的卡片。 */
+   只模糊其身后内容，不盖住控件行）。计数贴卡片网格左缘（与居中轴对齐，内衬与
+   墙内 inset 同级回落），控件贴浮条右缘。整行点击穿透，只有右侧控件接收指针。 */
 .home-controls-bar {
   position: sticky;
   z-index: var(--z-sticky);
   top: var(--home-controls-sticky-top, 5rem);
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
   padding: 0.25rem 1.25rem;
   pointer-events: none;
 }
 
 .home-controls-bar__count {
+  position: absolute;
+  left: max(
+    var(--memory-wall-inline-inset, 1rem),
+    calc((100% - var(--wall-content-width, 100%)) / 2)
+  );
+  top: 50%;
+  transform: translateY(-50%);
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
@@ -674,12 +680,13 @@ onUnmounted(() => {
   flex: 0 0 auto;
   align-items: center;
   gap: 0.5rem;
+  margin-left: auto;
   pointer-events: auto;
 }
 
 /* 紧凑态（滚动越顶）：计数淡出上移，分割线隐去，内容从行下滑过。 */
 .home-controls-bar--compact .home-controls-bar__count {
-  transform: translateY(-0.25rem);
+  transform: translateY(-50%) translateY(-0.25rem);
   opacity: 0;
 }
 
