@@ -56,6 +56,9 @@
   滑动？滚动条是不是常驻杵在那很丑？该隐藏就隐藏（`scrollbar-width:none`
   + `::-webkit-scrollbar` 隐藏），该滚动驱动就别常驻。
 - 同时核对：浅色/深色两主题、窄屏、键盘焦点、禁用态。
+- 验证**焦点类样式**（focus/focus-visible/focus-within）前，先确认浏览器页面
+  持有系统焦点：`document.activeElement` 指向元素不等于 `:focus` 匹配，后台
+  页面上读到的一切焦点态都不可信。
 - 依据：`DESIGN.md` 原则 3"状态永远清晰可辨"、Do's"同时检查浅色、深色、
   窄屏、键盘焦点和禁用状态"。
 
