@@ -665,17 +665,17 @@ onUnmounted(() => {
   container-type: inline-size;
 }
 
-/* 统一磨砂遮罩：加在软件内部、覆盖软件头到搜索浮条整条区间（顶=窗口顶/软件头位置，
-   底=浮条磨砂尾巴末端）。模糊从顶部 26px 随向下渐弱到 0，是唯一模糊层，软件头透明
-   盖在其上。sticky 吸附在滚动容器可视顶、不随内容滚走、不挡指针，只糊化视觉上滚到
-   它后面的墙内容。z 低于浮条（var(--z-sticky)），浮条清晰、不被糊。五层递增模糊叠出
-   连续曲线；负 margin 抵消自身占位，不影响布局。 */
+/* 统一磨砂遮罩：加在软件内部、从软件头下缘（浮条顶）开始，向下渐弱到 0，
+   底=浮条磨砂尾巴末端。这是唯一模糊层，软件头透明盖在其上不做模糊。sticky 吸附在
+   滚动容器可视顶、不随内容滚走、不挡指针，只糊化视觉上滚到它后面的墙内容。z 低于
+   浮条（var(--z-sticky)），浮条清晰、不被糊。五层递增模糊叠出连续曲线；负 margin
+   抵消自身占位，不影响布局。 */
 .home-pane-blur-band {
   position: sticky;
-  top: 0;
+  top: var(--shell-header-h, 2.1875rem);
   z-index: calc(var(--z-sticky) - 1);
-  height: calc(var(--shell-header-h, 2.1875rem) + 8.875rem + 2rem); /* 软件头35 + 浮条110 + 尾巴32 ≈ 177px */
-  margin-bottom: calc(-1 * (var(--shell-header-h, 2.1875rem) + 8.875rem + 2rem));
+  height: calc(8.875rem + 2rem); /* 浮条约 110px + 原磨砂尾巴 32px ≈ 142px */
+  margin-bottom: calc(-1 * (8.875rem + 2rem));
   pointer-events: none;
 }
 
@@ -684,7 +684,7 @@ onUnmounted(() => {
   inset: 0;
 }
 
-/* 第 1 层（最强，贴顶部软件头）：26px，向下约 30% 处淡出 */
+/* 第 1 层（最强，贴软件头下缘）：26px，向下约 30% 处淡出 */
 .home-pane-blur-band__layer--1 {
   backdrop-filter: blur(26px);
   -webkit-backdrop-filter: blur(26px);
@@ -692,28 +692,28 @@ onUnmounted(() => {
   -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 30%);
 }
 
-/* 第 2 层：18px，覆盖到约 48% */
+/* 第 2 层：18px，覆盖到约 50% */
 .home-pane-blur-band__layer--2 {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 48%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 48%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 50%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 50%);
 }
 
-/* 第 3 层：12px，覆盖到约 66% */
+/* 第 3 层：12px，覆盖到约 70% */
 .home-pane-blur-band__layer--3 {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 66%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 66%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 70%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 70%);
 }
 
-/* 第 4 层：8px，覆盖到约 84% */
+/* 第 4 层：8px，覆盖到约 88% */
 .home-pane-blur-band__layer--4 {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 84%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 84%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 88%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 88%);
 }
 
 /* 第 5 层（最弱，延伸最远）：4px，淡出于带尾 */

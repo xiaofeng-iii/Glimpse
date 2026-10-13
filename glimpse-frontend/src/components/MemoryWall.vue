@@ -175,7 +175,7 @@ const groups = computed<MemoryGroup[]>(() => {
 
 <template>
   <section ref="wall" class="memory-wall">
-    <div class="memory-wall-scroll pb-6 pt-4" aria-live="polite" :aria-busy="loading || undefined">
+    <div class="memory-wall-scroll pb-6 pt-[calc(1rem+var(--shell-header-h,2.1875rem))]" aria-live="polite" :aria-busy="loading || undefined">
 
       <Transition name="wall-cross">
         <div
