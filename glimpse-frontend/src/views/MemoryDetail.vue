@@ -103,7 +103,7 @@ const confirmDelete = async () => {
 </script>
 
 <template>
-  <main class="h-full min-h-0 overflow-y-auto bg-[var(--shell-window-bg)] px-5 py-4 sm:px-6">
+  <main class="h-full min-h-0 overflow-y-auto bg-[var(--shell-window-bg)] px-5 pb-4 pt-[calc(var(--shell-header-h)+1rem)] sm:px-6">
     <div class="mx-auto max-w-[1440px]">
       <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">

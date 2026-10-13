@@ -648,7 +648,7 @@ onUnmounted(() => {
   <ConfirmDialog id="update-notes" :open="updateDialogOpen" :title="t('settings.updateAvailable', { version: availableUpdate?.version ?? '' })" :description="updatesStore.installing ? t('settings.updateInstalling') : ''" :confirm-label="t('settings.updateNow')" :cancel-label="t('settings.updateLater')" :busy="updatesStore.installing" hide-icon @cancel="updateDialogOpen = false" @confirm="installUpdate">
     <UpdateNotesContent v-if="!updatesStore.installing" :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate?.notes ?? '' : undefined" />
   </ConfirmDialog>
-  <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-4 sm:p-5">
+  <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-4 pt-[calc(var(--shell-header-h)+1rem)] sm:p-5 sm:pt-[calc(var(--shell-header-h)+1.25rem)]">
     <div class="mx-auto flex h-full min-h-0 w-full max-w-[1020px] flex-col">
       <header class="mb-4 flex-none">
         <h1 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('settings.title') }}</h1>

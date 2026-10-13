@@ -70,6 +70,8 @@
   --shell-frame-bg: var(--color-canvas);
   --shell-window-bg: var(--color-canvas);
   --shell-header-bg: var(--color-header);
+  /* 软件头高度：悬浮后搜索浮条等吸顶元素用它让开软件头，避免压到栏下 */
+  --shell-header-h: 2.1875rem;
   --shell-card-border: var(--color-border);
   --shell-card-shadow: var(--shadow-card);
   --shell-control-bg: var(--color-surface);
@@ -124,6 +126,8 @@
   --shell-frame-bg: var(--color-canvas);
   --shell-window-bg: var(--color-canvas);
   --shell-header-bg: var(--color-header);
+  /* 软件头高度：悬浮后搜索浮条等吸顶元素用它让开软件头，避免压到栏下 */
+  --shell-header-h: 2.1875rem;
   --shell-card-border: var(--color-border);
   --shell-card-shadow: var(--shadow-card);
   --shell-control-bg: var(--color-surface-raised);
@@ -224,6 +228,7 @@ button {
 }
 
 .desktop-shell {
+  position: relative;
   display: flex;
   height: 100%;
   min-height: 0;
@@ -233,19 +238,30 @@ button {
   background: var(--color-canvas);
 }
 
+/* 软件头透明悬浮：不再与内容区上下并列，而是盖在内容之上，让记忆墙等内容能从
+   栏底穿过。背景用半透明画布色（并入画布色场、不加底边/阴影，见 DESIGN.md 表面
+   层级契约）。软件头自身不做模糊——模糊统一加在软件内部的记忆网格图层上
+   （见 Home.vue 的 .home-pane-blur-band），软件头只是透明盖在最上面。 */
 .desktop-shell__titlebar {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 30;
   display: flex;
   min-height: 2.1875rem;
+  height: 2.1875rem;
   flex: 0 0 2.1875rem;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0 0 0 0.5rem;
-  background: var(--shell-header-bg);
+  background: color-mix(in srgb, var(--shell-header-bg) 62%, transparent);
   user-select: none;
 }
+
+/* 软件头下方的连续磨砂带在首页滚动容器内实现（见 Home.vue 的 .home-pane-blur-band），
+   必须放在浮条之下才能只糊墙内容、不糊浮条本身；软件头（上方）与它在栏下缘衔接。 */
 
 .desktop-shell__drag-layer {
   position: absolute;

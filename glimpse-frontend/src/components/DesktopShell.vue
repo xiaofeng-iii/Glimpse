@@ -228,6 +228,10 @@ onUnmounted(() => {
 
 <template>
   <div class="desktop-shell">
+    <div class="desktop-shell__content">
+      <slot></slot>
+    </div>
+
     <header
       class="desktop-shell__titlebar"
       @contextmenu="handleTitlebarContextMenu"
@@ -347,10 +351,6 @@ onUnmounted(() => {
         </div>
       </div>
     </header>
-
-    <div class="desktop-shell__content">
-      <slot></slot>
-    </div>
 
     <CloseActionDialog
       :open="closeDialogOpen"

@@ -84,7 +84,11 @@ const scheduleStickyMetrics = () => {
     const toolbar = pane?.querySelector<HTMLElement>('.search-toolbar')
     if (!pane || !toolbar || !bar) return
     const toolbarHeight = toolbar.getBoundingClientRect().height
-    pane.style.setProperty('--home-controls-sticky-top', `${toolbarHeight}px`)
+    // 浮条吸顶已让开软件头（top: var(--shell-header-h)），控件行吸顶需再叠软件头高，
+    // 否则会与浮条下部重叠。读软件头实测高度而非写死，随字号/密度变化仍对齐。
+    const titlebar = document.querySelector<HTMLElement>('.desktop-shell__titlebar')
+    const titlebarHeight = titlebar?.getBoundingClientRect().height ?? 0
+    pane.style.setProperty('--home-controls-sticky-top', `${toolbarHeight + titlebarHeight}px`)
   })
 }
 let semanticWarmupTimer: ReturnType<typeof window.setTimeout> | null = null
@@ -504,6 +508,17 @@ onUnmounted(() => {
         :class="{ 'is-scrolling': paneScrollbarActive }"
         @scroll.passive="markPaneScrollbarActive"
       >
+        <!-- 统一磨砂遮罩：加在软件内部、覆盖软件头到搜索浮条整条区间，模糊从顶部
+             （软件头位置）26px 随向下渐弱到 0，到浮条下方完全清晰。这是唯一模糊层，
+             软件头只是透明盖在其上，因此模糊天然连续、无两段衔接。元素透明、不挡指针。 -->
+        <div class="home-pane-blur-band" aria-hidden="true">
+          <div class="home-pane-blur-band__layer home-pane-blur-band__layer--1"></div>
+          <div class="home-pane-blur-band__layer home-pane-blur-band__layer--2"></div>
+          <div class="home-pane-blur-band__layer home-pane-blur-band__layer--3"></div>
+          <div class="home-pane-blur-band__layer home-pane-blur-band__layer--4"></div>
+          <div class="home-pane-blur-band__layer home-pane-blur-band__layer--5"></div>
+        </div>
+
         <SearchToolbar
           ref="searchToolbar"
           v-model="query"
@@ -650,6 +665,65 @@ onUnmounted(() => {
   container-type: inline-size;
 }
 
+/* 统一磨砂遮罩：加在软件内部、覆盖软件头到搜索浮条整条区间（顶=窗口顶/软件头位置，
+   底=浮条磨砂尾巴末端）。模糊从顶部 26px 随向下渐弱到 0，是唯一模糊层，软件头透明
+   盖在其上。sticky 吸附在滚动容器可视顶、不随内容滚走、不挡指针，只糊化视觉上滚到
+   它后面的墙内容。z 低于浮条（var(--z-sticky)），浮条清晰、不被糊。五层递增模糊叠出
+   连续曲线；负 margin 抵消自身占位，不影响布局。 */
+.home-pane-blur-band {
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--z-sticky) - 1);
+  height: calc(var(--shell-header-h, 2.1875rem) + 8.875rem + 2rem); /* 软件头35 + 浮条110 + 尾巴32 ≈ 177px */
+  margin-bottom: calc(-1 * (var(--shell-header-h, 2.1875rem) + 8.875rem + 2rem));
+  pointer-events: none;
+}
+
+.home-pane-blur-band__layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* 第 1 层（最强，贴顶部软件头）：26px，向下约 30% 处淡出 */
+.home-pane-blur-band__layer--1 {
+  backdrop-filter: blur(26px);
+  -webkit-backdrop-filter: blur(26px);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 30%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 30%);
+}
+
+/* 第 2 层：18px，覆盖到约 48% */
+.home-pane-blur-band__layer--2 {
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 48%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 48%);
+}
+
+/* 第 3 层：12px，覆盖到约 66% */
+.home-pane-blur-band__layer--3 {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 66%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 66%);
+}
+
+/* 第 4 层：8px，覆盖到约 84% */
+.home-pane-blur-band__layer--4 {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 84%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 84%);
+}
+
+/* 第 5 层（最弱，延伸最远）：4px，淡出于带尾 */
+.home-pane-blur-band__layer--5 {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+}
+
 /* 计数 + 布局/筛选控件行：吸顶在搜索浮条正下方，与浮条同级 z-index（浮条磨砂尾巴
    只模糊其身后内容，不盖住控件行）。计数贴卡片网格左缘（与居中轴对齐，内衬与
    墙内 inset 同级回落），控件贴浮条右缘。整行点击穿透，只有右侧控件接收指针。 */
@@ -728,13 +802,14 @@ onUnmounted(() => {
   scrollbar-color: var(--shell-scrollbar-thumb) transparent;
 }
 
-/* 详情侧栏是浮在墙侧的内容块：白底、圆角与卡片阴影成块；边缘不加描边。 */
+/* 详情侧栏是浮在墙侧的内容块：白底、圆角与卡片阴影成块；边缘不加描边。
+   软件头悬浮后顶距需让开软件头高度，否则侧栏顶部会钻到软件头底下。 */
 .inspector-panel {
   width: 380px;
   flex: 0 0 380px;
   min-height: 0;
   overflow: hidden;
-  margin: 0.5rem 0.75rem 0.75rem 0.25rem;
+  margin: calc(var(--shell-header-h, 2.1875rem) + 0.5rem) 0.75rem 0.75rem 0.25rem;
   border-radius: var(--radius-xl);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
