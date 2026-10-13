@@ -83,8 +83,7 @@ const activeSourceIndex = computed(() =>
   Math.max(0, sources.findIndex((item) => item.value === source.value)),
 )
 
-// 滑动时长随路径长短变化：基础 200ms + 每格 100ms——相邻切换 0.3s、最远跨两格 0.4s。
-// 滑块位移与段按钮颜色共用同一时长，文字在滑块抵达时恰好完成变色。
+// 滑动时长随路径长短变化：基础 100ms + 每格 100ms——相邻切换 0.2s、最远跨两格 0.3s。
 const SLIDE_BASE_MS = 100
 const SLIDE_MS_PER_STEP = 100
 const slideDurationMs = ref(SLIDE_BASE_MS + SLIDE_MS_PER_STEP)
