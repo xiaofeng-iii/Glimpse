@@ -508,10 +508,9 @@ onUnmounted(() => {
         :class="{ 'is-scrolling': paneScrollbarActive }"
         @scroll.passive="markPaneScrollbarActive"
       >
-        <!-- 软件头段磨砂：把浮条磨砂尾巴的起始位置向上延伸到软件窗口顶部，
-             覆盖软件头（0-35px）。这段用与浮条顶相同的 blur(4px) 与透明度（等值
-             向上平移，不做渐变），只糊化从软件头底下穿过的墙内容。sticky 固定在
-             滚动容器可视顶、不随滚动滚走、不挡指针。z 低于浮条，浮条清晰。 -->
+        <!-- 统一磨砂带：覆盖软件头到浮条尾巴整条区间（0-177px），单层 blur(4px)。
+             sticky 固定在窗口顶、不随滚动滚走、不挡指针；z 低于浮条，浮条清晰。
+             软件头遮罩（shell 层）负责颜色渐变，这里负责模糊，两者叠加但模糊只有一层。 -->
         <div class="home-pane-blur-band" aria-hidden="true"></div>
 
         <SearchToolbar
@@ -660,19 +659,35 @@ onUnmounted(() => {
   container-type: inline-size;
 }
 
-/* 软件头段磨砂：把浮条磨砂尾巴的起始位置向上延伸到软件窗口顶部，覆盖软件头
-   （0-35px）。这段用与浮条顶相同的 blur(4px) 与透明度（等值向上平移，不做渐变），
-   只糊化从软件头底下穿过的墙内容。sticky 固定在滚动容器可视顶、不随滚动滚走、
-   不挡指针；z 低于浮条（var(--z-sticky)），浮条清晰。负 margin 抵消占位，不影响布局。 */
+/* 统一磨砂带：覆盖软件头到浮条尾巴整条区间（0-177px），单层 blur(4px)。
+/* 统一磨砂带：覆盖软件头到浮条尾巴整条区间（0-177px），单层 blur(4px)。
+   sticky 固定在窗口顶、不随滚动滚走、不挡指针；z 低于浮条（var(--z-sticky)），
+   浮条清晰。负 margin 抵消占位，不影响布局。mask 淡出点按 main 浮条尾巴的基准
+   （从浮条顶算起的最后 2rem+0.75rem，即 142px 处开始淡出）来定位。 */
 .home-pane-blur-band {
   position: sticky;
   top: 0;
   z-index: calc(var(--z-sticky) - 1);
-  height: var(--shell-header-h, 2.1875rem);
-  margin-bottom: calc(-1 * var(--shell-header-h, 2.1875rem));
+  height: 8.0625rem; /* 129px：过渡带结束位置 */
+  margin-bottom: -8.0625rem;
   pointer-events: none;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  /* 底部淡出：过渡带 85px→129px（44px 长度），从 85px 处开始渐弱，到 129px 淡出到 0。 */
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 5.3125rem, /* 85px */
+    rgb(0 0 0 / 72%) 6.8125rem, /* 109px */
+    transparent 8.0625rem /* 129px */
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 5.3125rem,
+    rgb(0 0 0 / 72%) 6.8125rem,
+    transparent 8.0625rem
+  );
 }
 
 /* 计数 + 布局/筛选控件行：吸顶在搜索浮条正下方，与浮条同级 z-index（浮条磨砂尾巴

@@ -262,7 +262,8 @@ button {
   user-select: none;
 }
 
-/* 软件头半透明遮罩：从顶缘 62% 不透明向下渐弱，延伸出软件头下缘 1.5rem 后淡出到 0。 */
+/* 软件头半透明遮罩：从顶缘 62% 不透明向下渐弱，延伸出软件头下缘 1.5rem 后淡出到 0。
+   延伸长度不超过浮条上缘（软件头下缘即浮条顶），避免盖住浮条导致变白。 */
 .desktop-shell__titlebar::after {
   content: '';
   position: absolute;
@@ -272,7 +273,8 @@ button {
   background: linear-gradient(
     to bottom,
     color-mix(in srgb, var(--shell-header-bg) 62%, transparent) 0%,
-    color-mix(in srgb, var(--shell-header-bg) 62%, transparent) calc(100% - 1.5rem),
+    color-mix(in srgb, var(--shell-header-bg) 45%, transparent) 40%,
+    color-mix(in srgb, var(--shell-header-bg) 25%, transparent) 75%,
     transparent 100%
   );
 }

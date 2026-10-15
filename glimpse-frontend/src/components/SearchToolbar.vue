@@ -522,31 +522,6 @@ defineExpose({ focus, clear })
   background: transparent;
 }
 
-/* 浮条滚动遮罩只做磨砂不做提亮：内容从卡下滑过时仅模糊、不叠加白色，
-   白色渐变遮罩已按设计决策移除。模糊带向下延伸出浮条下缘一段距离再淡出，
-   下边界不再骤然截断；停靠点用长度表达，浮条高度变化（紧凑换行）时依然对齐。 */
-.search-toolbar::after {
-  position: absolute;
-  z-index: 0;
-  inset: 0 0 calc(-1 * var(--search-toolbar-blur-tail));
-  pointer-events: none;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    rgb(0 0 0 / 72%) calc(100% - var(--search-toolbar-blur-tail) - 0.75rem),
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    rgb(0 0 0 / 72%) calc(100% - var(--search-toolbar-blur-tail) - 0.75rem),
-    transparent 100%
-  );
-  content: '';
-}
-
 .search-toolbar__surface {
   position: relative;
   z-index: 1;
