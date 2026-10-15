@@ -103,7 +103,7 @@ defineExpose({ canLeave })
 
     <div class="memory-inspector__divider" aria-hidden="true"></div>
 
-    <div class="memory-inspector__body min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+    <div class="memory-inspector__body min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-clip px-5 py-4">
       <MediaGallery v-if="!textMemory" :memory="memory" compact />
 
       <div
@@ -115,7 +115,7 @@ defineExpose({ canLeave })
 
       <p
         v-if="statusVisible && userNote"
-        class="whitespace-pre-wrap text-sm text-[var(--shell-ink)]"
+        class="whitespace-pre-wrap text-sm text-[var(--shell-ink)] [overflow-wrap:anywhere]"
       >
         {{ memory.user_text }}
       </p>

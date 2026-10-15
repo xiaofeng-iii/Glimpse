@@ -197,6 +197,11 @@ let maintenanceTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const currentSection = computed(() => sections.find((section) => section.id === activeSection.value) ?? sections[0])
 const maintenanceRunning = computed(() => Boolean(indexStatus.value?.running || ocrStatus.value?.running))
+// 索引计数行只在「已加载且不同步」时高亮：running/result 占位期间保持 muted，
+// 避免刚点完「修复索引」还在跑就先亮警告色。
+const indexOutOfSync = computed(() =>
+  Boolean(indexStatus.value && !indexStatus.value.running && !indexStatus.value.result && indexStatus.value.synced === false),
+)
 // 开发通道不写进 settings.json：后端只接受 stable/preview。
 const persistedUpdateChannel = computed(() =>
   import.meta.env.DEV && updateChannel.value === DEV_UPDATE_CHANNEL
@@ -957,15 +962,19 @@ onUnmounted(() => {
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.semanticIndex') }}</h3>
                     <p class="setting-help">{{ t('settings.semanticIndexHint') }}</p>
-                    <p v-if="indexStatus?.running" class="mt-3 text-sm text-[var(--color-primary)]">{{ t('settings.indexRepairRunning') }}</p>
-                    <p v-else-if="indexStatus?.result" class="mt-3 text-sm text-[var(--shell-muted)]">
+                    <p v-if="indexStatus?.running" class="mt-3 text-[.8125rem] text-[var(--color-primary)]">{{ t('settings.indexRepairRunning') }}</p>
+                    <p v-else-if="indexStatus?.result" class="mt-3 text-[.8125rem] text-[var(--shell-muted)]">
                       {{ t('settings.indexRepairLastResult', {
                         processed: indexStatus.result.processed,
                         indexed: indexStatus.result.indexed,
                         failed: indexStatus.result.failed,
                       }) }}
                     </p>
-                    <p v-else-if="indexStatus" class="mt-3 text-sm text-[var(--shell-muted)]">
+                    <p
+                      v-else-if="indexStatus"
+                      class="mt-3 text-[.8125rem]"
+                      :class="indexOutOfSync ? 'font-medium text-amber-600' : 'text-[var(--shell-muted)]'"
+                    >
                       {{ t('settings.indexRepairIdle', {
                         sqlite: indexStatus.sqlite_count ?? 0,
                         chroma: indexStatus.chroma_count ?? 0,
@@ -989,13 +998,13 @@ onUnmounted(() => {
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.ocrBackfill') }}</h3>
                     <p class="setting-help">{{ t('settings.ocrBackfillHint') }}</p>
-                    <p v-if="ocrStatus?.running" class="mt-3 text-sm text-[var(--color-primary)]">
+                    <p v-if="ocrStatus?.running" class="mt-3 text-[.8125rem] text-[var(--color-primary)]">
                       {{ t('settings.ocrBackfillRunning', {
                         processed: ocrStatus.result?.processed ?? 0,
                         total: ocrStatus.result?.total ?? 0,
                       }) }}
                     </p>
-                    <p v-else-if="ocrStatus?.result" class="mt-3 text-sm text-[var(--shell-muted)]">
+                    <p v-else-if="ocrStatus?.result" class="mt-3 text-[.8125rem] text-[var(--shell-muted)]">
                       {{ t('settings.ocrBackfillResult', {
                         processed: ocrStatus.result.processed,
                         succeeded: ocrSucceeded,

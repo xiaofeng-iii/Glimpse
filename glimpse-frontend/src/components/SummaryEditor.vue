@@ -336,7 +336,7 @@ defineExpose({
         :aria-label="contentLabel"
         @keydown="handleEditorKeydown"
       />
-      <p v-else class="whitespace-pre-wrap text-sm text-[var(--shell-ink)]">
+      <p v-else class="whitespace-pre-wrap text-sm text-[var(--shell-ink)] [overflow-wrap:anywhere]">
         {{ fieldText }}
       </p>
 

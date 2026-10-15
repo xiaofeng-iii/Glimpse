@@ -49,7 +49,7 @@ const copyText = async () => {
     </div>
     <p
       v-if="text"
-      class="max-h-64 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--shell-ink)]"
+      class="max-h-64 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--shell-ink)] [overflow-wrap:anywhere]"
     >
       {{ text }}
     </p>
