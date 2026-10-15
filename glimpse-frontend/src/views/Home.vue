@@ -508,16 +508,11 @@ onUnmounted(() => {
         :class="{ 'is-scrolling': paneScrollbarActive }"
         @scroll.passive="markPaneScrollbarActive"
       >
-        <!-- 统一磨砂遮罩：加在软件内部、覆盖软件头到搜索浮条整条区间，模糊从顶部
-             （软件头位置）26px 随向下渐弱到 0，到浮条下方完全清晰。这是唯一模糊层，
-             软件头只是透明盖在其上，因此模糊天然连续、无两段衔接。元素透明、不挡指针。 -->
-        <div class="home-pane-blur-band" aria-hidden="true">
-          <div class="home-pane-blur-band__layer home-pane-blur-band__layer--1"></div>
-          <div class="home-pane-blur-band__layer home-pane-blur-band__layer--2"></div>
-          <div class="home-pane-blur-band__layer home-pane-blur-band__layer--3"></div>
-          <div class="home-pane-blur-band__layer home-pane-blur-band__layer--4"></div>
-          <div class="home-pane-blur-band__layer home-pane-blur-band__layer--5"></div>
-        </div>
+        <!-- 软件头段磨砂：把浮条磨砂尾巴的起始位置向上延伸到软件窗口顶部，
+             覆盖软件头（0-35px）。这段用与浮条顶相同的 blur(4px) 与透明度（等值
+             向上平移，不做渐变），只糊化从软件头底下穿过的墙内容。sticky 固定在
+             滚动容器可视顶、不随滚动滚走、不挡指针。z 低于浮条，浮条清晰。 -->
+        <div class="home-pane-blur-band" aria-hidden="true"></div>
 
         <SearchToolbar
           ref="searchToolbar"
@@ -665,63 +660,19 @@ onUnmounted(() => {
   container-type: inline-size;
 }
 
-/* 统一磨砂遮罩：加在软件内部、从软件头下缘（浮条顶）开始，向下渐弱到 0，
-   底=浮条磨砂尾巴末端。这是唯一模糊层，软件头透明盖在其上不做模糊。sticky 吸附在
-   滚动容器可视顶、不随内容滚走、不挡指针，只糊化视觉上滚到它后面的墙内容。z 低于
-   浮条（var(--z-sticky)），浮条清晰、不被糊。五层递增模糊叠出连续曲线；负 margin
-   抵消自身占位，不影响布局。 */
+/* 软件头段磨砂：把浮条磨砂尾巴的起始位置向上延伸到软件窗口顶部，覆盖软件头
+   （0-35px）。这段用与浮条顶相同的 blur(4px) 与透明度（等值向上平移，不做渐变），
+   只糊化从软件头底下穿过的墙内容。sticky 固定在滚动容器可视顶、不随滚动滚走、
+   不挡指针；z 低于浮条（var(--z-sticky)），浮条清晰。负 margin 抵消占位，不影响布局。 */
 .home-pane-blur-band {
   position: sticky;
-  top: var(--shell-header-h, 2.1875rem);
+  top: 0;
   z-index: calc(var(--z-sticky) - 1);
-  height: calc(8.875rem + 2rem); /* 浮条约 110px + 原磨砂尾巴 32px ≈ 142px */
-  margin-bottom: calc(-1 * (8.875rem + 2rem));
+  height: var(--shell-header-h, 2.1875rem);
+  margin-bottom: calc(-1 * var(--shell-header-h, 2.1875rem));
   pointer-events: none;
-}
-
-.home-pane-blur-band__layer {
-  position: absolute;
-  inset: 0;
-}
-
-/* 第 1 层（最强，贴软件头下缘）：26px，向下约 30% 处淡出 */
-.home-pane-blur-band__layer--1 {
-  backdrop-filter: blur(26px);
-  -webkit-backdrop-filter: blur(26px);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 30%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 30%);
-}
-
-/* 第 2 层：18px，覆盖到约 50% */
-.home-pane-blur-band__layer--2 {
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 50%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 50%);
-}
-
-/* 第 3 层：12px，覆盖到约 70% */
-.home-pane-blur-band__layer--3 {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 70%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 70%);
-}
-
-/* 第 4 层：8px，覆盖到约 88% */
-.home-pane-blur-band__layer--4 {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 88%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 88%);
-}
-
-/* 第 5 层（最弱，延伸最远）：4px，淡出于带尾 */
-.home-pane-blur-band__layer--5 {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
 }
 
 /* 计数 + 布局/筛选控件行：吸顶在搜索浮条正下方，与浮条同级 z-index（浮条磨砂尾巴
