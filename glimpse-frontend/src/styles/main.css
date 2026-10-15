@@ -241,7 +241,9 @@ button {
 /* 软件头透明悬浮：不再与内容区上下并列，而是盖在内容之上，让记忆墙等内容能从
    栏底穿过。背景用半透明画布色（并入画布色场、不加底边/阴影，见 DESIGN.md 表面
    层级契约）。软件头自身不做模糊——模糊统一加在软件内部的记忆网格图层上
-   （见 Home.vue 的 .home-pane-blur-band），软件头只是透明盖在最上面。 */
+   （见 Home.vue 的 .home-pane-blur-band），软件头只是透明盖在最上面。
+   半透明遮罩用 ::after 向下延伸出软件头下缘一段距离并渐弱到 0，让软件头与
+   浮条之间的过渡更柔和，不再硬切。 */
 .desktop-shell__titlebar {
   position: absolute;
   top: 0;
@@ -256,8 +258,23 @@ button {
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0 0 0 0.5rem;
-  background: color-mix(in srgb, var(--shell-header-bg) 62%, transparent);
+  background: transparent;
   user-select: none;
+}
+
+/* 软件头半透明遮罩：从顶缘 62% 不透明向下渐弱，延伸出软件头下缘 1.5rem 后淡出到 0。 */
+.desktop-shell__titlebar::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 calc(-1 * 1.5rem) 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--shell-header-bg) 62%, transparent) 0%,
+    color-mix(in srgb, var(--shell-header-bg) 62%, transparent) calc(100% - 1.5rem),
+    transparent 100%
+  );
 }
 
 /* 软件头下方的连续磨砂带在首页滚动容器内实现（见 Home.vue 的 .home-pane-blur-band），
