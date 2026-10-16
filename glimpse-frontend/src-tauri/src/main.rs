@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use futures_util::StreamExt;
 use serde::Serialize;
 #[cfg(not(debug_assertions))]
 use std::fmt::Write as FmtWrite;
@@ -15,6 +16,7 @@ use std::net::TcpStream;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::str::FromStr;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
@@ -25,7 +27,6 @@ use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, Url, WindowEvent};
 use tauri_plugin_updater::{Update, UpdaterExt};
-use tokio::io::AsyncWriteExt;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -90,6 +91,7 @@ impl Default for AppState {
             backend_runtime: Mutex::new(BackendRuntime::default()),
             quitting: AtomicBool::new(false),
             pending_update: Mutex::new(None),
+            update_mirror_prefer: Mutex::new(false),
         }
     }
 }
