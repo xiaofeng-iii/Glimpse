@@ -1,6 +1,7 @@
 name: Frontend checks
 
-# 推送即校验：依赖声明完整性、Tauri npm/crate 版本对齐与类型检查。
+# 推送即校验：依赖声明完整性、Tauri npm/crate 版本对齐、前端类型检查，
+# 以及 Rust 侧 crate 声明与编译（cargo check 双 feature 路径）。
 # 规则见 docs/RELEASE.md「依赖对齐与构建失败排查」；发布构建只作最后防线。
 on:
   push:
@@ -39,3 +40,30 @@ jobs:
 
       - name: Check dependency declaration and Tauri version alignment
         run: node scripts/check_dependencies.mjs
+
+  rust:
+    name: Rust check
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: glimpse-frontend/src-tauri
+
+      # tauri.conf.json 的 bundle.resources 指向 CI 上不存在的 sidecar 目录，
+      # 用 TAURI_CONFIG 合并覆盖为空（与 tauri.dev.conf.json 同思路），否则
+      # tauri-build 在编译前就报 resource path doesn't exist。
+      - name: cargo check (dev features)
+        working-directory: glimpse-frontend/src-tauri
+        env:
+          TAURI_CONFIG: '{"bundle":{"resources":[]}}'
+        run: cargo check --no-default-features
+
+      - name: cargo check (release features)
+        working-directory: glimpse-frontend/src-tauri
+        env:
+          TAURI_CONFIG: '{"bundle":{"resources":[]}}'
+        run: cargo check

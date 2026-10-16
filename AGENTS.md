@@ -104,6 +104,7 @@ through the manual maintenance backfill; never add automatic startup backfill.
 - AI providers are OpenAI-compatible. Provider/base URL/model/timeout settings belong under the `ai` settings section.
 - Chinese search needs fallback behavior because SQLite FTS does not tokenize Chinese reliably.
 - Declare every runtime import at development time: `npm install <pkg>@<version>` must land it in `package.json` and the lockfile (`await import()` counts too). Tauri npm packages must stay on the same major.minor as the crate pinned in `src-tauri/Cargo.lock`, not the version left over in local node_modules. Push CI (`ci.yml` + `scripts/check_dependencies.mjs`) enforces both.
+- The same discipline applies on the Rust side: every crate referenced under `src-tauri/` must be declared in `Cargo.toml` at writing time — transitive entries in `Cargo.lock` do not count, rustc only sees direct dependencies — with the required trait imports (`use ...`) in scope. Verify with `cargo check` before committing `src-tauri/` changes; push CI runs it on both feature paths.
 - 本地 `vue-tsc --noEmit` 输出必须与 CI 保持**零错误基线**：不得把已知报错当"既有噪音"长期过滤——CI 抓到的每个 TS 错误都应被当作本批改动的责任清理，不是"与本次无关就跳过"。推送前跑一次无过滤的类型检查。
 
 ## What To Ignore

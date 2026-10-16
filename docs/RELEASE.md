@@ -22,9 +22,25 @@ Release 以及撰写面向用户的 Release 正文，都在这里维护。
 “最新”选；安装后检查锁文件 diff——npm 会为满足新包的依赖范围连带升级其他
 包，安装 plugin-opener@2.7.0 就曾把 @tauri-apps/api 从 2.11.0 抬到 2.12.1。
 
+Rust 侧同纪律：在 `src-tauri/` 引入新 crate 引用时当场写入 `Cargo.toml`——
+`Cargo.lock` 里的传递依赖不算声明，rustc 只认直接依赖（v0.4.5 的 main.rs
+引用 `semver`/`futures-util` 未声明即此例）；trait 方法还需对应 `use` 在
+作用域（如 `stream.next()` 需要 `futures_util::StreamExt`），依赖缺失的
+报错会掩盖后续 import 缺失，补依赖后应再查一轮编译错误。提交 `src-tauri/`
+改动前本地验证（sidecar 未构建时须覆盖资源声明，否则 tauri-build 先报
+resource path 缺失）：
+
+```powershell
+cd glimpse-frontend/src-tauri
+$env:TAURI_CONFIG = '{“bundle”:{“resources”:[]}}'  # dev 配置同思路，置空 sidecar 资源
+cargo check --no-default-features  # dev 路径（tauri dev 走这条）
+cargo check                        # release 路径（默认 features）
+```
+
 推送时：`ci.yml` 工作流在每次 push 到 main 与 PR 上运行 `npm ci` →
 `vue-tsc` → `scripts/check_dependencies.mjs`（校验导入 ⊆ 声明、Tauri npm 包
-与 crate 同 minor）。本地提交前可直跑同一脚本。
+与 crate 同 minor），并行的 Rust check job 在 windows runner 上以同样两条
+feature 路径跑 `cargo check`。本地提交前可直跑同一脚本。
 
 发布时（最后防线）：发布工作流只校验与 tag 绑定的事项——版本号同步
 （`set_version.py --check`）、Python 单元测试、完整构建（PyInstaller sidecar
