@@ -104,7 +104,9 @@ try {
         [int]$Matches.patch
     )
     $targetVersion = [System.Version]::Parse($Version)
-    $currentIsPrerelease = -not [string]::IsNullOrEmpty($Matches.prerelease)
+    # Windows PowerShell 5.1 下未命中的命名组不会写入 $Matches；StrictMode 下点语法
+    # 访问缺失键会抛 PropertyNotFoundException，索引器语法则返回 $null，两种 PS 行为一致。
+    $currentIsPrerelease = -not [string]::IsNullOrEmpty($Matches['prerelease'])
     if ($targetVersion -lt $currentVersion -or ($targetVersion -eq $currentVersion -and -not $currentIsPrerelease)) {
         throw "Release version $Version must be greater than current version $currentVersionText."
     }
