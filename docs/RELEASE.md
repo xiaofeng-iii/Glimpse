@@ -37,6 +37,9 @@ cargo check --no-default-features  # dev 路径（tauri dev 走这条）
 cargo check                        # release 路径（默认 features）
 ```
 
+干净克隆（`glimpse-frontend/dist` 尚未构建）时第二条会撞 `generate_context!`
+对 `frontendDist` 的编译期存在性检查，先 `mkdir ../dist` 建空目录占位即可。
+
 推送时：`ci.yml` 工作流在每次 push 到 main 与 PR 上运行 `npm ci` →
 `vue-tsc` → `scripts/check_dependencies.mjs`（校验导入 ⊆ 声明、Tauri npm 包
 与 crate 同 minor），并行的 Rust check job 在 windows runner 上以同样两条

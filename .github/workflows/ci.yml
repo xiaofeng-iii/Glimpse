@@ -56,6 +56,12 @@ jobs:
       # tauri.conf.json 的 bundle.resources 指向 CI 上不存在的 sidecar 目录，
       # 用 TAURI_CONFIG 合并覆盖为空（与 tauri.dev.conf.json 同思路），否则
       # tauri-build 在编译前就报 resource path doesn't exist。
+      # custom-protocol（release features）下 generate_context! 还会编译期检查
+      # frontendDist 存在性，CI 不构建前端，先建空目录占位。
+      - name: Create empty frontend dist placeholder
+        working-directory: glimpse-frontend
+        run: mkdir dist
+
       - name: cargo check (dev features)
         working-directory: glimpse-frontend/src-tauri
         env:
