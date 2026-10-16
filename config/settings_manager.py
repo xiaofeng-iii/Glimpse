@@ -105,6 +105,7 @@ class SettingsManager:
                 "start_minimized": False,
                 "close_action": "ask",
                 "update_channel": "stable",
+                "update_mirror_mode": "auto",
             },
             "cluster": {
                 "cluster_mode": False,
@@ -332,6 +333,10 @@ class SettingsManager:
         if "update_channel" in section:
             channel = section["update_channel"]
             if not isinstance(channel, str) or channel not in {"stable", "preview"}:
+                return False
+        if "update_mirror_mode" in section:
+            mode = section["update_mirror_mode"]
+            if not isinstance(mode, str) or mode not in {"auto", "direct", "mirror"}:
                 return False
         return True
 

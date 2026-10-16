@@ -10,6 +10,13 @@ from pathlib import Path
 
 OWNER = "xiaofeng-iii"
 REPO = "Glimpse"
+MIRROR_PREFIXES = [
+    "https://gh-proxy.com/",
+    "https://gh.ddlc.top/",
+    "https://gh.llkk.cc/",
+    "https://ghfast.top/",
+    "https://ghproxy.net/",
+]
 VERSION_RE = re.compile(
     r"^v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)"
     r"(?P<preview>-preview\.(?P<date>\d{8})(?:\.(?P<sequence>0|[1-9]\d*))?)?$"
@@ -60,6 +67,7 @@ def signed_releases(token: str) -> list[tuple[tuple[int, ...], bool, dict]]:
             manifest = {
                 "version": release["tag_name"][1:],
                 "notes": release["body"] or "",
+                "mirrors": MIRROR_PREFIXES,
                 "platforms": {
                     "windows-x86_64": {
                         "url": installer["browser_download_url"],

@@ -71,7 +71,10 @@ export interface Settings {
   screenshot: Record<string, any>
   ai: Record<string, any>
   ocr: Record<string, string>
-  ui: Record<string, any>
+  ui: Record<string, any> & {
+    update_channel?: 'stable' | 'preview'
+    update_mirror_mode?: 'auto' | 'direct' | 'mirror'
+  }
   cluster: Record<string, any>
 }
 

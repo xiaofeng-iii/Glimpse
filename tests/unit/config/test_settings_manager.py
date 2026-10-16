@@ -168,6 +168,18 @@ class TestSettingsManagerUpdate:
         assert not sm.update({"ui": {**ui, "update_channel": "nightly"}})
         assert sm.get("ui.update_channel") == "preview"
 
+    def test_update_mirror_mode_accepts_valid_and_rejects_unknown(self, mock_path_manager):
+        from config.settings_manager import SettingsManager
+        sm = SettingsManager(mock_path_manager)
+        ui = sm.get("ui")
+        assert sm.get("ui.update_mirror_mode") == "auto"
+        assert sm.update({"ui": {**ui, "update_mirror_mode": "direct"}})
+        assert sm.get("ui.update_mirror_mode") == "direct"
+        assert sm.update({"ui": {**ui, "update_mirror_mode": "mirror"}})
+        assert sm.get("ui.update_mirror_mode") == "mirror"
+        assert not sm.update({"ui": {**ui, "update_mirror_mode": "proxy"}})
+        assert sm.get("ui.update_mirror_mode") == "mirror"
+
     def test_update_invalid_no_change(self, mock_path_manager):
         from config.settings_manager import SettingsManager
         sm = SettingsManager(mock_path_manager)

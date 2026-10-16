@@ -88,6 +88,31 @@ describe('updates store', () => {
     expect(store.updateNotes?.sections.features).not.toContain('0.3.2 已有功能')
   })
 
+  it('syncs mirror mode to Rust after a successful check', async () => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.3.2')
+    apiMocks.invoke.mockResolvedValue({ version: '0.3.3', notes: null })
+
+    await store.checkForUpdate()
+
+    expect(apiMocks.invoke).toHaveBeenCalledWith('set_update_mirror_mode', { preferMirror: true })
+  })
+
+  it('syncs direct mode when user selects direct', async () => {
+    const settings = useSettingsStore()
+    settings.settings = {
+      ...settings.settings,
+      ui: { update_channel: 'stable', update_mirror_mode: 'direct' },
+    } as never
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.3.2')
+    apiMocks.invoke.mockResolvedValue({ version: '0.3.3', notes: null })
+
+    await store.checkForUpdate()
+
+    expect(apiMocks.invoke).toHaveBeenCalledWith('set_update_mirror_mode', { preferMirror: false })
+  })
+
   it('stays silent when the startup check fails', async () => {
     const store = useUpdatesStore()
     apiMocks.invoke.mockRejectedValue(new Error('offline'))

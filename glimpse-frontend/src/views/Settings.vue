@@ -112,6 +112,7 @@ const themePreference = ref<ThemePreference>('light')
 const language = ref<LanguagePreference>('zh-CN')
 const closeAction = ref<'ask' | 'minimize' | 'exit'>('ask')
 const updateChannel = ref<'stable' | 'preview' | 'dev-test'>('stable')
+const updateMirrorMode = ref<'auto' | 'direct' | 'mirror'>('auto')
 const lastRealChannel = ref<'stable' | 'preview'>('stable')
 const currentVersion = ref('')
 const availableUpdate = ref<{ version: string; notes: string | null } | null>(null)
@@ -183,6 +184,12 @@ const updateChannelOptions = computed(() => {
   return options
 })
 
+const updateMirrorModeOptions = computed(() => [
+  { value: 'auto', label: t('settings.updateMirrorAuto') },
+  { value: 'direct', label: t('settings.updateMirrorDirect') },
+  { value: 'mirror', label: t('settings.updateMirrorMirror') },
+])
+
 const testingAi = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
 const indexStatus = ref<IndexRepairStatus | null>(null)
@@ -226,6 +233,7 @@ const ordinarySettings = computed(() => ({
     language: language.value,
     close_action: closeAction.value,
     update_channel: persistedUpdateChannel.value,
+    update_mirror_mode: updateMirrorMode.value,
   },
 }))
 const aiSettings = computed(() => ({
@@ -346,6 +354,7 @@ const populateForm = () => {
     updateChannel.value = import.meta.env.DEV && updatesStore.devChannel
       ? DEV_UPDATE_CHANNEL
       : lastRealChannel.value
+    updateMirrorMode.value = settings.ui?.update_mirror_mode ?? 'auto'
     availableUpdate.value = null
     savedSnapshot.value = formSnapshot.value
     savedAiSnapshot.value = aiSnapshot.value
@@ -926,6 +935,19 @@ onUnmounted(() => {
                   v-model="updateChannel"
                   aria-labelledby="settings-update-channel-label"
                   :options="updateChannelOptions"
+                  :disabled="updatesStore.installing"
+                />
+              </div>
+              <div class="setting-row">
+                <div>
+                  <label id="settings-update-mirror-label" for="settings-update-mirror" class="setting-label">{{ t('settings.updateMirrorMode') }}</label>
+                  <p class="setting-help">{{ t('settings.updateMirrorModeHint') }}</p>
+                </div>
+                <AppSelect
+                  id="settings-update-mirror"
+                  v-model="updateMirrorMode"
+                  aria-labelledby="settings-update-mirror-label"
+                  :options="updateMirrorModeOptions"
                   :disabled="updatesStore.installing"
                 />
               </div>

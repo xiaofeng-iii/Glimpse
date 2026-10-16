@@ -19,13 +19,13 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
 };
-#[cfg(debug_assertions)]
 use std::time::Duration;
 use tauri::image::Image;
 use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, Url, WindowEvent};
 use tauri_plugin_updater::{Update, UpdaterExt};
+use tokio::io::AsyncWriteExt;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -34,6 +34,10 @@ const DEV_API_ORIGIN: &str = "http://127.0.0.1:8000";
 const APP_VERSION_ENV: &str = "GLIMPSE_APP_VERSION";
 const STABLE_UPDATE_URL: &str = "https://xiaofeng-iii.github.io/Glimpse/updates/stable.json";
 const PREVIEW_UPDATE_URL: &str = "https://xiaofeng-iii.github.io/Glimpse/updates/preview.json";
+/// 与 tauri.conf.json > plugins > updater > pubkey 保持一致；修改公钥时必须同步。
+const UPDATER_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU0RUVCMzE2RTdGQTg5QzQKUldURWlmcm5GclB1NUNKVU91SXZHTndtc1M1VlNTaTNXcTZMUHpobG5WUTRyNWNlSVAzRk1pSXcK";
+const UPDATE_MIRROR_STALL_TIMEOUT: Duration = Duration::from_secs(15);
+const UPDATE_DOWNLOAD_UA: &str = "Glimpse-Updater";
 const DATA_ROOT_ENV: &str = "GLIMPSE_DATA_ROOT";
 const PROJECT_ROOT_ENV: &str = "GLIMPSE_PROJECT_ROOT";
 #[cfg(not(debug_assertions))]
@@ -59,7 +63,8 @@ struct AppState {
     backend_child: Mutex<Option<Child>>,
     backend_runtime: Mutex<BackendRuntime>,
     quitting: AtomicBool,
-    pending_update: Mutex<Option<Update>>,
+    pending_update: Mutex<Option<(Update, Vec<String>)>>,
+    update_mirror_prefer: Mutex<bool>,
 }
 
 #[derive(Clone, Serialize)]
@@ -502,6 +507,148 @@ struct AvailableUpdate {
     notes: Option<String>,
 }
 
+fn parse_mirrors_from_update(update: &Update) -> Vec<String> {
+    update
+        .raw_json
+        .get("mirrors")
+        .and_then(|value| value.as_array())
+        .map(|array| {
+            array
+                .iter()
+                .filter_map(|item| item.as_str().map(ToString::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn verify_update_signature(
+    data: &[u8],
+    release_signature: &str,
+    announced_version: &str,
+) -> Result<(), String> {
+    let pub_key_decoded = base64_to_string(UPDATER_PUBKEY)?;
+    let public_key =
+        minisign_verify::PublicKey::decode(&pub_key_decoded).map_err(|error| error.to_string())?;
+    let signature_base64_decoded = base64_to_string(release_signature)?;
+    let signature = minisign_verify::Signature::decode(&signature_base64_decoded)
+        .map_err(|error| error.to_string())?;
+
+    public_key
+        .verify(data, &signature, true)
+        .map_err(|error| error.to_string())?;
+
+    let trusted_comment = signature.trusted_comment();
+    let signed_version = trusted_comment
+        .split('\t')
+        .find_map(|field| field.strip_prefix("version:"));
+    if let Some(signed_version) = signed_version {
+        let matches = match (
+            semver::Version::from_str(signed_version.trim_start_matches('v')),
+            semver::Version::from_str(announced_version.trim_start_matches('v')),
+        ) {
+            (Ok(signed), Ok(announced)) => signed == announced,
+            _ => signed_version == announced_version,
+        };
+        if !matches {
+            return Err(format!(
+                "signed version mismatch: signed={}, announced={}",
+                signed_version, announced_version
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn base64_to_string(base64_string: &str) -> Result<String, String> {
+    use base64::Engine;
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(base64_string)
+        .map_err(|error| error.to_string())?;
+    String::from_utf8(decoded).map_err(|error| error.to_string())
+}
+
+async fn download_from_candidate(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, String> {
+    let response = client
+        .get(url)
+        .header(reqwest::header::USER_AGENT, UPDATE_DOWNLOAD_UA)
+        .send()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+
+    if let Some(content_type) = response.headers().get(reqwest::header::CONTENT_TYPE) {
+        if let Ok(value) = content_type.to_str() {
+            if value.contains("text/html") {
+                return Err("mirror returned HTML page".to_string());
+            }
+        }
+    }
+
+    let mut stream = response.bytes_stream();
+    let mut buffer = Vec::new();
+    let mut sniffed = false;
+
+    while let Some(chunk_result) = tokio::time::timeout(UPDATE_MIRROR_STALL_TIMEOUT, stream.next())
+        .await
+        .map_err(|_| "download stalled".to_string())?
+    {
+        let chunk = chunk_result.map_err(|error| error.to_string())?;
+        if !sniffed {
+            if chunk.starts_with(b"<") {
+                return Err("mirror returned HTML content".to_string());
+            }
+            sniffed = true;
+        }
+        buffer.extend_from_slice(&chunk);
+    }
+
+    Ok(buffer)
+}
+
+async fn download_update_with_mirrors(
+    original_url: &Url,
+    signature: &str,
+    announced_version: &str,
+    mirror_prefixes: &[String],
+    prefer_mirror: bool,
+) -> Result<Vec<u8>, String> {
+    let client = reqwest::Client::new();
+    let mut candidates = Vec::new();
+    if prefer_mirror {
+        for prefix in mirror_prefixes {
+            candidates.push(format!("{}{}", prefix, original_url));
+        }
+    }
+    candidates.push(original_url.to_string());
+
+    let mut last_error = "no download candidates".to_string();
+    for candidate in candidates {
+        match download_from_candidate(&client, &candidate).await {
+            Ok(bytes) => {
+                verify_update_signature(&bytes, signature, announced_version)?;
+                return Ok(bytes);
+            }
+            Err(error) => {
+                last_error = format!("{}: {}", candidate, error);
+            }
+        }
+    }
+    Err(last_error)
+}
+
+#[tauri::command]
+async fn set_update_mirror_mode(app: AppHandle, prefer_mirror: bool) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    *state
+        .update_mirror_prefer
+        .lock()
+        .map_err(|error| error.to_string())? = prefer_mirror;
+    Ok(())
+}
+
 #[tauri::command]
 async fn check_for_update(
     app: AppHandle,
@@ -533,26 +680,40 @@ async fn check_for_update(
         notes: update.body.clone(),
     });
     let state = app.state::<AppState>();
+    let mirrors = update
+        .as_ref()
+        .map(parse_mirrors_from_update)
+        .unwrap_or_default();
     *state
         .pending_update
         .lock()
-        .map_err(|error| error.to_string())? = update;
+        .map_err(|error| error.to_string())? = update.map(|u| (u, mirrors));
     Ok(available)
 }
 
 #[tauri::command]
 async fn install_checked_update(app: AppHandle) -> Result<(), String> {
-    let update = app
+    let (update, mirrors) = app
         .state::<AppState>()
         .pending_update
         .lock()
         .map_err(|error| error.to_string())?
         .take()
         .ok_or("No checked update available")?;
-    update
-        .download_and_install(|_, _| {}, || {})
-        .await
-        .map_err(|error| error.to_string())
+    let prefer_mirror = *app
+        .state::<AppState>()
+        .update_mirror_prefer
+        .lock()
+        .map_err(|error| error.to_string())?;
+    let bytes = download_update_with_mirrors(
+        &update.download_url,
+        &update.signature,
+        &update.version,
+        &mirrors,
+        prefer_mirror,
+    )
+    .await?;
+    update.install(&bytes).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -741,6 +902,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             check_for_update,
             install_checked_update,
+            set_update_mirror_mode,
             quit_app,
             get_backend_runtime,
             hide_window,

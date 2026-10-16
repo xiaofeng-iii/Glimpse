@@ -17,6 +17,22 @@ export const LAST_RUN_VERSION_STORAGE_KEY = 'glimpse.lastRunVersion'
 export const DEV_UPDATE_CHANNEL = 'dev-test'
 export const DEV_UPDATE_CHANNEL_STORAGE_KEY = 'glimpse.devUpdateChannel'
 
+function isMainlandChina(): boolean {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (timeZone === 'Asia/Shanghai') return true
+  } catch {
+    // Intl API 不可用时继续按语言判断。
+  }
+  return navigator.language.startsWith('zh-CN')
+}
+
+function resolvePreferMirror(mode: 'auto' | 'direct' | 'mirror'): boolean {
+  if (mode === 'direct') return false
+  if (mode === 'mirror') return true
+  return isMainlandChina()
+}
+
 // 开发通道的选择只留在 localStorage：后端会拒绝 settings.json 里的未知通道值。
 const readDevChannelEnabled = () => {
   if (!import.meta.env.DEV) return false
@@ -134,6 +150,15 @@ export const useUpdatesStore = defineStore('updates', () => {
       }
       availableUpdate.value = target
       if (target) {
+        // 仅真实通道同步镜像模式；dev-test 通道没有 Rust 侧下载，不需要。
+        if (!(import.meta.env.DEV && requestedChannel === DEV_UPDATE_CHANNEL)) {
+          const mirrorMode = settingsStore.settings?.ui?.update_mirror_mode ?? 'auto'
+          const preferMirror = resolvePreferMirror(mirrorMode)
+          const { invoke } = await import('@tauri-apps/api/core')
+          void invoke('set_update_mirror_mode', { preferMirror }).catch((error) => {
+            logger.error('Failed to sync update mirror mode: %s', error)
+          })
+        }
         const generation = ++notesGeneration
         updateNotes.value = null
         updateNotesPartial.value = false
