@@ -37,6 +37,11 @@ class TestAPIServer:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
+        # AI 服务状态随健康检查上报：configured 表示是否已配置，reachable=None 表示尚未探测
+        assert set(data["ai"].keys()) == {"configured", "reachable"}
+        assert isinstance(data["ai"]["configured"], bool)
+        if not data["ai"]["configured"]:
+            assert data["ai"]["reachable"] is None
 
     def test_list_memories(self, client):
         """Test list memories endpoint"""

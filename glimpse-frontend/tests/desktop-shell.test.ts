@@ -100,4 +100,31 @@ describe('DesktopShell service status', () => {
     expect(status().text()).toBe('服务异常')
     expect(status().classes()).toContain('service-status--offline')
   })
+
+  it('reports AI service disabled when backend is ready but AI is unavailable', async () => {
+    mocks.checkHealth.mockResolvedValue({
+      status: 'healthy',
+      ai: { configured: false, reachable: null },
+    })
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', name: 'home', component: { template: '<div />' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(DesktopShell, {
+      slots: { default: '<div />' },
+      global: {
+        plugins: [createPinia(), router],
+        stubs: { CloseActionDialog: true },
+      },
+    })
+    await flushPromises()
+
+    const status = wrapper.get('[role="status"]')
+    expect(status.text()).toBe('AI 服务未启用')
+    expect(status.classes()).toContain('service-status--ai-off')
+    expect(status.classes()).not.toContain('service-status--ready')
+  })
 })

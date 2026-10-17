@@ -28,6 +28,13 @@ class AIClient:
         self._base_url: str = self.DEFAULT_BASE_URL
         self._model: str = self.DEFAULT_MODEL
         self._timeout: int = self.DEFAULT_TIMEOUT
+        # 最近一次连通性结论（None=尚未探测）：由启动探测、配置变更重探与真实调用
+        # 被动更新，配置变更时重置。供健康检查上报"AI 服务未启用"，不做周期探测。
+        self._last_connection_ok: Optional[bool] = None
+
+    @property
+    def last_connection_ok(self) -> Optional[bool]:
+        return self._last_connection_ok
 
     def clear_configuration(self):
         self._client = None
@@ -37,6 +44,7 @@ class AIClient:
         self._base_url = self.DEFAULT_BASE_URL
         self._model = self.DEFAULT_MODEL
         self._timeout = self.DEFAULT_TIMEOUT
+        self._last_connection_ok = None
 
     def configure(
         self,
@@ -60,6 +68,7 @@ class AIClient:
         self._model = model or self.DEFAULT_MODEL
         self._timeout = timeout
         self._client = openai.OpenAI(api_key=api_key, base_url=self._base_url, timeout=timeout)
+        self._last_connection_ok = None
         return True
 
     def configure_from_settings(self) -> bool:
@@ -93,6 +102,7 @@ class AIClient:
 
     def test_model_connection(self) -> Tuple[bool, str]:
         if not self._client:
+            self._last_connection_ok = False
             return False, "AI client not configured"
         try:
             self._client.chat.completions.create(
@@ -101,8 +111,10 @@ class AIClient:
                 max_tokens=1,
                 temperature=0,
             )
+            self._last_connection_ok = True
             return True, "Connection successful!"
         except Exception as exc:
+            self._last_connection_ok = False
             return False, str(exc)
 
     def analyze_image(
@@ -130,39 +142,50 @@ class AIClient:
             )
         content.append({"type": "text", "text": prompt})
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=[{"role": "user", "content": content}],
-            max_tokens=500,
-            temperature=0.7,
-            stream=True if stream_callback else False,
-        )
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=[{"role": "user", "content": content}],
+                max_tokens=500,
+                temperature=0.7,
+                stream=True if stream_callback else False,
+            )
 
-        if stream_callback:
-            full_response = ""
-            for chunk in response:
-                if chunk.choices[0].delta.content:
-                    content = chunk.choices[0].delta.content
-                    full_response += content
-                    stream_callback(content)
-            return full_response
-        else:
-            return response.choices[0].message.content
+            if stream_callback:
+                full_response = ""
+                for chunk in response:
+                    if chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        full_response += content
+                        stream_callback(content)
+                self._last_connection_ok = True
+                return full_response
+            else:
+                self._last_connection_ok = True
+                return response.choices[0].message.content
+        except Exception:
+            self._last_connection_ok = False
+            raise
 
     def generate_summary(self, text: str, prompt: str = "为以下内容生成简短摘要：") -> str:
         if not self._client:
             raise RuntimeError("AI client not configured")
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=[
-                {"role": "system", "content": "你是一个文本摘要助手。"},
-                {"role": "user", "content": f"{prompt}\n\n{text}"},
-            ],
-            max_tokens=200,
-            temperature=0.7,
-        )
-        return response.choices[0].message.content
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": "你是一个文本摘要助手。"},
+                    {"role": "user", "content": f"{prompt}\n\n{text}"},
+                ],
+                max_tokens=200,
+                temperature=0.7,
+            )
+            self._last_connection_ok = True
+            return response.choices[0].message.content
+        except Exception:
+            self._last_connection_ok = False
+            raise
 
     def _read_image_base64(self, image_path: str) -> str:
         import base64

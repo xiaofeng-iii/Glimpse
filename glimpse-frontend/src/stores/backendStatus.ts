@@ -11,6 +11,9 @@ export const useBackendStatusStore = defineStore('backend-status', () => {
   const state = ref<BackendState>('starting')
   const isChecking = ref(false)
   const lastCheckedAt = ref<number | null>(null)
+  // AI 服务状态来自健康检查附带的探测结论：null=未知（尚未探测或后端未上报）
+  const aiConfigured = ref<boolean | null>(null)
+  const aiReachable = ref<boolean | null>(null)
   const startupDeadlineAt = Date.now() + BACKEND_STARTUP_GRACE_PERIOD_MS
   let pendingCheck: Promise<boolean> | null = null
   let hasEverBeenReady = false
@@ -18,6 +21,10 @@ export const useBackendStatusStore = defineStore('backend-status', () => {
   const isReady = computed(() => state.value === 'ready')
   const isStarting = computed(() => state.value === 'starting')
   const isOffline = computed(() => state.value === 'offline')
+  // 后端正常但 AI 未配置/模型不通时，状态条改报「AI 服务未启用」
+  const aiUnavailable = computed(
+    () => state.value === 'ready' && (aiConfigured.value === false || aiReachable.value === false),
+  )
 
   const applyCheckFailure = (error: unknown) => {
     const coldStartConnectionFailure = state.value === 'starting'
@@ -42,6 +49,8 @@ export const useBackendStatusStore = defineStore('backend-status', () => {
         if (ready) {
           hasEverBeenReady = true
           state.value = 'ready'
+          aiConfigured.value = result.ai?.configured ?? null
+          aiReachable.value = result.ai?.reachable ?? null
         } else {
           state.value = 'offline'
         }
@@ -64,6 +73,7 @@ export const useBackendStatusStore = defineStore('backend-status', () => {
     isReady,
     isStarting,
     isOffline,
+    aiUnavailable,
     isChecking,
     lastCheckedAt,
     check,

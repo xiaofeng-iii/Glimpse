@@ -410,3 +410,73 @@ class TestAIClientGlobal:
     def test_global_not_configured_initially(self):
         """验证: 全局实例初始未配置"""
         assert ai_client.is_configured() is False
+
+
+class TestAIClientConnectivityTracking:
+    """连通性结论追踪：供健康检查上报「AI 服务未启用」。"""
+
+    def test_unknown_initially(self):
+        """验证: 新实例尚未探测，结论为 None"""
+        assert AIClient().last_connection_ok is None
+
+    def test_configure_resets_conclusion(self):
+        """验证: 重新配置后旧结论作废"""
+        client = AIClient()
+        with patch("openai.OpenAI"):
+            client.configure("test-key")
+        client._last_connection_ok = True
+        with patch("openai.OpenAI"):
+            client.configure("another-key")
+        assert client.last_connection_ok is None
+
+    def test_clear_configuration_resets_conclusion(self):
+        """验证: 清空配置后结论作废"""
+        client = AIClient()
+        client._last_connection_ok = False
+        client.clear_configuration()
+        assert client.last_connection_ok is None
+
+    def test_probe_records_success(self):
+        """验证: 探测成功记录 True"""
+        client = AIClient()
+        with patch("openai.OpenAI"):
+            client.configure("test-key")
+        client._client.chat.completions.create.return_value = MagicMock()
+        assert client.test_model_connection()[0] is True
+        assert client.last_connection_ok is True
+
+    def test_probe_records_failure(self):
+        """验证: 探测失败记录 False"""
+        client = AIClient()
+        with patch("openai.OpenAI"):
+            client.configure("test-key")
+        client._client.chat.completions.create.side_effect = Exception("boom")
+        assert client.test_model_connection()[0] is False
+        assert client.last_connection_ok is False
+
+    def test_probe_unconfigured_records_failure(self):
+        """验证: 未配置时探测记录 False"""
+        client = AIClient()
+        assert client.test_model_connection()[0] is False
+        assert client.last_connection_ok is False
+
+    def test_summary_success_marks_reachable(self):
+        """验证: 真实调用成功被动标记为通"""
+        client = AIClient()
+        with patch("openai.OpenAI"):
+            client.configure("test-key")
+        mock_choice = MagicMock()
+        mock_choice.message.content = "摘要"
+        client._client.chat.completions.create.return_value = MagicMock(choices=[mock_choice])
+        client.generate_summary("text")
+        assert client.last_connection_ok is True
+
+    def test_summary_failure_marks_unreachable_and_reraises(self):
+        """验证: 真实调用失败被动标记为不通且异常照常抛出"""
+        client = AIClient()
+        with patch("openai.OpenAI"):
+            client.configure("test-key")
+        client._client.chat.completions.create.side_effect = Exception("timeout")
+        with pytest.raises(Exception, match="timeout"):
+            client.generate_summary("text")
+        assert client.last_connection_ok is False

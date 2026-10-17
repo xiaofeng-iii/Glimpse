@@ -59,7 +59,12 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize container and services
     logger.info("Starting Glimpse API Server...")
     container.initialize_defaults()
-    configure_ai_client(container.get("ai_client"), container.get("settings_manager"))
+    ai_client = container.get("ai_client")
+    configure_ai_client(ai_client, container.get("settings_manager"))
+    # 启动时探测一次 AI 连通性（1 token ping），结论随健康检查上报给状态条；
+    # 之后不再周期探测，只由真实调用被动更新、配置变更时重探。
+    if ai_client.is_configured():
+        asyncio.create_task(asyncio.to_thread(ai_client.test_model_connection))
     # Older databases may contain valid vectors whose legacy rows never moved
     # beyond PENDING. The conditional check only queues a non-destructive vector
     # repair; it never runs OCR or blocks startup on the repair itself.
@@ -135,6 +140,12 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
+    # AI 连通性结论由 AIClient 被动维护（启动探测/真实调用/配置变更重探），这里只读取
+    ai_status = {"configured": False, "reachable": None}
+    if container.has("ai_client"):
+        ai_client = container.get("ai_client")
+        if ai_client.is_configured():
+            ai_status = {"configured": True, "reachable": ai_client.last_connection_ok}
     return {
         "status": "healthy",
         "app": "Glimpse",
@@ -142,6 +153,7 @@ async def health_check():
         "version": APP_VERSION,
         "pid": os.getpid(),
         "container_initialized": container.has("memory_service"),
+        "ai": ai_status,
     }
 
 

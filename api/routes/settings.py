@@ -2,6 +2,7 @@
 Settings Routes - Application settings management
 """
 from fastapi import APIRouter, HTTPException
+import asyncio
 import copy
 
 from api.schemas import SettingsResponse, SettingsUpdate, AITestRequest, AITestResponse
@@ -188,7 +189,12 @@ async def update_settings(settings: SettingsUpdate):
             capture_manager.update_settings(settings.screenshot)
 
         if settings.ai is not None:
-            configure_ai_client(get_ai_client(), settings_manager)
+            ai_client = get_ai_client()
+            configure_ai_client(ai_client, settings_manager)
+            # 配置变更后重探一次连通性，右上角状态条随即轮询到新结论；
+            # 不做周期探测，平时由真实调用被动更新。
+            if ai_client.is_configured():
+                asyncio.create_task(asyncio.to_thread(ai_client.test_model_connection))
 
         if settings.hotkeys is not None:
             reload_global_hotkeys()

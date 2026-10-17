@@ -315,7 +315,15 @@ export const statsApi = {
 
 // Health check
 export const healthApi = {
-  check: async (): Promise<{ status: string, app?: string, role?: string, version?: string, pid?: number }> => {
+  check: async (): Promise<{
+    status: string
+    app?: string
+    role?: string
+    version?: string
+    pid?: number
+    /** AI 服务状态：configured=false 未配置；reachable=false 已配置但模型不通（null=尚未探测）。 */
+    ai?: { configured: boolean; reachable: boolean | null }
+  }> => {
     const response = await api.get('/health', {
       timeout: 2000,
     })

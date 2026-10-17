@@ -102,4 +102,49 @@ describe('backend status store', () => {
     await expect(Promise.all([first, second])).resolves.toEqual([true, true])
     expect(store.state).toBe('ready')
   })
+
+  it('reports aiUnavailable when AI is not configured or the model is unreachable', async () => {
+    const store = useBackendStatusStore()
+
+    apiMocks.checkHealth.mockResolvedValueOnce({
+      status: 'healthy',
+      ai: { configured: false, reachable: null },
+    })
+    await expect(store.check()).resolves.toBe(true)
+    expect(store.aiUnavailable).toBe(true)
+
+    apiMocks.checkHealth.mockResolvedValueOnce({
+      status: 'healthy',
+      ai: { configured: true, reachable: false },
+    })
+    await expect(store.check()).resolves.toBe(true)
+    expect(store.aiUnavailable).toBe(true)
+
+    apiMocks.checkHealth.mockResolvedValueOnce({
+      status: 'healthy',
+      ai: { configured: true, reachable: true },
+    })
+    await expect(store.check()).resolves.toBe(true)
+    expect(store.aiUnavailable).toBe(false)
+  })
+
+  it('keeps aiUnavailable false when AI is probing, unreported, or the backend is offline', async () => {
+    const store = useBackendStatusStore()
+
+    apiMocks.checkHealth.mockResolvedValueOnce({
+      status: 'healthy',
+      ai: { configured: true, reachable: null },
+    })
+    await expect(store.check()).resolves.toBe(true)
+    expect(store.aiUnavailable).toBe(false)
+
+    // 旧后端不携带 ai 字段：按未知处理，不误报
+    apiMocks.checkHealth.mockResolvedValueOnce({ status: 'healthy' })
+    await expect(store.check()).resolves.toBe(true)
+    expect(store.aiUnavailable).toBe(false)
+
+    apiMocks.checkHealth.mockRejectedValueOnce(connectionFailure())
+    await expect(store.check()).resolves.toBe(false)
+    expect(store.aiUnavailable).toBe(false)
+  })
 })

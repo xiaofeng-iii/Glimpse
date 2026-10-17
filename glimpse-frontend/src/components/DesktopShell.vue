@@ -52,9 +52,10 @@ const logger = createLogger('components/DesktopShell')
 const isDesktop = isDesktopShell()
 const isHome = computed(() => route.name === 'home')
 const serviceLabel = computed(() => {
-  if (backendStatus.isReady) return t('status.ready')
+  if (backendStatus.isOffline) return t('status.offline')
   if (backendStatus.isStarting) return t('status.starting')
-  return t('status.offline')
+  if (backendStatus.aiUnavailable) return t('status.aiDisabled')
+  return t('status.ready')
 })
 
 const isWindowMaximized = ref(false)
@@ -282,7 +283,8 @@ onUnmounted(() => {
         <div
           class="service-status"
           :class="{
-            'service-status--ready': backendStatus.isReady,
+            'service-status--ready': backendStatus.isReady && !backendStatus.aiUnavailable,
+            'service-status--ai-off': backendStatus.aiUnavailable,
             'service-status--starting': backendStatus.isStarting,
             'service-status--offline': backendStatus.isOffline,
           }"
@@ -290,7 +292,7 @@ onUnmounted(() => {
           aria-live="polite"
         >
           <CheckCircleIcon
-            v-if="backendStatus.isReady"
+            v-if="backendStatus.isReady && !backendStatus.aiUnavailable"
             class="service-status__icon"
             aria-hidden="true"
           />
