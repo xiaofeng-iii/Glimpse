@@ -680,7 +680,7 @@ onUnmounted(() => {
               v-for="section in group.sections"
               :key="section.id"
               type="button"
-              class="flex h-[var(--control-h-md)] min-h-[var(--control-h-md)] w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 text-left text-xs font-normal transition"
+              class="flex h-[var(--control-h-md)] min-h-[var(--control-h-md)] w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 text-left text-sm font-normal transition"
               :class="activeSection === section.id
                 ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
                 : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
@@ -871,7 +871,7 @@ onUnmounted(() => {
                     v-for="option in themeOptions"
                     :key="option.value"
                     type="button"
-                    class="theme-switcher__button text-xs text-[var(--shell-muted)] hover:text-[var(--shell-ink)]"
+                    class="theme-switcher__button text-sm text-[var(--shell-muted)] hover:text-[var(--shell-ink)]"
                     :aria-pressed="themePreference === option.value"
                     @click="themePreference = option.value"
                   >
@@ -889,7 +889,7 @@ onUnmounted(() => {
                       <span
                         v-for="option in themeOptions"
                         :key="option.value"
-                        class="theme-switcher__ink-label text-xs"
+                        class="theme-switcher__ink-label text-sm"
                       >
                         {{ t(option.labelKey) }}
                       </span>
@@ -1288,7 +1288,6 @@ onUnmounted(() => {
 .setting-label {
   display: block;
   font-size: .875rem;
-  font-weight: 600;
   line-height: var(--line-height-14);
   color: var(--shell-ink);
 }
@@ -1435,9 +1434,9 @@ onUnmounted(() => {
   min-height: var(--control-h-md);
   height: var(--control-h-md);
   padding: 0 .75rem;
-  font-size: .75rem;
+  font-size: .875rem;
   font-weight: 400;
-  line-height: var(--line-height-12);
+  line-height: var(--line-height-14);
   color: #ffffff;
   text-shadow: none;
 }
@@ -1446,10 +1445,19 @@ onUnmounted(() => {
   min-height: var(--control-h-md);
   height: var(--control-h-md);
   padding: 0 .75rem;
-  font-size: .75rem;
+  font-size: .875rem;
   font-weight: 400;
-  line-height: var(--line-height-12);
+  line-height: var(--line-height-14);
   text-shadow: none;
+}
+
+.settings-content :deep(.btn-secondary) {
+  min-height: var(--control-h-md);
+  height: var(--control-h-md);
+  padding: 0 .75rem;
+  font-size: .875rem;
+  font-weight: 400;
+  line-height: var(--line-height-14);
 }
 
 :root[data-theme='dark'] .settings-content :deep(.btn-primary) {

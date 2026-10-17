@@ -125,7 +125,7 @@ const handleOpenChange = async (open: boolean) => {
   padding: .35rem .65rem;
   border: none;
   border-radius: var(--radius-md);
-  font-size: .75rem;
+  font-size: .875rem;
   font-weight: 400;
   color: var(--color-text);
   background: var(--color-surface-hover);
@@ -213,7 +213,7 @@ const handleOpenChange = async (open: boolean) => {
   border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: .75rem;
+  font-size: .875rem;
   line-height: var(--line-height-14);
   outline: none;
   user-select: none;
