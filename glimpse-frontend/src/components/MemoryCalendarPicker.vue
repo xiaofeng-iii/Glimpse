@@ -486,7 +486,6 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   flex: 1;
   color: var(--color-text);
   font-size: 0.8125rem;
-  font-weight: 700;
   text-align: center;
 }
 
@@ -526,7 +525,6 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
 .memory-calendar__month-cell--current {
   color: var(--color-primary-hover);
   background: var(--color-primary-soft);
-  font-weight: 600;
 }
 
 .memory-calendar__nav-btn {
@@ -568,7 +566,6 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   background: transparent;
   cursor: pointer;
   font-size: 0.875rem;
-  font-weight: 700;
 }
 
 .memory-calendar__month:hover {
@@ -635,7 +632,6 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
 .memory-calendar__day--endpoint {
   color: var(--color-on-primary);
   background: var(--color-primary);
-  font-weight: 600;
 }
 
 .memory-calendar__day--today::after {

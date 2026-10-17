@@ -26,7 +26,7 @@ const countdownText = computed(() => {
       <!-- Status -->
       <div class="flex items-center gap-2.5">
         <div class="w-2.5 h-2.5 rounded-full bg-[var(--color-primary)] animate-pulse-soft"></div>
-        <span class="text-sm font-medium text-[var(--color-primary-hover)]">
+        <span class="text-sm text-[var(--color-primary-hover)]">
           {{ t('cluster.progress', { progress: progressText, countdown: countdownText }) }}
         </span>
       </div>

@@ -528,7 +528,7 @@ onUnmounted(() => {
           class="home-controls-bar"
           :class="{ 'home-controls-bar--compact': controlsBarCompact }"
         >
-          <h1 class="home-controls-bar__count text-base font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">
+          <h1 class="home-controls-bar__count text-base tracking-[-0.01em] text-[var(--shell-ink)]">
             {{
               searching && !memoriesStore.isLoading
                 ? t('memory.searchCount', { count: memoriesStore.memories.length })

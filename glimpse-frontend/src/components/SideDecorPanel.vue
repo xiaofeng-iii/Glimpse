@@ -140,7 +140,6 @@ const phrase = computed(() =>
 .side-decor__phrase {
   max-width: 17rem;
   font-size: 0.9375rem;
-  font-weight: 500;
   line-height: 1.7;
   color: var(--shell-muted);
 }

@@ -266,7 +266,6 @@ onBeforeUnmount(unbindListeners)
   color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 0.875rem;
-  font-weight: 500;
   line-height: var(--line-height-14);
   text-align: left;
   transition: background-color 140ms ease, color 140ms ease;
@@ -290,7 +289,6 @@ onBeforeUnmount(unbindListeners)
   color: var(--color-text-muted);
   font-family: var(--font-ui);
   font-size: 0.75rem;
-  font-weight: 500;
 }
 
 :global([data-theme='dark']) .edit-text-menu {

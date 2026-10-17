@@ -675,7 +675,7 @@ onUnmounted(() => {
       <div v-else class="settings-layout min-h-0 flex-1">
         <nav class="settings-nav min-h-0 overflow-y-auto" :aria-label="t('settings.sectionNavigation')">
           <div v-for="group in sectionGroups" :key="group.labelKey" class="settings-nav__group flex flex-col">
-            <h3 class="px-3 pb-0.5 pt-1 text-xs font-medium text-[var(--shell-muted)]">{{ t(group.labelKey) }}</h3>
+            <h3 class="px-3 pb-0.5 pt-1 text-xs text-[var(--shell-muted)]">{{ t(group.labelKey) }}</h3>
             <button
               v-for="section in group.sections"
               :key="section.id"
@@ -845,10 +845,10 @@ onUnmounted(() => {
                   {{ t('settings.localOcr') }}
                 </div>
                 <dl class="mt-3 grid gap-2.5 text-sm sm:grid-cols-2">
-                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrModel') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">PP-OCRv6-small</dd></div>
-                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrFramework') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">RapidOCR 3.9.2</dd></div>
-                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrRuntime') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">ONNX Runtime CPU</dd></div>
-                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.dataPrivacy') }}</dt><dd class="mt-0.5 font-medium text-[var(--shell-ink)]">{{ t('settings.localNoUpload') }}</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrModel') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">PP-OCRv6-small</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrFramework') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">RapidOCR 3.9.2</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrRuntime') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">ONNX Runtime CPU</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.dataPrivacy') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">{{ t('settings.localNoUpload') }}</dd></div>
                 </dl>
               </div>
             </template>
@@ -871,7 +871,7 @@ onUnmounted(() => {
                     v-for="option in themeOptions"
                     :key="option.value"
                     type="button"
-                    class="theme-switcher__button text-xs font-medium text-[var(--shell-muted)] hover:text-[var(--shell-ink)]"
+                    class="theme-switcher__button text-xs text-[var(--shell-muted)] hover:text-[var(--shell-ink)]"
                     :aria-pressed="themePreference === option.value"
                     @click="themePreference = option.value"
                   >
@@ -889,7 +889,7 @@ onUnmounted(() => {
                       <span
                         v-for="option in themeOptions"
                         :key="option.value"
-                        class="theme-switcher__ink-label text-xs font-medium"
+                        class="theme-switcher__ink-label text-xs"
                       >
                         {{ t(option.labelKey) }}
                       </span>
@@ -995,7 +995,7 @@ onUnmounted(() => {
                     <p
                       v-else-if="indexStatus"
                       class="mt-3 text-[.8125rem]"
-                      :class="indexOutOfSync ? 'font-medium text-amber-600' : 'text-[var(--shell-muted)]'"
+                      :class="indexOutOfSync ? 'text-amber-600' : 'text-[var(--shell-muted)]'"
                     >
                       {{ t('settings.indexRepairIdle', {
                         sqlite: indexStatus.sqlite_count ?? 0,

@@ -110,7 +110,7 @@ const markImageError = (memoryId: string) => {
 
               <!-- Content -->
               <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-medium text-gray-900">
+                <p class="truncate text-sm text-gray-900">
                   {{ truncate(getMemoryDisplayText(memory), 80) }}
                 </p>
 
@@ -156,7 +156,7 @@ const markImageError = (memoryId: string) => {
                   </div>
 
                   <button
-                    class="inline-flex items-center rounded-full border border-slate-200/85 bg-slate-50/72 px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-sky-200 hover:bg-sky-50/82 hover:text-sky-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    class="inline-flex items-center rounded-full border border-slate-200/85 bg-slate-50/72 px-3 py-1.5 text-xs text-slate-500 transition-colors hover:border-sky-200 hover:bg-sky-50/82 hover:text-sky-600 disabled:cursor-not-allowed disabled:opacity-60"
                     :disabled="Boolean(deletingId)"
                     @click.stop="handleDelete(memory)"
                   >

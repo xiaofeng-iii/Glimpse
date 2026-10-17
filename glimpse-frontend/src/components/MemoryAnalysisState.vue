@@ -94,7 +94,6 @@ onBeforeUnmount(() => progressAnimation?.cancel())
   gap: 0.25rem;
   color: var(--color-primary);
   font-size: 0.75rem;
-  font-weight: 500;
   line-height: 1rem;
 }
 

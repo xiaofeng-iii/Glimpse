@@ -232,7 +232,6 @@ const handleOpenChange = async (open: boolean) => {
 
 .app-select__item[data-state='checked'] {
   color: var(--color-text);
-  font-weight: 600;
 }
 
 .app-select__item[data-state='checked'][data-highlighted] {

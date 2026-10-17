@@ -164,7 +164,7 @@ onBeforeUnmount(cancelSelectIntent)
             <span
               v-for="kind in matchSourceKinds"
               :key="kind"
-              class="rounded px-2 py-0.5 text-[11px] font-semibold"
+              class="rounded px-2 py-0.5 text-[11px]"
               :class="kind === 'exact'
                 ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
                 : 'bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] text-[var(--color-accent-hover)]'"

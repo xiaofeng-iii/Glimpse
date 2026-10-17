@@ -304,7 +304,7 @@ defineExpose({ focus, clear })
             v-for="item in sources"
             :key="item.value"
             type="button"
-            class="search-toolbar__source-button h-7 min-h-0 px-2.5 text-[13px] font-medium text-[var(--shell-ink)] hover:text-[var(--color-primary)]"
+            class="search-toolbar__source-button h-7 min-h-0 px-2.5 text-[13px] text-[var(--shell-ink)] hover:text-[var(--color-primary)]"
             :aria-pressed="source === item.value"
             @click="source = item.value"
           >
@@ -355,7 +355,7 @@ defineExpose({ focus, clear })
             :aria-label="t('search.debugTitle')"
           >
             <AdjustmentsHorizontalIcon class="h-4 w-4 flex-none" aria-hidden="true" />
-            <span class="search-toolbar__dev-label text-[10px] font-bold tracking-wide">DEV</span>
+            <span class="search-toolbar__dev-label text-[10px] tracking-wide">DEV</span>
           </summary>
           <div
             class="search-toolbar__debug-panel absolute right-0 top-[calc(100%+.5rem)] w-[min(440px,calc(100vw-2.5rem))] rounded-lg border border-amber-200/80 bg-[var(--shell-card)] p-4 text-left shadow-2xl"
@@ -409,7 +409,7 @@ defineExpose({ focus, clear })
             <div class="mt-3 border-t border-amber-200/60 pt-3">
               <div class="flex items-center justify-between">
                 <p class="text-xs font-semibold text-amber-800">{{ t('search.devStateOverride') }}</p>
-                <p v-if="devState.hasOverride" class="text-[10px] font-medium text-amber-700">{{ t('search.devStateOverrideActive') }}</p>
+                <p v-if="devState.hasOverride" class="text-[10px] text-amber-700">{{ t('search.devStateOverrideActive') }}</p>
               </div>
               <p class="mt-0.5 text-[11px] text-[var(--shell-muted)]">{{ t('search.devStateOverrideHint') }}</p>
               <div class="mt-2 grid grid-cols-2 gap-3">
@@ -456,7 +456,7 @@ defineExpose({ focus, clear })
             <button
               data-testid="show-onboarding"
               type="button"
-              class="mt-4 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-amber-300/80 bg-amber-50 px-3 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+              class="mt-4 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-amber-300/80 bg-amber-50 px-3 text-xs text-amber-800 transition hover:bg-amber-100"
               @click="handleShowOnboarding"
             >
               <QuestionMarkCircleIcon class="h-4 w-4" aria-hidden="true" />
@@ -622,7 +622,6 @@ defineExpose({ focus, clear })
   justify-content: center;
   padding: 0 0.625rem;
   font-size: 13px;
-  font-weight: 500;
   white-space: nowrap;
   color: var(--color-on-primary);
 }

@@ -24,7 +24,7 @@ const emit = defineEmits<{
 <template>
   <button
     type="button"
-    class="capture-button inline-flex min-w-[5.875rem] items-center gap-2 px-4 font-semibold text-white transition"
+    class="capture-button inline-flex min-w-[5.875rem] items-center gap-2 px-4 text-white transition"
     :class="density === 'toolbar' ? 'h-8 capture-button--slim' : 'h-10'"
     :disabled="capturing || disabled"
     :aria-busy="capturing"

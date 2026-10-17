@@ -205,7 +205,7 @@ onBeforeUnmount(() => {
               </p>
               <kbd
                 v-if="item.shortcut"
-                class="mt-3 inline-flex rounded-md border border-[var(--shell-line)] bg-[var(--shell-frame-bg)] px-2 py-1 text-xs font-semibold text-[var(--shell-ink)] shadow-sm"
+                class="mt-3 inline-flex rounded-md border border-[var(--shell-line)] bg-[var(--shell-frame-bg)] px-2 py-1 text-xs text-[var(--shell-ink)] shadow-sm"
               >
                 {{ item.shortcut }}
               </kbd>
@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
           <div class="mt-5 flex items-start gap-3 rounded-xl bg-[var(--color-primary-soft)] px-4 py-3.5">
             <Cog6ToothIcon class="mt-0.5 h-5 w-5 flex-none text-[var(--color-primary)]" aria-hidden="true" />
             <p class="text-sm text-[var(--shell-ink)]">
-              <span class="font-semibold">{{ t('onboarding.aiTitle') }}</span>
+              <span>{{ t('onboarding.aiTitle') }}</span>
               {{ t('onboarding.aiDescription') }}
             </p>
           </div>

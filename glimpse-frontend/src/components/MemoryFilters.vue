@@ -396,7 +396,6 @@ onUnmounted(() => {
 
 .memory-filters__trigger--active {
   color: var(--color-primary);
-  font-weight: 600;
 }
 
 .memory-filters__trigger:disabled {
@@ -449,7 +448,7 @@ onUnmounted(() => {
   margin: 0;
   color: var(--color-text);
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.01em;
   line-height: var(--line-height-16);
 }
@@ -505,7 +504,7 @@ onUnmounted(() => {
   padding: 0;
   color: var(--color-text-secondary);
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25rem;
 }
 

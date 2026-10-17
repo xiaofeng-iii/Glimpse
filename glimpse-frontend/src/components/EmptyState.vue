@@ -22,7 +22,7 @@ const shortcutParts = computed(() => {
       <PhotoIcon class="h-10 w-10 text-violet-500" aria-hidden="true" />
     </div>
 
-    <h3 class="text-lg font-medium text-gray-900 mb-2">{{ t('memory.emptyTitle') }}</h3>
+    <h3 class="text-lg text-gray-900 mb-2">{{ t('memory.emptyTitle') }}</h3>
     <p class="text-gray-500 text-sm mb-4">{{ t('memory.emptyHint') }}</p>
 
     <div class="empty-shortcut flex items-center gap-1">
@@ -37,7 +37,6 @@ const shortcutParts = computed(() => {
 <style scoped>
 .empty-shortcut {
   color: rgba(23, 32, 51, 0.84);
-  font-weight: 700;
 }
 
 .empty-shortcut-plus {
@@ -49,7 +48,6 @@ const shortcutParts = computed(() => {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(35, 93, 103, 0.18);
   color: var(--shell-highlight-strong);
-  font-weight: 700;
   box-shadow: 0 8px 18px rgba(35, 93, 103, 0.08);
 }
 </style>

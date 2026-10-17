@@ -303,7 +303,7 @@ const preventOutsideDismiss = (event: Event) => {
                 @click="openFilePicker"
               >
                 <PlusIcon v-if="!dragging" class="h-5 w-5" aria-hidden="true" />
-                <span v-else class="px-1 text-center text-xs font-medium leading-4">{{ t('addMemory.dropHint') }}</span>
+                <span v-else class="px-1 text-center text-xs leading-4">{{ t('addMemory.dropHint') }}</span>
               </button>
             </div>
 
