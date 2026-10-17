@@ -112,7 +112,7 @@ const phrase = computed(() =>
 }
 
 .side-decor__month {
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--shell-ink);
 }
@@ -139,7 +139,7 @@ const phrase = computed(() =>
 
 .side-decor__phrase {
   max-width: 17rem;
-  font-size: 0.9375rem;
+  font-size: 1rem;
   line-height: 1.7;
   color: var(--shell-muted);
 }

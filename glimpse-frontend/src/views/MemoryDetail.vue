@@ -107,7 +107,7 @@ const confirmDelete = async () => {
     <div class="mx-auto max-w-[1440px]">
       <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h1 class="text-lg font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('memory.detail') }}</h1>
+          <h1 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('memory.detail') }}</h1>
           <time v-if="memory" class="text-sm text-[var(--shell-muted)]" :datetime="memory.created_at">
             {{ formatDate(memory.created_at) }}
           </time>
@@ -132,7 +132,7 @@ const confirmDelete = async () => {
         v-else-if="loadFailed || !memory"
         class="flex min-h-[65vh] flex-col items-center justify-center text-center"
       >
-        <h2 class="text-lg font-semibold text-[var(--shell-ink)]">{{ t('memory.missing') }}</h2>
+        <h2 class="text-xl font-semibold text-[var(--shell-ink)]">{{ t('memory.missing') }}</h2>
         <p class="mt-2 text-sm text-[var(--shell-muted)]">{{ t('memory.loadFailedHint') }}</p>
         <button type="button" class="btn-primary mt-4" @click="loadMemory">
           <ArrowPathIcon class="h-4 w-4 flex-none" aria-hidden="true" />

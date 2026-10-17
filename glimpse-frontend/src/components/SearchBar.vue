@@ -113,7 +113,7 @@ defineExpose({ focus })
         v-model="query"
         type="text"
         :placeholder="t('search.placeholder')"
-        class="flex-1 bg-transparent border-none outline-none px-4 py-3 text-gray-900 placeholder-gray-400 text-lg"
+        class="flex-1 bg-transparent border-none outline-none px-4 py-3 text-gray-900 placeholder-gray-400 text-base"
       />
 
       <!-- Keyboard Shortcut -->

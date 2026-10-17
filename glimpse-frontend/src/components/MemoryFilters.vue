@@ -330,7 +330,7 @@ onUnmounted(() => {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 400;
   transition:
     gap 160ms ease,
@@ -503,7 +503,7 @@ onUnmounted(() => {
   margin: 0 0 0.25rem;
   padding: 0;
   color: var(--color-text-secondary);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.25rem;
 }
@@ -521,7 +521,7 @@ onUnmounted(() => {
   background: var(--color-surface-subtle);
   cursor: pointer;
   text-align: left;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   line-height: 1.25rem;
 }
 
@@ -661,7 +661,7 @@ onUnmounted(() => {
   min-height: 2rem;
   padding: 0 0.75rem;
   border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 .memory-filters__actions .btn-primary {

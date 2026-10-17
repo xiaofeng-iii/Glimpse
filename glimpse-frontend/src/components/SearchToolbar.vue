@@ -283,7 +283,7 @@ defineExpose({ focus, clear })
             >
               <XMarkIcon class="h-3 w-3" aria-hidden="true" />
             </button>
-            <kbd class="search-toolbar__detail-control border border-[var(--shell-line)] px-1 py-0 text-[11px] leading-[14px] text-[var(--shell-muted)]">
+            <kbd class="search-toolbar__detail-control border border-[var(--shell-line)] px-1 py-0 text-xs text-[var(--shell-muted)]">
               {{ shortcutLabel }}
             </kbd>
           </div>
@@ -304,7 +304,7 @@ defineExpose({ focus, clear })
             v-for="item in sources"
             :key="item.value"
             type="button"
-            class="search-toolbar__source-button h-7 min-h-0 px-2.5 text-[13px] text-[var(--shell-ink)] hover:text-[var(--color-primary)]"
+            class="search-toolbar__source-button h-7 min-h-0 px-2.5 text-xs text-[var(--shell-ink)] hover:text-[var(--color-primary)]"
             :aria-pressed="source === item.value"
             @click="source = item.value"
           >
@@ -411,7 +411,7 @@ defineExpose({ focus, clear })
                 <p class="text-xs font-semibold text-amber-800">{{ t('search.devStateOverride') }}</p>
                 <p v-if="devState.hasOverride" class="text-[10px] text-amber-700">{{ t('search.devStateOverrideActive') }}</p>
               </div>
-              <p class="mt-0.5 text-[11px] text-[var(--shell-muted)]">{{ t('search.devStateOverrideHint') }}</p>
+              <p class="mt-0.5 text-xs text-[var(--shell-muted)]">{{ t('search.devStateOverrideHint') }}</p>
               <div class="mt-2 grid grid-cols-2 gap-3">
                 <div>
                   <span class="mb-1 block text-xs text-[var(--shell-muted)]">{{ t('search.devAnalysisState') }}</span>
@@ -621,7 +621,7 @@ defineExpose({ focus, clear })
   align-items: center;
   justify-content: center;
   padding: 0 0.625rem;
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
   color: var(--color-on-primary);
 }

@@ -105,9 +105,9 @@ onBeforeUnmount(() => progressAnimation?.cancel())
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 600;
-  line-height: 1.25rem;
+  line-height: var(--line-height-14);
 }
 
 .memory-analysis-state__icon {

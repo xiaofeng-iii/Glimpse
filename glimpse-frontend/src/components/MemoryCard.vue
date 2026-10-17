@@ -147,7 +147,7 @@ onBeforeUnmount(cancelSelectIntent)
       class="flex flex-col"
       :class="textMemory ? 'memory-card__text-footer' : 'flex-1 p-2'"
     >
-      <p v-if="!textMemory" class="line-clamp-4 min-h-20 text-[13px] leading-5 text-[var(--shell-ink)]">
+      <p v-if="!textMemory" class="line-clamp-4 min-h-20 text-sm text-[var(--shell-ink)]">
         {{ displayText || (showStatus ? '' : t('memory.noContent')) }}
       </p>
       <div
@@ -164,7 +164,7 @@ onBeforeUnmount(cancelSelectIntent)
             <span
               v-for="kind in matchSourceKinds"
               :key="kind"
-              class="rounded px-2 py-0.5 text-[11px]"
+              class="rounded px-2 py-0.5 text-xs"
               :class="kind === 'exact'
                 ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
                 : 'bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] text-[var(--color-accent-hover)]'"

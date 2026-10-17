@@ -131,7 +131,7 @@ const markImageError = (memoryId: string) => {
 
                 <div
                   v-if="isDev && memory.search_debug"
-                  class="mt-2 flex flex-wrap gap-x-3 gap-y-1 rounded-lg bg-slate-100/80 px-2 py-1.5 font-mono text-[11px] text-slate-600"
+                  class="mt-2 flex flex-wrap gap-x-3 gap-y-1 rounded-lg bg-slate-100/80 px-2 py-1.5 font-mono text-xs text-slate-600"
                 >
                   <span
                     v-if="memory.search_debug.semantic_distance != null"

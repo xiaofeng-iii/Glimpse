@@ -254,7 +254,7 @@ defineExpose({
       <button
         v-if="!editing"
         type="button"
-        class="summary-editor__edit-action inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] px-3 text-[0.8125rem] font-normal text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
+        class="summary-editor__edit-action inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] px-3 text-xs font-normal text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
         @click="startEditing"
       >
         <PencilSquareIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
@@ -263,7 +263,7 @@ defineExpose({
       <div v-else class="summary-editor__edit-actions flex flex-none items-center gap-2">
         <button
           type="button"
-          class="summary-editor__edit-action btn-secondary !h-8 !min-h-8 px-2.5 text-[0.8125rem]"
+          class="summary-editor__edit-action btn-secondary !h-8 !min-h-8 px-2.5 text-xs"
           :disabled="saving"
           @click="cancelEditing"
         >
@@ -271,7 +271,7 @@ defineExpose({
         </button>
         <button
           type="button"
-          class="summary-editor__edit-action btn-primary !h-8 !min-h-8 gap-1.5 px-3 text-[0.8125rem]"
+          class="summary-editor__edit-action btn-primary !h-8 !min-h-8 gap-1.5 px-3 text-xs"
           :disabled="!canSave"
           @click="save"
         >

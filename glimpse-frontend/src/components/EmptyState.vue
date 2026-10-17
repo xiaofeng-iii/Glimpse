@@ -22,7 +22,7 @@ const shortcutParts = computed(() => {
       <PhotoIcon class="h-10 w-10 text-violet-500" aria-hidden="true" />
     </div>
 
-    <h3 class="text-lg text-gray-900 mb-2">{{ t('memory.emptyTitle') }}</h3>
+    <h3 class="text-base text-gray-900 mb-2">{{ t('memory.emptyTitle') }}</h3>
     <p class="text-gray-500 text-sm mb-4">{{ t('memory.emptyHint') }}</p>
 
     <div class="empty-shortcut flex items-center gap-1">

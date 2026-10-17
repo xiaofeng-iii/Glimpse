@@ -386,8 +386,8 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   border-radius: var(--radius-sm);
   color: var(--color-text);
   cursor: pointer;
-  font-size: 0.8125rem;
-  line-height: var(--line-height-14);
+  font-size: 0.75rem;
+  line-height: var(--line-height-12);
 }
 
 .memory-calendar__mode-input {
@@ -485,7 +485,7 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
 .memory-calendar__year {
   flex: 1;
   color: var(--color-text);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   text-align: center;
 }
 
@@ -504,7 +504,7 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   color: var(--color-text);
   background: transparent;
   cursor: pointer;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   transition: background-color 120ms ease, color 120ms ease;
 }
 
@@ -589,7 +589,7 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
 .memory-calendar__weekday {
   padding: 0.25rem 0;
   color: var(--color-text-muted);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   text-align: center;
 }
 
@@ -603,7 +603,7 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   color: var(--color-text);
   background: transparent;
   cursor: pointer;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   transition: background-color 120ms ease, color 120ms ease;
 }
 

@@ -39,7 +39,7 @@ const copyText = async () => {
         v-if="text"
         type="button"
         class="inline-flex items-center gap-2 rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
-        :class="compact ? 'min-h-7 px-2 text-[0.8125rem]' : 'min-h-8 px-2.5 text-sm'"
+        :class="compact ? 'min-h-7 px-2 text-xs' : 'min-h-8 px-2.5 text-sm'"
         @click="copyText"
       >
         <CheckIcon v-if="copied" class="h-4 w-4 flex-none text-emerald-600" aria-hidden="true" />

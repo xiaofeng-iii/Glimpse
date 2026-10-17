@@ -39,7 +39,7 @@ const emit = defineEmits<{
 .add-memory-button--slim {
   min-width: 0;
   padding-inline: 0.625rem;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 400;
 }
 

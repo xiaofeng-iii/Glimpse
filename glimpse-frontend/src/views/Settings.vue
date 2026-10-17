@@ -680,7 +680,7 @@ onUnmounted(() => {
               v-for="section in group.sections"
               :key="section.id"
               type="button"
-              class="flex h-[var(--control-h-md)] min-h-[var(--control-h-md)] w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 text-left text-[0.8125rem] font-normal transition"
+              class="flex h-[var(--control-h-md)] min-h-[var(--control-h-md)] w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 text-left text-xs font-normal transition"
               :class="activeSection === section.id
                 ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
                 : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
@@ -984,8 +984,8 @@ onUnmounted(() => {
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.semanticIndex') }}</h3>
                     <p class="setting-help">{{ t('settings.semanticIndexHint') }}</p>
-                    <p v-if="indexStatus?.running" class="mt-3 text-[.8125rem] text-[var(--color-primary)]">{{ t('settings.indexRepairRunning') }}</p>
-                    <p v-else-if="indexStatus?.result" class="mt-3 text-[.8125rem] text-[var(--shell-muted)]">
+                    <p v-if="indexStatus?.running" class="mt-3 text-xs text-[var(--color-primary)]">{{ t('settings.indexRepairRunning') }}</p>
+                    <p v-else-if="indexStatus?.result" class="mt-3 text-xs text-[var(--shell-muted)]">
                       {{ t('settings.indexRepairLastResult', {
                         processed: indexStatus.result.processed,
                         indexed: indexStatus.result.indexed,
@@ -994,7 +994,7 @@ onUnmounted(() => {
                     </p>
                     <p
                       v-else-if="indexStatus"
-                      class="mt-3 text-[.8125rem]"
+                      class="mt-3 text-xs"
                       :class="indexOutOfSync ? 'text-amber-600' : 'text-[var(--shell-muted)]'"
                     >
                       {{ t('settings.indexRepairIdle', {
@@ -1020,13 +1020,13 @@ onUnmounted(() => {
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.ocrBackfill') }}</h3>
                     <p class="setting-help">{{ t('settings.ocrBackfillHint') }}</p>
-                    <p v-if="ocrStatus?.running" class="mt-3 text-[.8125rem] text-[var(--color-primary)]">
+                    <p v-if="ocrStatus?.running" class="mt-3 text-xs text-[var(--color-primary)]">
                       {{ t('settings.ocrBackfillRunning', {
                         processed: ocrStatus.result?.processed ?? 0,
                         total: ocrStatus.result?.total ?? 0,
                       }) }}
                     </p>
-                    <p v-else-if="ocrStatus?.result" class="mt-3 text-[.8125rem] text-[var(--shell-muted)]">
+                    <p v-else-if="ocrStatus?.result" class="mt-3 text-xs text-[var(--shell-muted)]">
                       {{ t('settings.ocrBackfillResult', {
                         processed: ocrStatus.result.processed,
                         succeeded: ocrSucceeded,
@@ -1287,7 +1287,7 @@ onUnmounted(() => {
 
 .setting-label {
   display: block;
-  font-size: .8125rem;
+  font-size: .875rem;
   font-weight: 600;
   line-height: var(--line-height-14);
   color: var(--shell-ink);
@@ -1311,7 +1311,7 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   background: var(--shell-control-bg);
   padding: 0 .65rem;
-  font-size: .8125rem;
+  font-size: .875rem;
   color: var(--shell-ink);
   outline: none;
   transition: border-color 140ms ease, background-color 140ms ease;
@@ -1435,9 +1435,9 @@ onUnmounted(() => {
   min-height: var(--control-h-md);
   height: var(--control-h-md);
   padding: 0 .75rem;
-  font-size: .8125rem;
+  font-size: .75rem;
   font-weight: 400;
-  line-height: var(--line-height-14);
+  line-height: var(--line-height-12);
   color: #ffffff;
   text-shadow: none;
 }
@@ -1446,9 +1446,9 @@ onUnmounted(() => {
   min-height: var(--control-h-md);
   height: var(--control-h-md);
   padding: 0 .75rem;
-  font-size: .8125rem;
+  font-size: .75rem;
   font-weight: 400;
-  line-height: var(--line-height-14);
+  line-height: var(--line-height-12);
   text-shadow: none;
 }
 
