@@ -509,8 +509,8 @@ defineExpose({ focus, clear })
     0 6px 16px rgba(26, 38, 64, 0.08);
   /* 浮条下方模糊尾巴的长度：模糊在下缘之外继续向下渐变这么远 */
   --search-toolbar-blur-tail: 2rem;
-  /* 分段器滑动缓动：easeOutCubic——起步平缓、逐帧位移均匀递减，收尾柔和。
-     更陡的 easeOut 曲线（如 easeOutQuint）会把大部分位移压在开头几帧，产生跳跃感 */
+/* 分段器滑动缓动：easeOutCubic——起步平缓、逐帧位移均匀递减，收尾柔和。
+   更陡的 easeOut 曲线（如 easeOutQuint）会把大部分位移压在开头几帧，产生跳跃感 */
   --segment-slide-easing: cubic-bezier(0.33, 1, 0.68, 1);
 
   position: sticky;
@@ -519,6 +519,20 @@ defineExpose({ focus, clear })
   isolation: isolate;
   padding: 0.5rem 1.25rem 0.375rem;
   background: transparent;
+}
+
+/* 125%/175% 缩放下 2px inset = 2.5/3.5 物理像素，半像素取整导致滑块四边间隙不均；
+   凑整到物理 3px 后间隙位置无关、四边恒等（与排版切换器同一方案，已按位置奇偶性实测） */
+@media (resolution: 1.25dppx) {
+  .search-toolbar {
+    --search-toolbar-segment-inset: 2.4px;
+  }
+}
+
+@media (resolution: 1.75dppx) {
+  .search-toolbar {
+    --search-toolbar-segment-inset: calc(12px / 7);
+  }
 }
 
 /* 浮条滚动遮罩只做磨砂不做提亮：内容从卡下滑过时仅模糊、不叠加白色，
@@ -583,7 +597,8 @@ defineExpose({ focus, clear })
   width: calc((100% - var(--search-toolbar-segment-inset) * 4) / 3);
   border-radius: var(--search-toolbar-segment-radius);
   background: var(--color-primary);
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 5%);
+  /* 对称光晕：向下偏移的投影在分数缩放下会吃掉滑块底部间隙的视觉，导致四边读数不一致 */
+  box-shadow: 0 0 2px rgba(0, 0, 0, .1);
   will-change: transform;
   transition: transform var(--segment-slide-duration, 300ms) var(--segment-slide-easing);
 }

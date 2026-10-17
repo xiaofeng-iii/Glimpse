@@ -1356,6 +1356,20 @@ onUnmounted(() => {
   background: var(--color-surface-subtle);
 }
 
+/* 125%/175% 缩放下 2px inset = 2.5/3.5 物理像素，半像素取整导致滑块四边间隙不均；
+   凑整到物理 3px 后间隙位置无关、四边恒等（与排版切换器同一方案，已按位置奇偶性实测） */
+@media (resolution: 1.25dppx) {
+  .theme-switcher {
+    --theme-segment-inset: 2.4px;
+  }
+}
+
+@media (resolution: 1.75dppx) {
+  .theme-switcher {
+    --theme-segment-inset: calc(12px / 7);
+  }
+}
+
 .theme-switcher__thumb {
   position: absolute;
   top: var(--theme-segment-inset);

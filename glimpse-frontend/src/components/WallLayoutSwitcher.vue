@@ -62,6 +62,22 @@ const choose = (mode: WallLayoutMode) => {
   transition: box-shadow 160ms ease, background-color 160ms ease;
 }
 
+/* 125%/175% 缩放下 2px = 2.5/3.5 物理像素，半像素取整导致四边间隙不均；
+   凑整到物理 3px 后间隙位置无关、四边恒等（已按全部位置奇偶性实测） */
+@media (resolution: 1.25dppx) {
+  .wall-layout-switcher {
+    gap: 2.4px;
+    padding: 2.4px;
+  }
+}
+
+@media (resolution: 1.75dppx) {
+  .wall-layout-switcher {
+    gap: calc(12px / 7);
+    padding: calc(12px / 7);
+  }
+}
+
 .wall-layout-switcher--compact {
   border: none;
   background: rgba(15, 23, 42, 0.07);
@@ -94,7 +110,8 @@ const choose = (mode: WallLayoutMode) => {
 .wall-layout-switcher__option--active {
   color: var(--shell-ink);
   background: var(--color-surface-raised, var(--shell-card));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .1), 0 1px 2px rgba(0, 0, 0, .06);
+  /* 对称光晕：向下的投影在 175% 等分数缩放下会吃掉底部间隙的视觉，导致四边读数不一致 */
+  box-shadow: 0 0 2px rgba(0, 0, 0, .12);
 }
 
 :root[data-theme='dark'] .wall-layout-switcher {
@@ -111,7 +128,7 @@ const choose = (mode: WallLayoutMode) => {
 
 :root[data-theme='dark'] .wall-layout-switcher__option--active {
   background: var(--color-surface-hover);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+  box-shadow: 0 0 4px rgba(0, 0, 0, .4);
 }
 
 .wall-layout-switcher__option:focus-visible {
