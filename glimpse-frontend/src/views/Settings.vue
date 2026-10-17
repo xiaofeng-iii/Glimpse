@@ -804,10 +804,13 @@ onUnmounted(() => {
                 <span class="setting-label">Base URL</span>
                 <input v-model="aiBaseUrl" class="setting-input" type="url" />
               </label>
-              <label class="setting-row">
-                <span class="setting-label">{{ t('settings.visualModel') }}</span>
-                <input v-model="aiModel" class="setting-input" type="text" />
-              </label>
+              <div class="setting-row">
+                <div>
+                  <label id="settings-ai-model-label" for="settings-ai-model" class="setting-label">{{ t('settings.visualModel') }}</label>
+                  <p class="setting-help">{{ t('settings.visualModelHint') }}</p>
+                </div>
+                <input id="settings-ai-model" v-model="aiModel" class="setting-input" type="text" aria-labelledby="settings-ai-model-label" />
+              </div>
               <div class="setting-row">
                 <div>
                   <span class="setting-label">{{ t('settings.vectorModel') }}</span>
