@@ -1,4 +1,4 @@
-name: Frontend checks
+name: Push checks
 
 # 推送即校验：依赖声明完整性、Tauri npm/crate 版本对齐、前端类型检查，
 # 以及 Rust 侧 crate 声明与编译（cargo check 双 feature 路径）。
@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: frontend-checks-${{ github.ref }}
+  group: push-checks-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
