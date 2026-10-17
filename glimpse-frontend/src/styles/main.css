@@ -2,9 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Windows 中文垂直居中修正：雅黑墨迹在行框内偏上，此处重定义上下度量把墨迹拉回中心。
+   调参旋钮是 ascent/descent 的比例分配（两者相加固定 100，行框锁在 1em）：
+   ascent 每 +4 个百分点，12px 文字下沉约 0.5px。 */
+@font-face {
+  font-family: 'YaHei UI Adjusted';
+  src: local('Microsoft YaHei UI'), local('Microsoft YaHei');
+  ascent-override: 86%;
+  descent-override: 14%;
+  line-gap-override: 0%;
+}
+
 :root {
-  --font-ui: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-cjk: 'PingFang SC', 'PingFang HK', 'Helvetica Neue', Helvetica, 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  --font-ui: 'Segoe UI', 'PingFang SC', 'YaHei UI Adjusted', 'Microsoft YaHei', sans-serif;
+  --font-cjk: 'PingFang SC', 'PingFang HK', 'YaHei UI Adjusted', 'Microsoft YaHei', '微软雅黑', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --line-height-12: 20px;
   --line-height-14: 22px;
   --line-height-16: 24px;
