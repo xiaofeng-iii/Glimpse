@@ -212,9 +212,16 @@ export const useUpdatesStore = defineStore('updates', () => {
     try {
       const entries = await loadNotes()
       const entry = entries.find((release) => release.version === currentVersion.value)
-      if (entry) currentNotes.value = parseNotes(entry.notes)
-      else currentNotesError.value = 'settings.notesMissing'
+      if (entry) {
+        currentNotes.value = parseNotes(entry.notes)
+        // 上一次失败残留的错误在正文里优先渲染，成功后必须清掉。
+        currentNotesError.value = ''
+      } else {
+        currentNotesError.value = 'settings.notesMissing'
+      }
     } catch {
+      // 放开门闩，让下次打开浮窗/重进设置页时还能再试；成功路径保持会话级缓存不变。
+      currentNotesRequested = false
       currentNotesError.value = 'settings.notesNetwork'
     } finally {
       currentNotesLoading.value = false
