@@ -14,12 +14,10 @@ export interface DevAvailableUpdate {
   notes: string
 }
 
-const release = (version: string, notes: string): ReleaseNotes => ({
-  version,
-  preview: version.includes('-preview'),
-  notes,
-  sortKey: versionKey(version)!,
-})
+const release = (version: string, notes: string): ReleaseNotes => {
+  const sortKey = versionKey(version)!
+  return { version, preview: sortKey[3] === 0, notes, sortKey }
+}
 
 // 目标版本正文，同时充当假索引不可用时的原始日志兜底。
 const targetNotes = `**新特性**
@@ -72,7 +70,7 @@ const targetNotes = `**新特性**
 // 假索引故意混入一条被最新正式版覆盖的预览条目：聚合结果里不该出现它。
 export const devReleaseNotes = (): ReleaseNotes[] => [
   release(DEV_UPDATE_VERSION, targetNotes),
-  release('0.5.1-preview.20260101', '**新特性**\n- 仅预览版测试条目（聚合时应被剔除）'),
+  release('0.5.1-beta.1', '**新特性**\n- 仅预览版测试条目（聚合时应被剔除）'),
   release('0.5.0', '**新特性**\n- 新增记忆连拍合并开关\n\n**优化**\n- 启动速度更快'),
 ]
 

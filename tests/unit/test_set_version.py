@@ -95,6 +95,7 @@ def test_validate_version_rejects_non_stable_semver(version: str):
     [
         "0.2.0",
         "0.2.0-preview.20260806",
+        "0.2.0-beta.1",
         "0.2.0-dev",
         "0.2.0-rc.1",
         "0.2.0+build.5",

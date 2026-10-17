@@ -32,7 +32,7 @@ def validate_version(version: str) -> str:
         raise VersionSyncError(
             f"Invalid version {version!r}; expected SemVer MAJOR.MINOR.PATCH with "
             "optional -prerelease and +build metadata "
-            "(for example 0.2.0 or 0.2.0-preview.20260806)."
+            "(for example 0.2.0 or 0.2.0-beta.1)."
         )
     return version
 
@@ -250,7 +250,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "version",
         nargs="?",
         help="Target SemVer (MAJOR.MINOR.PATCH with optional -prerelease/+build), "
-        "such as 0.2.0 or 0.2.0-preview.20260806",
+        "such as 0.2.0 or 0.2.0-beta.1",
     )
     parser.add_argument(
         "--check",

@@ -22,7 +22,7 @@
 
 ### 第 1 步：下载安装
 
-前往 [GitHub Releases](https://github.com/xiaofeng-iii/Glimpse/releases) 下载 Windows 安装包（`.exe`），双击安装即可。日常使用建议选正式版（`vX.Y.Z`）；带 `-preview` 字样的是抢先体验版，功能更新但可能不稳定。
+前往 [GitHub Releases](https://github.com/xiaofeng-iii/Glimpse/releases) 下载 Windows 安装包（`.exe`），双击安装即可。日常使用建议选正式版（`vX.Y.Z`）；带 `-beta` 字样的是抢先体验版，功能更新但可能不稳定。
 
 数据保存在 `%LOCALAPPDATA%\Glimpse\GlimpseData`，删除这个文件夹就能彻底清除所有数据。后台有一个名为 `GlimpseRuntime.exe` 的服务进程（"Glimpse 核心服务"），随主程序一起启动和退出。
 

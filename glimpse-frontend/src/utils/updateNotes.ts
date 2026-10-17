@@ -4,9 +4,9 @@ export interface Notes { sections: Record<'features' | 'improvements' | 'fixes',
 export const notesIndexUrl = 'https://xiaofeng-iii.github.io/Glimpse/updates/index.json'
 
 export function versionKey(version: string): SortKey | null {
-  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-preview\.(\d{8})(?:\.(0|[1-9]\d*))?)?$/.exec(version)
+  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-preview\.(\d{8})(?:\.(0|[1-9]\d*))?|-beta\.(0|[1-9]\d*))?$/.exec(version)
   if (!match) return null
-  const key = [Number(match[1]), Number(match[2]), Number(match[3]), match[4] ? 0 : 1, Number(match[4] ?? 0), Number(match[5] ?? 0)]
+  const key = [Number(match[1]), Number(match[2]), Number(match[3]), match[4] || match[6] ? 0 : 1, Number(match[4] ?? match[6] ?? 0), Number(match[5] ?? 0)]
   return key.every(Number.isSafeInteger) ? key : null
 }
 export function compareKeys(a: SortKey, b: SortKey): number {

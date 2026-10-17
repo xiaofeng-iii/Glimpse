@@ -3,8 +3,7 @@ name: Build preview release
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+-preview.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]"
-      - "v[0-9]+.[0-9]+.[0-9]+-preview.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+"
 
 permissions:
   contents: write
@@ -42,13 +41,10 @@ jobs:
       - name: Verify preview tag and synchronized version
         shell: pwsh
         run: |
-          if ($env:GITHUB_REF_NAME -notmatch '^v(?<ver>[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]{8}(?:\.[0-9]+)?)$') {
-            throw "Preview tag must be vMAJOR.MINOR.PATCH-preview.YYYYMMDD[.N], got: $env:GITHUB_REF_NAME"
+          if ($env:GITHUB_REF_NAME -notmatch '^v(?<ver>[0-9]+\.[0-9]+\.[0-9]+-beta\.(0|[1-9][0-9]*))$') {
+            throw "Preview tag must be vMAJOR.MINOR.PATCH-beta.N, got: $env:GITHUB_REF_NAME"
           }
           $version = $Matches['ver']
-          if ($version -notmatch '^(?<base>[0-9]+\.[0-9]+\.[0-9]+)-preview\.(?<date>[0-9]{8})(?:\.(?<sequence>[0-9]+))?$') {
-            throw "Preview version must be <base>-preview.YYYYMMDD[.N], got: $version"
-          }
           $current = python scripts/set_version.py --current
           if ($LASTEXITCODE -ne 0) {
             throw "Failed to read the current synchronized version: $current"

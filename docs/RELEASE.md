@@ -92,7 +92,7 @@ python scripts/set_version.py --check
 宣布发布完成。两个通道的写入流程完全一致，仅预览版在预创建命令上追加 `--prerelease`。
 
 Release 标题统一为 `Glimpse <标签名>`（如 `Glimpse v0.3.2`、
-`Glimpse v0.3.3-preview.20261001`）；Workflow 兜底创建的标题是裸标签名，验收发现
+`Glimpse v0.3.3-beta.1`）；Workflow 兜底创建的标题是裸标签名，验收发现
 不符时用 `gh release edit $CurrentTag --title "Glimpse $CurrentTag"` 修正。
 
 发布说明的内容边界：
@@ -229,18 +229,20 @@ gh release create $CurrentTag --verify-tag --prerelease --title "Glimpse $Curren
 | 通道 | 版本号 | Git 标签 | GitHub Release 形态 | 可见性 |
 |---|---|---|---|---|
 | 正式版 | `0.2.0`、`0.3.0`、`1.0.0` | `v0.2.0` | Release | 所有人可见 |
-| 公开预览 | `0.2.0-preview.20260806` | `v0.2.0-preview.20260806` | Pre-release | 所有人可见（带 prerelease 标记） |
+| 公开预览 | `0.2.0-beta.1` | `v0.2.0-beta.1` | Pre-release | 所有人可见（带 prerelease 标记） |
 | 私密开发版 | `0.2.0-dev.20260806` | `v0.2.0-dev.20260806` | Draft | 仅仓库协作者可见 |
 
 - **正式版**：功能稳定后发布，推送纯 SemVer 标签后触发 `.github/workflows/release.yml`
-- **公开预览（preview）**：功能完成、准备收集外部反馈时发布，推送 Preview 标签后触发 `.github/workflows/preview-release.yml`
+- **公开预览（beta）**：功能完成、准备收集外部反馈时发布，推送 Beta 标签后触发 `.github/workflows/preview-release.yml`
 - **私密开发版（dev）**：开发中途自测用，不对外暴露半成品，通过 GitHub Actions 的 `workflow_dispatch` 手动触发 `.github/workflows/dev-release.yml`
 
-同一天需要重新构建同一基础版本时，在日期后追加递增序号，例如
-`0.2.0-preview.20260806.1`、`0.2.0-preview.20260806.2`；不要移动或覆盖已经推送的预览标签。
+同一基础版本需要再次发布公开预览时，递增 beta 序号，例如
+`0.2.0-beta.1`、`0.2.0-beta.2`；不要移动或覆盖已经推送的预览标签。2026 年 10 月
+之前的公开预览版使用 `-preview.YYYYMMDD[.N]` 日期格式，已发布的旧版本继续保留在
+更新索引中，新发布一律使用 `-beta.N`。
 
 三个通道都会校验 `scripts/set_version.py --check`（仓库版本必须与标签/输入完全一致）。
-`scripts/set_version.py` 接受标准 SemVer 预发布后缀（`-preview.20260806`、`-dev.20260806`、`-rc.1`）和构建元数据（`+build.5`）。
+`scripts/set_version.py` 接受标准 SemVer 预发布后缀（`-beta.1`、`-dev.20260806`、`-rc.1`）和构建元数据（`+build.5`）。
 
 ## 发布产物与运行时
 

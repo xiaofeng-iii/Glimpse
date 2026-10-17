@@ -19,7 +19,8 @@ MIRROR_PREFIXES = [
 ]
 VERSION_RE = re.compile(
     r"^v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)"
-    r"(?P<preview>-preview\.(?P<date>\d{8})(?:\.(?P<sequence>0|[1-9]\d*))?)?$"
+    r"(?:(?P<preview>-preview\.(?P<date>\d{8})(?:\.(?P<sequence>0|[1-9]\d*))?)"
+    r"|(?P<beta>-beta\.(?P<betanum>0|[1-9]\d*)))?$"
 )
 
 
@@ -34,11 +35,17 @@ def request(url: str, token: str) -> bytes:
         return response.read()
 
 
+def is_preview(match: re.Match[str]) -> bool:
+    return bool(match.group("preview") or match.group("beta"))
+
+
 def version_key(match: re.Match[str]) -> tuple[int, ...]:
     base = tuple(int(match.group(part)) for part in ("major", "minor", "patch"))
-    if not match.group("preview"):
-        return (*base, 1, 0, 0)
-    return (*base, 0, int(match.group("date")), int(match.group("sequence") or 0))
+    if match.group("preview"):
+        return (*base, 0, int(match.group("date")), int(match.group("sequence") or 0))
+    if match.group("beta"):
+        return (*base, 0, int(match.group("betanum")), 0)
+    return (*base, 1, 0, 0)
 
 
 def signed_releases(token: str) -> list[tuple[tuple[int, ...], bool, dict]]:
@@ -51,7 +58,7 @@ def signed_releases(token: str) -> list[tuple[tuple[int, ...], bool, dict]]:
             raise ValueError("GitHub releases response was not a list")
         for release in batch:
             match = VERSION_RE.fullmatch(release["tag_name"])
-            if release["draft"] or not match or release["prerelease"] != bool(match.group("preview")):
+            if release["draft"] or not match or release["prerelease"] != is_preview(match):
                 continue
             assets = release["assets"]
             installers = [asset for asset in assets if asset["name"].endswith("-setup.exe")]
@@ -75,7 +82,7 @@ def signed_releases(token: str) -> list[tuple[tuple[int, ...], bool, dict]]:
                     }
                 },
             }
-            releases.append((version_key(match), bool(match.group("preview")), manifest))
+            releases.append((version_key(match), is_preview(match), manifest))
         if len(batch) < 100:
             break
         page += 1

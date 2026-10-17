@@ -41,6 +41,37 @@ def test_preview_channel_can_lead_stable_and_orders_numeric_sequence(tmp_path):
     assert preview["version"] == "0.3.4-preview.20261003.10"
 
 
+def test_beta_releases_order_numerically_and_lead_stable(tmp_path):
+    releases = [
+        candidate("0.4.6", False),
+        candidate("0.4.7-beta.2", True),
+        candidate("0.4.7-beta.10", True),
+    ]
+    write_feeds(tmp_path, releases)
+
+    stable = json.loads((tmp_path / "updates/stable.json").read_text(encoding="utf-8"))
+    preview = json.loads((tmp_path / "updates/preview.json").read_text(encoding="utf-8"))
+    assert stable["version"] == "0.4.6"
+    assert preview["version"] == "0.4.7-beta.10"
+
+
+def test_beta_sorts_before_legacy_preview_on_same_base(tmp_path):
+    releases = [
+        candidate("0.4.7-preview.20261015", True),
+        candidate("0.4.7-beta.1", True),
+    ]
+    write_feeds(tmp_path, releases)
+
+    index = json.loads((tmp_path / "updates/index.json").read_text(encoding="utf-8"))
+    assert [item["version"] for item in index["releases"]] == [
+        "0.4.7-preview.20261015",
+        "0.4.7-beta.1",
+    ]
+    beta = index["releases"][1]
+    assert beta["preview"] is True
+    assert beta["sortKey"] == [0, 4, 7, 0, 1, 0]
+
+
 def test_index_json_lists_every_release_newest_first_with_sort_key(tmp_path):
     releases = [
         candidate("0.3.3-preview.20261003", True),
@@ -100,4 +131,6 @@ def test_signed_releases_skips_unsigned_and_uses_signature_contents(monkeypatch)
 def test_feed_skips_versions_outside_published_channels():
     assert VERSION_RE.fullmatch("v0.3.4-dev.20261003") is None
     assert VERSION_RE.fullmatch("v0.3.4-preview.20261003.01") is None
+    assert VERSION_RE.fullmatch("v0.3.4-beta.01") is None
     assert re.fullmatch(r"\d{8}", VERSION_RE.fullmatch("v0.3.4-preview.20261003").group("date"))
+    assert VERSION_RE.fullmatch("v0.3.4-beta.1").group("betanum") == "1"

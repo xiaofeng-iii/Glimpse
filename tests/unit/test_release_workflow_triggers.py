@@ -19,13 +19,11 @@ def test_formal_release_only_accepts_stable_semver_tags():
     assert "workflow_dispatch:" not in trigger
 
 
-def test_preview_release_only_accepts_preview_tags():
+def test_preview_release_only_accepts_beta_tags():
     trigger = _trigger_block("preview-release.yml")
 
-    preview_prefix = '"v[0-9]+.[0-9]+.[0-9]+-preview.'
-    preview_date = '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
-    assert f'{preview_prefix}{preview_date}"' in trigger
-    assert f'{preview_prefix}{preview_date}.[0-9]+"' in trigger
+    assert '"v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+"' in trigger
+    assert "-preview." not in trigger
     assert "workflow_dispatch:" not in trigger
 
 

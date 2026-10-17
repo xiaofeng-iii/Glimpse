@@ -8,12 +8,10 @@ import {
   type ReleaseNotes,
 } from '@/utils/updateNotes'
 
-const release = (version: string, notes: string): ReleaseNotes => ({
-  version,
-  preview: version.includes('-preview'),
-  notes,
-  sortKey: versionKey(version)!,
-})
+const release = (version: string, notes: string): ReleaseNotes => {
+  const sortKey = versionKey(version)!
+  return { version, preview: sortKey[3] === 0, notes, sortKey }
+}
 
 describe('versionKey', () => {
   it('builds a numeric key where a stable beats same-base previews', () => {
@@ -22,10 +20,20 @@ describe('versionKey', () => {
     expect(compareKeys(versionKey('0.3.2')!, versionKey('0.3.3')!)).toBe(-1)
   })
 
+  it('accepts beta releases and orders them numerically', () => {
+    expect(versionKey('0.4.7-beta.1')).toEqual([0, 4, 7, 0, 1, 0])
+    expect(compareKeys(versionKey('0.4.7-beta.2')!, versionKey('0.4.7-beta.1')!)).toBe(1)
+    expect(compareKeys(versionKey('0.4.7-beta.10')!, versionKey('0.4.7-beta.2')!)).toBeGreaterThan(0)
+    expect(compareKeys(versionKey('0.4.7')!, versionKey('0.4.7-beta.3')!)).toBe(1)
+    // 与 SemVer 字母序一致：同基线下 beta 排在旧 preview 日期格式之前。
+    expect(compareKeys(versionKey('0.4.7-beta.1')!, versionKey('0.4.7-preview.20261015')!)).toBeLessThan(0)
+  })
+
   it('throws for malformed versions', () => {
     expect(versionKey('abc')).toBeNull()
     expect(versionKey('0.3.2-dev.1')).toBeNull()
     expect(versionKey('0.3.2+build.1')).toBeNull()
+    expect(versionKey('0.4.7-beta.01')).toBeNull()
   })
 })
 
@@ -36,9 +44,10 @@ describe('parseIndex', () => {
       releases: [
         { version: '0.3.2', preview: false, notes: 'a', sortKey: [0, 3, 2, 1, 0, 0] },
         { version: '0.3.3-preview.20261003', preview: true, notes: 'b', sortKey: [0, 3, 3, 0, 20261003, 0] },
+        { version: '0.4.7-beta.1', preview: true, notes: 'c', sortKey: [0, 4, 7, 0, 1, 0] },
       ],
     })
-    expect(entries).toHaveLength(2)
+    expect(entries).toHaveLength(3)
     expect(entries[0]!.version).toBe('0.3.2')
   })
 
@@ -136,5 +145,13 @@ describe('aggregateNotes', () => {
     expect(notes.sections.improvements).toEqual(['0.3.4 预览优化'])
     expect(notes.sections.features).toEqual([])
     expect(notes.sections.fixes).toEqual([])
+  })
+
+  it('aggregates across legacy preview and beta formats', () => {
+    const legacy = release('0.4.7-preview.20261010', '**优化**\n- 旧格式预览优化')
+    const beta = release('0.4.8-beta.1', '**新特性**\n- beta 功能')
+    const notes = aggregateNotes([v033, legacy, beta], '0.3.3', '0.4.8-beta.1', 'preview')!
+    expect(notes.sections.improvements).toEqual(['旧格式预览优化'])
+    expect(notes.sections.features).toEqual(['beta 功能'])
   })
 })
