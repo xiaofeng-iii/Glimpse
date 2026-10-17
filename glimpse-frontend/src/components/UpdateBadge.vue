@@ -61,7 +61,8 @@ const installNow = async () => {
       :raw="updates.updateNotesPartial ? updates.availableUpdate.notes ?? '' : undefined"
     />
     <template #footer>
-      <button type="button" class="btn-secondary" :disabled="updates.installing" @click="viewDetails">
+      <!-- 查看详情只是跳转设置页，下载安装状态在全局 store，不随导航丢失，下载中保持可点 -->
+      <button type="button" class="btn-secondary" @click="viewDetails">
         {{ t('updates.viewDetails') }}
       </button>
       <button type="button" class="btn-primary" :disabled="updates.installing" @click="installNow">
