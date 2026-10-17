@@ -62,8 +62,9 @@ const deletingMemory = ref(false)
 const showSearchDebug = ref(false)
 const clusterModeEnabled = ref(false)
 const screenshotShortcutLabel = ref('Ctrl+Shift+G')
+// 1180 同时是排版分界与侧栏交互分界：CSS 在 1179px 以下把侧栏面板变成右侧浮层，
+// 点外/Esc 关闭只在浮层形态生效（见 handleDocumentPointerDown 与 handleKeydown）。
 const wideLayout = ref(window.innerWidth >= 1180)
-const dockedLayout = ref(window.innerWidth >= 820)
 const isDesktop = isDesktopShell()
 // 浮条下方控件行的吸顶与紧凑态：布局/筛选控件已从墙头部上移到这里，
 // 三级吸顶（浮条 → 控件行 → 墙头标题）的 top 由脚本按实测高度级联写入。
@@ -377,9 +378,6 @@ const confirmContextDelete = async () => {
 
 const handleResize = () => {
   wideLayout.value = window.innerWidth >= 1180
-  // 侧栏关闭交互跟随视觉形态：≥820px 侧栏是排版内的内容块（docked），点外/Esc 不关闭；
-  // <820px 侧栏浮于内容之上，才有关闭语义。分界与 .inspector-panel 的媒体查询保持一致。
-  dockedLayout.value = window.innerWidth >= 820
 }
 
 // 记忆墙滚动条仅在滚动进行时浮现，停止片刻即隐回（详见 .home-memory-pane 样式注释）。
@@ -396,12 +394,14 @@ const markPaneScrollbarActive = () => {
   }, SCROLLBAR_IDLE_MS)
 }
 
-// 浮层形态（<820px）下，点击面板以外（记忆卡片除外）即关闭；docked 形态是排版内
-// 的内容块，点外不关闭。拖动标题栏是窗口操作，任何形态都不视为关闭意图。走
-// handleCloseInspector 以保留未保存草稿确认。模态对话框打开时不参与关闭。
+// 浮层形态（<1180px，与把面板变成右侧浮层的媒体查询同界）下，点击面板以外
+//（记忆卡片除外）即关闭；docked 形态是排版内的内容块，点外不关闭。<820px 面板
+// 全屏覆盖窗口，不存在面板外区域，实际只有 X 按钮与 Esc 能关。拖动标题栏是窗口
+// 操作，任何形态都不视为关闭意图。走 handleCloseInspector 以保留未保存草稿确认。
+// 模态对话框打开时不参与关闭。
 const handleDocumentPointerDown = (event: PointerEvent) => {
   if (!memoriesStore.selectedId || event.button !== 0) return
-  if (dockedLayout.value) return
+  if (wideLayout.value) return
   if (!(event.target instanceof Node)) return
   if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
   if (event.target instanceof Element && event.target.closest('.desktop-shell__titlebar')) return
@@ -431,7 +431,7 @@ const handleKeydown = (event: KeyboardEvent) => {
   if (
     key === 'escape'
     && selectedMemory.value
-    && !dockedLayout.value
+    && !wideLayout.value
     && !editingText
     && !(target instanceof Element && target.closest('.search-toolbar'))
   ) {

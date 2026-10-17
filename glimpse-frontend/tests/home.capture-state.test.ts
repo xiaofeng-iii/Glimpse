@@ -115,7 +115,9 @@ describe('Home capture state wiring', () => {
   })
 
   it('closes the floating inspector on outside pointerdown and Escape but not on card or titlebar clicks', async () => {
-    vi.stubGlobal('innerWidth', 800) // <820 浮层形态
+    // <1180 浮层形态。真实浏览器中 <820 面板全屏覆盖、不存在面板外区域，
+    // 点外关闭在该区间只是逻辑路径；本用例验证的是处理器本身的判定逻辑。
+    vi.stubGlobal('innerWidth', 800)
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', name: 'home', component: Home }],
@@ -195,7 +197,7 @@ describe('Home capture state wiring', () => {
     vi.unstubAllGlobals()
   })
 
-  it('keeps the docked inspector open on outside clicks and shows the decor panel when closed', async () => {
+  it('closes the floating inspector below 1180px but keeps the docked inspector open on outside clicks', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', name: 'home', component: Home }],
@@ -237,43 +239,49 @@ describe('Home capture state wiring', () => {
       match_sources: [],
     }
     memoriesStore.upsert(memory as never)
-    memoriesStore.select(memory as never)
-    await flushPromises()
-    const pointerDownOn = async (target: Element) => {
-      target.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+    const select = async () => {
+      memoriesStore.select(memory as never)
+      await flushPromises()
+    }
+    const pointerDownOnBody = async () => {
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
       await flushPromises()
     }
 
-    // jsdom 默认 1024px，docked 形态：点外与 Esc 都不关闭
-    document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-    await flushPromises()
-    expect(memoriesStore.selectedId).toBe('memory-1')
+    // jsdom 默认 1024px（<1180 浮层形态）：点外与 Esc 都关闭
+    await select()
+    await pointerDownOnBody()
+    expect(memoriesStore.selectedId).toBeNull()
 
+    await select()
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     await flushPromises()
-    expect(memoriesStore.selectedId).toBe('memory-1')
+    expect(memoriesStore.selectedId).toBeNull()
 
-    // 关闭后：1024px（窄于 docked 边界 1180）不渲染装饰板，墙列数封顶三列
-    memoriesStore.select(null)
-    await flushPromises()
+    // 浮层形态关闭后：1024px（窄于 docked 边界 1180）不渲染装饰板，墙列数封顶三列
     expect(document.querySelector('.inspector-panel--decor')).toBeNull()
     expect(wrapper.findComponent({ name: 'MemoryWall' }).attributes('max-columns')).toBe('3')
 
-    // 宽度到达 docked 边界（≥1180px）时关闭侧栏，槽位渲染装饰面板，封顶解除
+    // ≥1180 docked 形态：点外与 Esc 都不关闭
     vi.stubGlobal('innerWidth', 1280)
     window.dispatchEvent(new Event('resize'))
     await flushPromises()
     expect(wrapper.findComponent({ name: 'MemoryWall' }).attributes('max-columns')).toBeUndefined()
-    memoriesStore.select(memory as never)
+    await select()
+    await pointerDownOnBody()
+    expect(memoriesStore.selectedId).toBe('memory-1')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     await flushPromises()
+    expect(memoriesStore.selectedId).toBe('memory-1')
+
+    // docked 关闭后：槽位渲染装饰面板，封顶保持解除
     memoriesStore.select(null)
     await flushPromises()
     expect(document.querySelector('.inspector-panel--decor')).not.toBeNull()
     expect(document.querySelector('.side-decor__day')?.textContent).toBeTruthy()
     expect(document.querySelector('.side-decor__phrase')?.textContent).toBeTruthy()
 
-    memoriesStore.select(memory as never)
-    await flushPromises()
+    await select()
     expect(document.querySelector('.inspector-panel--decor')).toBeNull()
     expect(memoriesStore.selectedId).toBe('memory-1')
 
