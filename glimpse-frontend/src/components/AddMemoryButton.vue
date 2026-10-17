@@ -20,7 +20,7 @@ const emit = defineEmits<{
 <template>
   <button
     type="button"
-    class="btn-primary add-memory-button min-w-[7.25rem] shrink-0 gap-2 whitespace-nowrap px-4 text-sm"
+    class="btn-primary add-memory-button min-w-[7.25rem] shrink-0 gap-2 whitespace-nowrap px-4"
     :class="density === 'toolbar' ? 'h-8 add-memory-button--slim' : 'h-10'"
     :disabled="busy || disabled"
     :aria-busy="busy"
@@ -39,7 +39,7 @@ const emit = defineEmits<{
 .add-memory-button--slim {
   min-width: 0;
   padding-inline: 0.625rem;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 400;
 }
 
