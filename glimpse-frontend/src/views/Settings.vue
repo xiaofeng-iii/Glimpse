@@ -640,8 +640,10 @@ onMounted(async () => {
     }
   }
   // 当前版本笔记从共享 store 读取；这里兜底记录版本，避免启动检测未完成时查询落空。
+  // 挂载即预取说明正文：浮窗打开时已是完整内容，不经历「加载态撑开、正文到达后长高」的定位跳变。
   if (currentVersion.value) {
     updatesStore.recordCurrentVersion(currentVersion.value)
+    void updatesStore.loadCurrentNotes()
   }
   // 默认进入不自动检测：检测由用户点「检查更新」或启动流程触发；
   // 但共享 store 里已发现的更新（含进行中的下载）总是同步进来展示。

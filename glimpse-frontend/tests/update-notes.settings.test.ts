@@ -146,6 +146,22 @@ describe('Settings update notes', () => {
     expect(fixHeading!.parentElement!.querySelector('li')).toBeNull()
   })
 
+  it('preloads current-version notes on entering settings, so the popover opens without a loading state', async () => {
+    const wrapper = await mountSettings()
+    const store = useUpdatesStore()
+    await vi.waitFor(() => expect(store.currentNotes).not.toBeNull())
+    expect(apiMocks.fetchIndex).toHaveBeenCalledTimes(1)
+
+    await openUpdates(wrapper)
+    await currentVersionButton(wrapper).trigger('click')
+    await flushPromises()
+
+    // 说明已就绪：打开浮窗不出现加载文案，也不追加请求。
+    expect(document.body.textContent).not.toContain('正在加载更新说明')
+    expect(document.body.textContent).toContain('0.3.2 已有功能')
+    expect(apiMocks.fetchIndex).toHaveBeenCalledTimes(1)
+  })
+
   it('shows the version and repository link below the panel on every section', async () => {
     const wrapper = await mountSettings()
     const meta = wrapper.get('.settings-meta')
@@ -177,6 +193,28 @@ describe('Settings update notes', () => {
     await flushPromises()
 
     expect(document.body.textContent).toContain('更新说明获取失败，请稍后重试')
+  })
+
+  it('retries and recovers when a failed notes load is opened again', async () => {
+    // 预取与首次打开都赶上网络不通；再次打开必须能恢复，而不是锁死到重启。
+    apiMocks.fetchIndex.mockRejectedValueOnce(new TypeError('offline'))
+    apiMocks.fetchIndex.mockRejectedValueOnce(new TypeError('offline'))
+    const wrapper = await openUpdates(await mountSettings())
+
+    await currentVersionButton(wrapper).trigger('click')
+    await flushPromises()
+    expect(apiMocks.fetchIndex).toHaveBeenCalledTimes(2)
+    expect(document.body.textContent).toContain('更新说明获取失败，请稍后重试')
+
+    // 关闭再打开：第三次请求成功，错误被清掉、显示完整说明。
+    await currentVersionButton(wrapper).trigger('click')
+    await flushPromises()
+    await currentVersionButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.fetchIndex).toHaveBeenCalledTimes(3)
+    expect(document.body.textContent).toContain('0.3.2 已有功能')
+    expect(document.body.textContent).not.toContain('更新说明获取失败')
   })
 
   it('opens the update dialog with aggregated notes after finding a new version', async () => {

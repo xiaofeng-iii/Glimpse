@@ -154,4 +154,23 @@ describe('updates store', () => {
     expect(store.installFailed).toBe(true)
     expect(store.availableUpdate).toBeNull()
   })
+
+  it('recovers current notes when a failed load is retried', async () => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.3.2')
+
+    apiMocks.fetchIndex.mockRejectedValueOnce(new TypeError('offline'))
+    await store.loadCurrentNotes()
+    expect(store.currentNotesError).toBe('settings.notesNetwork')
+    expect(store.currentNotes).toBeNull()
+
+    // 同一会话第二次调用重新发请求（不再是死锁的 rejected promise 缓存）。
+    await store.loadCurrentNotes()
+    expect(apiMocks.fetchIndex).toHaveBeenCalledTimes(2)
+    expect(store.currentNotes?.sections.features).toContain('0.3.2 已有功能')
+    expect(store.currentNotesError).toBe('')
+    // 成功后恢复会话级缓存：第三次调用不再请求。
+    await store.loadCurrentNotes()
+    expect(apiMocks.fetchIndex).toHaveBeenCalledTimes(2)
+  })
 })

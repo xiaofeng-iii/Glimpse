@@ -26,7 +26,8 @@ describe('frontend rendering contracts', () => {
     expect(selectTags).toEqual([])
 
     const settingsSource = readFileSync(resolve(sourceRoot, 'views/Settings.vue'), 'utf8')
-    expect(settingsSource.match(/<AppSelect\b/g)).toHaveLength(3)
+    // 语言 / 关闭窗口时 / 更新通道 / 下载加速，四处下拉全部走 AppSelect。
+    expect(settingsSource.match(/<AppSelect\b/g)).toHaveLength(4)
 
     const selectSource = readFileSync(resolve(sourceRoot, 'components/AppSelect.vue'), 'utf8')
     expect(selectSource).toContain('<SelectPortal>')

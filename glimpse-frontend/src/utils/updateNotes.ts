@@ -56,15 +56,22 @@ export function aggregateNotes(releases: ReleaseNotes[], current: string, target
 }
 
 // Page-session cache; public fetch never uses the authenticated local API client.
+// 只缓存成功的结果：网络失败时丢弃 promise，下次调用重新发起请求。
+// 若缓存 rejected promise，瞬时断网会把整段会话锁死在失败态，再无重试入口。
 export function createNotesLoader() {
-  let pending: Promise<ReleaseNotes[]> | undefined
-  return () => pending ??= (async () => {
+  let cached: Promise<ReleaseNotes[]> | undefined
+  return () => cached ??= (async () => {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 12000)
     try {
       const response = await fetch(notesIndexUrl, { credentials: 'omit', signal: controller.signal })
       if (!response.ok) throw new Error('Notes unavailable')
-      return parseIndex(await response.json())
+      const entries = parseIndex(await response.json())
+      cached = Promise.resolve(entries)
+      return entries
+    } catch (error) {
+      cached = undefined
+      throw error
     } finally { clearTimeout(timer) }
   })()
 }
