@@ -330,7 +330,7 @@ onUnmounted(() => {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 400;
   transition:
     gap 160ms ease,
@@ -521,8 +521,8 @@ onUnmounted(() => {
   background: var(--color-surface-subtle);
   cursor: pointer;
   text-align: left;
-  font-size: 0.75rem;
-  line-height: 1.25rem;
+  font-size: 0.875rem;
+  line-height: var(--line-height-14);
 }
 
 .memory-filters__date-text {
@@ -661,7 +661,7 @@ onUnmounted(() => {
   min-height: 2rem;
   padding: 0 0.75rem;
   border-radius: var(--radius-sm);
-  font-size: 0.75rem;
+  font-size: 0.875rem;
 }
 
 .memory-filters__actions .btn-primary {

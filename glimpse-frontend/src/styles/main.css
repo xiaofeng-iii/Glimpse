@@ -386,8 +386,8 @@ button {
   color: var(--color-text-secondary);
   background: transparent;
   cursor: pointer;
-  font-size: 0.75rem;
-  line-height: var(--line-height-12);
+  font-size: 0.875rem;
+  line-height: var(--line-height-14);
   transition:
     color 160ms ease,
     background-color 160ms ease,
@@ -513,9 +513,9 @@ button {
   border-radius: var(--radius-md);
   cursor: pointer;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 400;
-  line-height: var(--line-height-12);
+  line-height: var(--line-height-14);
   transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
   background: var(--color-primary);
   box-shadow: 0 2px 8px var(--shell-primary-shadow);
@@ -577,9 +577,9 @@ button {
   color: var(--color-text);
   border: none;
   border-radius: var(--radius-md);
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 400;
-  line-height: var(--line-height-12);
+  line-height: var(--line-height-14);
   transition: background-color 0.16s ease, color 0.16s ease;
   cursor: pointer;
 }
@@ -613,9 +613,9 @@ button {
   border-radius: var(--radius-md);
   background: var(--color-danger);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 400;
-  line-height: var(--line-height-12);
+  line-height: var(--line-height-14);
   transition: background 0.18s ease, opacity 0.18s ease;
   cursor: pointer;
 }
@@ -642,9 +642,9 @@ button {
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-danger);
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 400;
-  line-height: var(--line-height-12);
+  line-height: var(--line-height-14);
   transition: background-color 160ms ease, color 160ms ease;
   cursor: pointer;
 }
@@ -664,12 +664,12 @@ kbd {
   color: rgba(255, 255, 255, 0.92);
 }
 
-/* 弹窗/浮层里的动作按钮是低频操作，用苗条档：28px 高、12px 常规字重、无投影，
+/* 弹窗/浮层里的动作按钮是低频操作，用苗条档：28px 高、14px 常规字重、无投影，
    与设置区"更苗条的控件"同一策略，不拿主路径按钮的分量。 */
 .btn-sm {
   min-height: var(--control-h-sm);
   padding: 0.125rem 0.75rem;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 400;
   box-shadow: none;
 }

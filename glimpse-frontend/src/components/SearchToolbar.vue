@@ -304,7 +304,7 @@ defineExpose({ focus, clear })
             v-for="item in sources"
             :key="item.value"
             type="button"
-            class="search-toolbar__source-button h-7 min-h-0 px-2.5 text-xs text-[var(--shell-ink)] hover:text-[var(--color-primary)]"
+            class="search-toolbar__source-button h-7 min-h-0 px-2.5 text-sm text-[var(--shell-ink)] hover:text-[var(--color-primary)]"
             :aria-pressed="source === item.value"
             @click="source = item.value"
           >
@@ -621,7 +621,7 @@ defineExpose({ focus, clear })
   align-items: center;
   justify-content: center;
   padding: 0 0.625rem;
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
   color: var(--color-on-primary);
 }

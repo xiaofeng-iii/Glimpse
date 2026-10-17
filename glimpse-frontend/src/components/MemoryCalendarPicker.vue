@@ -386,8 +386,8 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   border-radius: var(--radius-sm);
   color: var(--color-text);
   cursor: pointer;
-  font-size: 0.75rem;
-  line-height: var(--line-height-12);
+  font-size: 0.875rem;
+  line-height: var(--line-height-14);
 }
 
 .memory-calendar__mode-input {
@@ -504,7 +504,7 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   color: var(--color-text);
   background: transparent;
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   transition: background-color 120ms ease, color 120ms ease;
 }
 
@@ -603,7 +603,7 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   color: var(--color-text);
   background: transparent;
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   transition: background-color 120ms ease, color 120ms ease;
 }
 

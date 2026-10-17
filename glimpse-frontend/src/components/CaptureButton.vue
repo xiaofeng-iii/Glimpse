@@ -46,7 +46,7 @@ const emit = defineEmits<{
 .capture-button--slim {
   min-width: 0;
   padding-inline: 0.625rem;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 400;
 }
 
