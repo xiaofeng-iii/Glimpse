@@ -132,8 +132,8 @@ const handleOpenChange = async (open: boolean) => {
   cursor: pointer;
   text-align: left;
   transition:
-    color 140ms ease,
-    background-color 140ms ease;
+    color 160ms ease,
+    background-color 160ms ease;
 }
 
 .app-select__trigger:hover {
@@ -167,7 +167,7 @@ const handleOpenChange = async (open: boolean) => {
   height: .875rem;
   flex: 0 0 .875rem;
   color: var(--color-text-muted);
-  transition: transform 160ms ease, color 140ms ease;
+  transition: transform 160ms ease, color 160ms ease;
 }
 
 .app-select__icon > svg {
@@ -217,7 +217,7 @@ const handleOpenChange = async (open: boolean) => {
   line-height: var(--line-height-14);
   outline: none;
   user-select: none;
-  transition: color 120ms ease, background-color 120ms ease;
+  transition: color 160ms ease, background-color 160ms ease;
 }
 
 .app-select__item[data-highlighted] {

@@ -198,7 +198,7 @@ describe('memory wall layout & grouping', () => {
 
     it('范围模式两次点选起止并自动归一', async () => {
       const wrapper = mountCalendar(createEmptyMemoryFilters())
-      await wrapper.find('.memory-calendar__mode-input').setValue(true)
+      await wrapper.setProps({ rangeMode: true })
       await cell(wrapper, '2026-10-12').trigger('pointerdown')
       expect(wrapper.emitted('apply')).toBeUndefined()
       await cell(wrapper, '2026-10-14').trigger('pointerdown')
@@ -216,7 +216,7 @@ describe('memory wall layout & grouping', () => {
 
     it('范围模式点同一天两次 = 单日', async () => {
       const wrapper = mountCalendar(createEmptyMemoryFilters())
-      await wrapper.find('.memory-calendar__mode-input').setValue(true)
+      await wrapper.setProps({ rangeMode: true })
       await cell(wrapper, '2026-10-10').trigger('pointerdown')
       await cell(wrapper, '2026-10-10').trigger('pointerdown')
       expect(wrapper.emitted('apply')![0]![0]).toMatchObject({
@@ -259,22 +259,13 @@ describe('memory wall layout & grouping', () => {
       })
     })
 
-    it('选中后显示清空按钮，点击只清日期', async () => {
-      const wrapper = mountCalendar({
-        ...createEmptyMemoryFilters(),
-        datePreset: 'custom',
-        dateFrom: '2026-08-01',
-        dateTo: '2026-08-31',
-        contentTypes: ['screenshot'],
-      })
-      expect(wrapper.find('.memory-calendar__chip').exists()).toBe(false)
-      await wrapper.get('.memory-calendar__clear').trigger('click')
-      expect(wrapper.emitted('apply')![0]![0]).toMatchObject({
-        datePreset: 'all',
-        dateFrom: '',
-        dateTo: '',
-        contentTypes: ['screenshot'],
-      })
+    it('父级清空时段后进行中的范围起点同步丢弃', async () => {
+      const wrapper = mountCalendar(createEmptyMemoryFilters())
+      await wrapper.setProps({ rangeMode: true })
+      await cell(wrapper, '2026-10-12').trigger('pointerdown')
+      await wrapper.setProps({ filters: createEmptyMemoryFilters() })
+      await cell(wrapper, '2026-10-10').trigger('pointerdown')
+      expect(wrapper.emitted('apply')).toBeUndefined()
     })
 
     it('月份速选仅跳转视图，不改动已选时段', async () => {
@@ -291,7 +282,7 @@ describe('memory wall layout & grouping', () => {
 
     it('范围模式下跨月跳转后可继续点选终点', async () => {
       const wrapper = mountCalendar(createEmptyMemoryFilters())
-      await wrapper.find('.memory-calendar__mode-input').setValue(true)
+      await wrapper.setProps({ rangeMode: true })
       await cell(wrapper, '2026-10-02').trigger('pointerdown')
       await wrapper.get('.memory-calendar__pick-btn').trigger('click')
       await wrapper.get('.memory-calendar__year-prev').trigger('click')

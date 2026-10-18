@@ -86,7 +86,7 @@ const markImageError = (memoryId: string) => {
             @click="emit('select', memory)"
             @dblclick.stop="emit('open', memory)"
             :class="[
-              'group relative cursor-pointer rounded-2xl border p-4 transition-all duration-300',
+              'group relative cursor-pointer rounded-2xl border p-4 transition-all duration-[160ms] ease-[ease]',
               selectedId === memory.id
                 ? 'border-blue-300 bg-blue-50 shadow-sm'
                 : 'border-gray-100 bg-white hover:border-violet-200 hover:bg-gray-50',
@@ -156,7 +156,7 @@ const markImageError = (memoryId: string) => {
                   </div>
 
                   <button
-                    class="inline-flex items-center rounded-full border border-slate-200/85 bg-slate-50/72 px-3 py-1.5 text-xs text-slate-500 transition-colors hover:border-sky-200 hover:bg-sky-50/82 hover:text-sky-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    class="inline-flex items-center rounded-full border border-slate-200/85 bg-slate-50/72 px-3 py-1.5 text-xs text-slate-500 transition-colors duration-[160ms] ease-[ease] hover:border-sky-200 hover:bg-sky-50/82 hover:text-sky-600 disabled:cursor-not-allowed disabled:opacity-60"
                     :disabled="Boolean(deletingId)"
                     @click.stop="handleDelete(memory)"
                   >

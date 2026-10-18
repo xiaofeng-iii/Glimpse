@@ -105,7 +105,7 @@ function restoreFocus(event: Event) {
   color: var(--color-text-muted);
   background: transparent;
   cursor: pointer;
-  transition: color 140ms ease, background-color 140ms ease;
+  transition: color 160ms ease, background-color 160ms ease;
 }
 
 .notes-popover__close:hover {

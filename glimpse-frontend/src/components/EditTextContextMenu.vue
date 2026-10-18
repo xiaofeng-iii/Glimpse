@@ -268,7 +268,7 @@ onBeforeUnmount(unbindListeners)
   font-size: 0.875rem;
   line-height: var(--line-height-14);
   text-align: left;
-  transition: background-color 140ms ease, color 140ms ease;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .edit-text-menu__item:hover:not(:disabled),
@@ -291,7 +291,7 @@ onBeforeUnmount(unbindListeners)
   font-size: 0.75rem;
 }
 
-:global([data-theme='dark']) .edit-text-menu {
+:root[data-theme='dark'] .edit-text-menu {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
 }
 

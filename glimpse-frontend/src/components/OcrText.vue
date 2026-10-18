@@ -30,7 +30,7 @@ const copyText = async () => {
   <section
     class="ocr-text rounded-lg p-3.5"
     :class="compact
-      ? 'bg-[var(--color-surface-subtle)]'
+      ? 'ocr-text--compact bg-[var(--color-surface-subtle)]'
       : 'border border-[var(--shell-line)] bg-[var(--shell-control-bg)]'"
   >
     <div class="mb-2.5 flex items-center justify-between gap-3">
@@ -38,7 +38,7 @@ const copyText = async () => {
       <button
         v-if="text"
         type="button"
-        class="inline-flex items-center gap-2 rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+        class="ocr-text__copy inline-flex items-center gap-2 rounded-md text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
         :class="compact ? 'min-h-7 px-2 text-sm' : 'min-h-8 px-2.5 text-sm'"
         @click="copyText"
       >
@@ -56,3 +56,13 @@ const copyText = async () => {
     <p v-else class="text-sm text-[var(--shell-muted)]">{{ t('memory.noRecognizedText') }}</p>
   </section>
 </template>
+
+<style scoped>
+.ocr-text--compact .ocr-text__copy:hover {
+  background: rgb(224, 228, 237);
+}
+
+:root[data-theme='dark'] .ocr-text--compact .ocr-text__copy:hover {
+  background: var(--color-surface-hover);
+}
+</style>

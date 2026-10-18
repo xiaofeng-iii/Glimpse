@@ -83,7 +83,7 @@ const markImageError = (url: string) => {
       </div>
       <span
         v-if="activeImage"
-        class="pointer-events-none absolute bottom-3 rounded-md bg-slate-950/55 px-2.5 py-1 text-xs text-white opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-visible:opacity-100"
+        class="pointer-events-none absolute bottom-3 rounded-md bg-slate-950/55 px-2.5 py-1 text-xs text-white opacity-0 backdrop-blur transition duration-[160ms] ease-[ease] group-hover:opacity-100 group-focus-visible:opacity-100"
       >
         {{ t('preview.hint') }}
       </span>

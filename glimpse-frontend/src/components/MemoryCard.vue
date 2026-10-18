@@ -101,7 +101,7 @@ onBeforeUnmount(cancelSelectIntent)
 
 <template>
   <article
-    class="memory-card group flex cursor-pointer flex-col overflow-hidden rounded-lg border bg-[var(--shell-card)] transition duration-200"
+    class="memory-card group flex cursor-pointer flex-col overflow-hidden rounded-lg border bg-[var(--shell-card)] transition duration-[160ms] ease-[ease]"
     :class="[
       textMemory ? 'memory-card--text' : '',
       selected
@@ -133,7 +133,7 @@ onBeforeUnmount(cancelSelectIntent)
         v-if="imageUrl && !imageFailed"
         :src="imageUrl"
         :alt="displayText || t('memory.imageAnalyzing')"
-        class="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+        class="h-full w-full object-contain transition duration-[160ms] ease-[ease] group-hover:scale-[1.01]"
         loading="lazy"
         @error="imageFailed = true"
       />

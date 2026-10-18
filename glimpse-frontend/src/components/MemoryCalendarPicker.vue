@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ChevronLeftIcon, ChevronRightIcon, Squares2X2Icon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ChevronLeftIcon, ChevronRightIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
 import { languagePreference, t } from '@/utils/i18n'
 import { cloneMemoryFilters, toDateInputValue, type MemoryFilters } from '@/utils/memory-filters'
 import {
@@ -27,15 +27,14 @@ const viewYear = ref(anchor.getFullYear())
 const viewMonth = ref(anchor.getMonth())
 
 // 「范围」模式：开启后点两次选起止日期；关闭时按下拖动框选、单击即单日
-const rangeMode = ref(false)
+// 开关在筛选面板头部，状态经 v-model 双向同步
+const rangeMode = defineModel<boolean>('rangeMode', { default: false })
 const pendingStart = ref('')
 const dragging = ref(false)
 const dragStart = ref('')
 const dragPreviewEnd = ref('')
 
 const currentNow = computed(() => props.now ?? new Date())
-
-const active = computed(() => Boolean(props.filters.dateFrom || props.filters.dateTo))
 
 const atCurrentMonth = computed(() =>
   viewYear.value === currentNow.value.getFullYear()
@@ -76,16 +75,6 @@ const emitPeriod = (dateFrom: string, dateTo: string) => {
     datePreset: 'custom',
     dateFrom,
     dateTo,
-  })
-}
-
-const clearPeriod = () => {
-  pendingStart.value = ''
-  emit('apply', {
-    ...cloneMemoryFilters(props.filters),
-    datePreset: 'all',
-    dateFrom: '',
-    dateTo: '',
   })
 }
 
@@ -187,9 +176,14 @@ const handleWindowPointerUp = () => {
   emitPeriod(from, to)
 }
 
-const exitRangeMode = () => {
-  if (!rangeMode.value) pendingStart.value = ''
-}
+watch(rangeMode, (on) => {
+  if (!on) pendingStart.value = ''
+})
+
+// 「清除」按钮在筛选面板头部；父级清空时段后同步丢掉进行中的范围起点
+watch(() => [props.filters.dateFrom, props.filters.dateTo], ([from, to]) => {
+  if (!from && !to) pendingStart.value = ''
+})
 
 onMounted(() => window.addEventListener('pointerup', handleWindowPointerUp))
 onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp))
@@ -197,29 +191,6 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
 
 <template>
   <div class="memory-calendar">
-    <div class="memory-calendar__toolbar">
-      <button
-        v-if="active"
-        type="button"
-        class="memory-calendar__clear"
-        :title="t('wall.clearPeriod')"
-        :aria-label="t('wall.clearPeriod')"
-        @click="clearPeriod"
-      >
-        <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
-      <label class="memory-calendar__mode" :title="t('wall.rangeModeHint')">
-        <input
-          v-model="rangeMode"
-          type="checkbox"
-          class="memory-calendar__mode-input"
-          @change="exitRangeMode"
-        />
-        <span class="memory-calendar__mode-indicator" aria-hidden="true"></span>
-        <span>{{ t('wall.rangeMode') }}</span>
-      </label>
-    </div>
-
     <div
       class="memory-calendar__block"
       role="group"
@@ -342,99 +313,11 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   gap: 0.5rem;
 }
 
-.memory-calendar__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  min-height: 1.75rem;
-}
-
-.memory-calendar__clear {
-  display: inline-flex;
-  width: 1.75rem;
-  height: 1.75rem;
-  min-height: 0;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  margin-right: auto;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  background: transparent;
-  cursor: pointer;
-}
-
-.memory-calendar__clear:hover {
-  color: var(--color-text);
-  background: var(--color-surface-hover);
-}
-
-.memory-calendar__clear:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
-
-.memory-calendar__mode {
-  position: relative;
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0 0.375rem;
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  cursor: pointer;
-  font-size: 0.875rem;
-  line-height: var(--line-height-14);
-}
-
-.memory-calendar__mode-input {
-  position: absolute;
-  width: 1rem;
-  height: 1rem;
-  margin: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.memory-calendar__mode-indicator {
-  display: inline-flex;
-  width: 1rem;
-  height: 1rem;
-  flex: 0 0 1rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 0.1875rem;
-  background: transparent;
-}
-
-.memory-calendar__mode-input:checked + .memory-calendar__mode-indicator {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-}
-
-.memory-calendar__mode-input:checked + .memory-calendar__mode-indicator::after {
-  content: '';
-  width: 0.4375rem;
-  height: 0.25rem;
-  border-bottom: 2px solid var(--color-on-primary);
-  border-left: 2px solid var(--color-on-primary);
-  transform: translateY(-0.0625rem) rotate(-45deg);
-}
-
-.memory-calendar__mode:has(.memory-calendar__mode-input:focus-visible) {
-  background: var(--color-primary-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-focus) 26%, transparent);
-}
-
 .memory-calendar__block {
   padding: 0.75rem 0.75rem 0.875rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  background: var(--color-surface-subtle);
 }
 
 .memory-calendar__nav {
@@ -505,11 +388,11 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   background: transparent;
   cursor: pointer;
   font-size: 0.875rem;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .memory-calendar__month-cell:hover:not(:disabled) {
-  background: var(--color-surface-hover);
+  background: rgb(224, 228, 237);
 }
 
 .memory-calendar__month-cell:focus-visible {
@@ -540,11 +423,12 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   color: var(--color-text-muted);
   background: transparent;
   cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .memory-calendar__nav-btn:hover:not(:disabled) {
   color: var(--color-text);
-  background: var(--color-surface-hover);
+  background: rgb(224, 228, 237);
 }
 
 .memory-calendar__nav-btn:focus-visible {
@@ -566,6 +450,7 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   background: transparent;
   cursor: pointer;
   font-size: 0.875rem;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .memory-calendar__month:hover {
@@ -604,11 +489,22 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   background: transparent;
   cursor: pointer;
   font-size: 0.875rem;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .memory-calendar__day:hover:not(:disabled) {
+  background: rgb(224, 228, 237);
+}
+
+:root[data-theme='dark'] .memory-calendar__month-cell:hover:not(:disabled),
+:root[data-theme='dark'] .memory-calendar__day:hover:not(:disabled),
+:root[data-theme='dark'] .memory-calendar__nav-btn:hover:not(:disabled) {
   background: var(--color-surface-hover);
+}
+
+.memory-calendar__day--endpoint:hover:not(:disabled),
+:root[data-theme='dark'] .memory-calendar__day--endpoint:hover:not(:disabled) {
+  background: var(--color-primary-hover);
 }
 
 .memory-calendar__day:focus-visible {

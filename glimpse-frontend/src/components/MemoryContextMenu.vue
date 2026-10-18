@@ -245,7 +245,7 @@ onBeforeUnmount(unbindListeners)
   font-size: 0.875rem;
   line-height: var(--line-height-14);
   text-align: left;
-  transition: background-color 140ms ease, color 140ms ease;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .memory-context-menu__item > svg {
@@ -276,7 +276,7 @@ onBeforeUnmount(unbindListeners)
   background: var(--color-border);
 }
 
-:global([data-theme='dark']) .memory-context-menu {
+:root[data-theme='dark'] .memory-context-menu {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
 }
 

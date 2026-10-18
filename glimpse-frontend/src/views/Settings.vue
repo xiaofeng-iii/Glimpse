@@ -682,7 +682,7 @@ onUnmounted(() => {
               v-for="section in group.sections"
               :key="section.id"
               type="button"
-              class="flex h-[var(--control-h-md)] min-h-[var(--control-h-md)] w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 text-left text-sm font-normal transition"
+              class="flex h-[var(--control-h-md)] min-h-[var(--control-h-md)] w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 text-left text-sm font-normal transition duration-[160ms] ease-[ease]"
               :class="activeSection === section.id
                 ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-hover)]'
                 : 'text-[var(--shell-ink)] hover:bg-[var(--shell-control-hover)]'"
@@ -791,7 +791,7 @@ onUnmounted(() => {
                   />
                   <button
                     type="button"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[var(--shell-muted)] hover:bg-[var(--shell-control-hover)]"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
                     :aria-label="showApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')"
                     @click="showApiKey = !showApiKey"
                   >
@@ -1066,7 +1066,7 @@ onUnmounted(() => {
           <div class="settings-content__footer flex-none px-7 py-3">
             <button
               type="button"
-              class="settings-reset-link text-xs text-[var(--shell-muted)] hover:text-red-600 transition"
+              class="settings-reset-link text-xs text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:text-red-600"
               :disabled="resetting"
               @click="openConfirmation('reset')"
             >
@@ -1118,7 +1118,7 @@ onUnmounted(() => {
   text-decoration-color: transparent;
   text-underline-offset: 2px;
   cursor: pointer;
-  transition: color 400ms ease-out, text-decoration-color 400ms ease-out;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
 }
 .version-notes-trigger:hover {
   color: var(--color-primary-hover);
@@ -1208,7 +1208,7 @@ onUnmounted(() => {
   text-decoration: underline;
   text-decoration-color: transparent;
   text-underline-offset: 2px;
-  transition: color 400ms ease-out, text-decoration-color 400ms ease-out;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
 }
 
 .settings-meta__link:hover {
@@ -1393,6 +1393,7 @@ onUnmounted(() => {
   user-select: none;
   cursor: pointer;
   outline: none;
+  transition: color 160ms ease;
 }
 
 .theme-switcher__button:focus-visible {

@@ -102,9 +102,10 @@ const choose = (mode: WallLayoutMode) => {
   transition: color 160ms ease, background-color 160ms ease;
 }
 
+/* hover 不做底色叠加：选项浮在轨道填充色上，任何半透明底色都会与轨道合成出第三色；
+   内容强调（muted→ink 颜色交叉淡化）与筛选按钮的 hover 表达保持同一套方案。 */
 .wall-layout-switcher__option:hover:not(:disabled):not(.wall-layout-switcher__option--active) {
   color: var(--shell-ink);
-  background: rgba(15, 23, 42, 0.06);
 }
 
 .wall-layout-switcher__option--active {
@@ -119,10 +120,6 @@ const choose = (mode: WallLayoutMode) => {
 }
 
 :root[data-theme='dark'] .wall-layout-switcher--compact {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-:root[data-theme='dark'] .wall-layout-switcher__option:hover:not(:disabled):not(.wall-layout-switcher__option--active) {
   background: rgba(255, 255, 255, 0.08);
 }
 

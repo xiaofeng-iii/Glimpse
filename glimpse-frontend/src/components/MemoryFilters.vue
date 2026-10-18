@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { CalendarDaysIcon, ChevronDownIcon, FunnelIcon as FunnelOutlineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { languagePreference, t } from '@/utils/i18n'
-import { describeMemoryPeriod, describeMemoryPeriodParts } from '@/utils/memory-grouping'
+import { describeMemoryPeriod } from '@/utils/memory-grouping'
 import {
   cloneMemoryFilters,
   createEmptyMemoryFilters,
@@ -26,6 +26,7 @@ const root = ref<HTMLElement | null>(null)
 const trigger = ref<HTMLButtonElement | null>(null)
 const open = ref(false)
 const calendarOpen = ref(false)
+const rangeMode = ref(false)
 const draft = ref<MemoryFilters>(cloneMemoryFilters(props.modelValue))
 const panelId = 'memory-filter-panel'
 const calendarId = `${panelId}-calendar`
@@ -38,11 +39,13 @@ let calendarAnimation = 0
 const dateLabel = computed(() => draft.value.dateFrom || draft.value.dateTo
   ? describeMemoryPeriod(draft.value.dateFrom, draft.value.dateTo, languagePreference.value)
   : t('filter.anyTime'))
-const dateParts = computed(() => describeMemoryPeriodParts(
-  draft.value.dateFrom,
-  draft.value.dateTo,
-  languagePreference.value,
-))
+// 按钮上的日期段用紧凑数字格式单行展示；完整中文表述保留在 title 悬浮提示
+const dateRangeText = computed(() => {
+  const { dateFrom, dateTo } = draft.value
+  if (!dateFrom && !dateTo) return t('filter.anyTime')
+  if (!dateFrom || !dateTo || dateFrom === dateTo) return (dateFrom || dateTo).replace(/-/g, '.')
+  return `${dateFrom.replace(/-/g, '.')} - ${dateTo.replace(/-/g, '.')}`
+})
 
 const contentTypeOptions: Array<{ value: MemoryContentType; label: Parameters<typeof t>[0] }> = [
   { value: 'screenshot', label: 'filter.screenshotMemory' },
@@ -59,6 +62,7 @@ const close = (restoreFocus = false) => {
 const show = () => {
   draft.value = cloneMemoryFilters(props.modelValue)
   calendarOpen.value = false
+  rangeMode.value = false
   open.value = true
 }
 
@@ -75,6 +79,18 @@ const emitDraft = () => {
 const applyCalendar = (next: MemoryFilters) => {
   draft.value = next
   emitDraft()
+}
+
+const dateActive = computed(() => Boolean(draft.value.dateFrom || draft.value.dateTo))
+
+// 头部「清除」与日历选日同一条实时生效路径：清空时段、回到「不限时间」
+const clearPeriod = () => {
+  applyCalendar({
+    ...cloneMemoryFilters(draft.value),
+    datePreset: 'all',
+    dateFrom: '',
+    dateTo: '',
+  })
 }
 
 const stopCalendarObservation = () => {
@@ -237,36 +253,63 @@ onUnmounted(() => {
 
         <div class="memory-filters__body">
           <fieldset class="memory-filters__group">
-            <legend class="memory-filters__group-label">{{ t('filter.timeRange') }}</legend>
-            <button
-              type="button"
-              class="memory-filters__date-toggle"
-              :class="{ 'memory-filters__date-toggle--active': draft.dateFrom || draft.dateTo }"
-              :aria-expanded="calendarOpen"
-              :aria-controls="calendarId"
-              :title="dateLabel"
-              @click="calendarOpen = !calendarOpen"
-            >
-              <CalendarDaysIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span class="memory-filters__date-text" :title="dateLabel">
-                <template v-if="draft.dateFrom || draft.dateTo">
-                  <span class="memory-filters__date-seg">{{ dateParts.head }}</span><span v-if="dateParts.tail" class="memory-filters__date-seg memory-filters__date-seg--tail">{{ ` ${dateParts.tail}` }}</span>
-                </template>
-                <template v-else>{{ dateLabel }}</template>
+            <legend class="memory-filters__group-label memory-filters__group-label--row">
+              <span class="memory-filters__group-title">
+                <span>{{ t('filter.timeRange') }}</span>
+                <button
+                  v-if="dateActive"
+                  type="button"
+                  class="memory-filters__clear-period"
+                  :title="t('wall.clearPeriod')"
+                  :aria-label="t('wall.clearPeriod')"
+                  @click="clearPeriod"
+                >
+                  <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
               </span>
-              <ChevronDownIcon
-                class="memory-filters__date-chevron h-4 w-4 shrink-0"
-                :class="{ 'memory-filters__date-chevron--open': calendarOpen }"
-                aria-hidden="true"
-              />
-            </button>
+              <label class="memory-filters__range-mode" :title="t('wall.rangeModeHint')">
+                <input
+                  v-model="rangeMode"
+                  type="checkbox"
+                  class="memory-filters__content-type"
+                />
+                <span class="memory-filters__checkbox-indicator" aria-hidden="true"></span>
+                <span>{{ t('wall.rangeMode') }}</span>
+              </label>
+            </legend>
             <div
-              :id="calendarId"
-              ref="calendarReveal"
-              class="memory-filters__calendar-reveal"
-              :style="{ height: `${calendarHeight}px` }"
+              class="memory-filters__date-block"
+              :class="{ 'memory-filters__date-block--open': calendarOpen }"
             >
-              <MemoryCalendarPicker v-if="calendarMounted" class="memory-filters__calendar" :filters="draft" @apply="applyCalendar" />
+              <button
+                type="button"
+                class="memory-filters__date-toggle"
+                :class="{ 'memory-filters__date-toggle--active': draft.dateFrom || draft.dateTo }"
+                :aria-expanded="calendarOpen"
+                :aria-controls="calendarId"
+                :title="dateLabel"
+                @click="calendarOpen = !calendarOpen"
+              >
+                <CalendarDaysIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span
+                  class="memory-filters__date-text"
+                  :class="{ 'memory-filters__date-text--range': dateActive }"
+                  :title="dateLabel"
+                >{{ dateRangeText }}</span>
+                <ChevronDownIcon
+                  class="memory-filters__date-chevron h-4 w-4 shrink-0"
+                  :class="{ 'memory-filters__date-chevron--open': calendarOpen }"
+                  aria-hidden="true"
+                />
+              </button>
+              <div
+                :id="calendarId"
+                ref="calendarReveal"
+                class="memory-filters__calendar-reveal"
+                :style="{ height: `${calendarHeight}px` }"
+              >
+                <MemoryCalendarPicker v-if="calendarMounted" v-model:range-mode="rangeMode" class="memory-filters__calendar" :filters="draft" @apply="applyCalendar" />
+              </div>
             </div>
           </fieldset>
 
@@ -325,7 +368,7 @@ onUnmounted(() => {
   padding: 0 0.65rem;
   border: none;
   border-radius: var(--radius-md);
-  color: var(--shell-ink);
+  color: var(--shell-muted);
   background: rgba(15, 23, 42, 0.07);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -367,25 +410,18 @@ onUnmounted(() => {
   transform: translateX(0.25rem);
 }
 
+/* hover 不动底色，只做内容强调（muted→ink 交叉淡化）：与排版切换器选项同一套方案。 */
 .memory-filters__trigger:hover {
-  background: rgba(15, 23, 42, 0.12);
   color: var(--shell-ink);
 }
 
-.memory-filters--compact .memory-filters__trigger:hover {
-  background: rgba(15, 23, 42, 0.12);
-}
-
-:global(:root[data-theme='dark']) .memory-filters__trigger {
+/* 暗色规则不得用 :global(...) 写：带后代选择器时整条会被 scoped 编译器丢弃（构建产物已验证）。 */
+:root[data-theme='dark'] .memory-filters__trigger {
   background: rgba(255, 255, 255, 0.08);
 }
 
-:global(:root[data-theme='dark']) .memory-filters--compact .memory-filters__trigger {
+:root[data-theme='dark'] .memory-filters--compact .memory-filters__trigger {
   background: rgba(255, 255, 255, 0.08);
-}
-
-:global(:root[data-theme='dark']) .memory-filters__trigger:hover {
-  background: rgba(255, 255, 255, 0.14);
 }
 
 .memory-filters__trigger-icon {
@@ -426,7 +462,7 @@ onUnmounted(() => {
     0 24px 24px -12px rgba(0, 0, 0, 0.06);
 }
 
-:global(:root[data-theme='dark']) .memory-filters__panel {
+:root[data-theme='dark'] .memory-filters__panel {
   box-shadow:
     0 0 0 1px rgba(226, 232, 240, 0.09),
     0 2px 4px rgba(0, 0, 0, 0.3),
@@ -467,6 +503,7 @@ onUnmounted(() => {
   color: var(--color-text-muted);
   background: transparent;
   cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .memory-filters__close:hover {
@@ -503,9 +540,86 @@ onUnmounted(() => {
   margin: 0 0 0.25rem;
   padding: 0;
   color: var(--color-text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.25rem;
+}
+
+.memory-filters__group-label--row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.memory-filters__group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.memory-filters__range-mode {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: var(--line-height-14);
+  transition: background-color 160ms ease;
+}
+
+.memory-filters__range-mode:hover {
+  background: var(--color-surface-hover);
+}
+
+.memory-filters__range-mode:has(.memory-filters__content-type:focus-visible) {
+  background: var(--color-primary-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-focus) 26%, transparent);
+}
+
+.memory-filters__clear-period {
+  display: inline-flex;
+  width: calc(var(--line-height-14) + 0.25rem);
+  height: calc(var(--line-height-14) + 0.25rem);
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.memory-filters__clear-period:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.memory-filters__clear-period:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.memory-filters__date-block {
+  border-radius: var(--radius-lg);
+  transition: background-color 160ms ease;
+}
+
+.memory-filters__date-block--open {
+  background: var(--color-surface-subtle);
+}
+
+.memory-filters__date-block--open .memory-filters__date-toggle {
+  background: transparent;
 }
 
 .memory-filters__date-toggle {
@@ -523,6 +637,7 @@ onUnmounted(() => {
   text-align: left;
   font-size: 0.875rem;
   line-height: var(--line-height-14);
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .memory-filters__date-text {
@@ -532,12 +647,9 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
 }
 
-.memory-filters__date-seg {
+.memory-filters__date-text--range {
+  font-size: 0.75rem;
   white-space: nowrap;
-}
-
-.memory-filters__date-seg--tail {
-  display: inline-block;
 }
 
 .memory-filters__date-toggle--active {
@@ -546,6 +658,10 @@ onUnmounted(() => {
 }
 
 .memory-filters__date-toggle:hover {
+  background: rgb(224, 228, 237);
+}
+
+:root[data-theme='dark'] .memory-filters__date-toggle:hover {
   background: var(--color-surface-hover);
 }
 
@@ -569,7 +685,7 @@ onUnmounted(() => {
 }
 
 .memory-filters__calendar {
-  padding-top: 0.5rem;
+  padding: 0.5rem 0.375rem 0.375rem;
 }
 
 .memory-filters__calendar :deep(.memory-calendar__block) {
@@ -601,11 +717,11 @@ onUnmounted(() => {
   cursor: pointer;
   font-size: 0.875rem;
   line-height: var(--line-height-14);
-  transition: background-color 120ms ease;
+  transition: background-color 160ms ease;
 }
 
 .memory-filters__preset-row:hover {
-  background: var(--color-surface-subtle);
+  background: var(--color-surface-hover);
 }
 
 .memory-filters__content-type {

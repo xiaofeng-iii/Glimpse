@@ -58,7 +58,7 @@ const getIcon = (type: string) => {
         <!-- Close Button -->
         <button
           @click="notificationStore.dismiss(notification.id)"
-          class="inline-flex flex-none items-center justify-center rounded p-1 transition-colors hover:bg-gray-100"
+          class="inline-flex flex-none items-center justify-center rounded p-1 transition-colors duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
         >
           <XMarkIcon class="h-4 w-4 text-gray-400" aria-hidden="true" />
         </button>

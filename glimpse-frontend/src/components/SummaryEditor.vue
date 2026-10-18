@@ -254,7 +254,7 @@ defineExpose({
       <button
         v-if="!editing"
         type="button"
-        class="summary-editor__edit-action inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] px-3 text-sm font-normal text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
+        class="summary-editor__edit-action inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] px-3 text-sm font-normal text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
         @click="startEditing"
       >
         <PencilSquareIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
@@ -430,5 +430,13 @@ defineExpose({
   height: 1.75rem;
   min-height: 1.75rem;
   padding-inline: 0.625rem;
+}
+
+.summary-editor--compact .summary-editor__edit-action:hover {
+  background: rgb(224, 228, 237);
+}
+
+:root[data-theme='dark'] .summary-editor--compact .summary-editor__edit-action:hover {
+  background: var(--color-surface-hover);
 }
 </style>

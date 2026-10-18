@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
           </div>
           <button
             type="button"
-            class="inline-flex h-[var(--control-h-md)] w-[var(--control-h-md)] min-h-[var(--control-h-md)] flex-none items-center justify-center rounded-[var(--radius-md)] text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+            class="inline-flex h-[var(--control-h-md)] w-[var(--control-h-md)] min-h-[var(--control-h-md)] flex-none items-center justify-center rounded-[var(--radius-md)] text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
             :aria-label="cancelLabel"
             :disabled="busy"
             @click="cancel"
@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+            class="text-white transition duration-[160ms] ease-[ease] disabled:cursor-not-allowed disabled:opacity-60"
             :class="[destructive ? 'btn-danger' : 'btn-primary']"
             :disabled="busy"
             @click="emit('confirm')"

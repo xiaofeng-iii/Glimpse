@@ -122,7 +122,8 @@
 
   --shell-ink: var(--color-text);
   --shell-muted: var(--color-text-secondary);
-  --shell-line: var(--color-border);
+  /* 暗色下 1px 描边比亮色同款更跳：分隔线与控件框柔化为 60% 不透明度。 */
+  --shell-line: color-mix(in srgb, var(--color-border) 60%, transparent);
   --shell-card: var(--color-surface);
   --shell-highlight: var(--color-primary);
   --shell-highlight-strong: var(--color-primary-hover);
@@ -135,7 +136,8 @@
   --shell-frame-bg: var(--color-canvas);
   --shell-window-bg: var(--color-canvas);
   --shell-header-bg: var(--color-header);
-  --shell-card-border: var(--color-border);
+  /* 卡片/搜索浮条描边同样柔化；浮起表面（菜单、对话框）保持 --color-border 全强度兜底。 */
+  --shell-card-border: color-mix(in srgb, var(--color-border) 60%, transparent);
   --shell-card-shadow: var(--shadow-card);
   --shell-control-bg: var(--color-surface-raised);
   --shell-control-hover: var(--color-surface-hover);
@@ -401,7 +403,7 @@ button {
 .shell-navigation-button:hover {
   color: var(--color-text);
   border-color: transparent;
-  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  background: var(--color-surface-hover);
 }
 
 .shell-icon-button.desktop-shell__settings-button,
@@ -412,7 +414,7 @@ button {
 }
 
 .desktop-shell__leading .shell-icon-button:hover {
-  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  background: var(--color-surface-hover);
   border-color: transparent;
 }
 
@@ -443,13 +445,13 @@ button {
   background: transparent;
   cursor: pointer;
   transition:
-    color 120ms ease,
-    background-color 120ms ease;
+    color 160ms ease,
+    background-color 160ms ease;
 }
 
 .window-control:hover {
   color: var(--color-text);
-  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  background: var(--color-surface-hover);
 }
 
 .window-control--danger:hover {
@@ -475,15 +477,6 @@ button {
   background: var(--shell-frame-bg);
 }
 
-.shell-card {
-  background: var(--shell-window-bg);
-  border: 0;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(26px);
-  -webkit-backdrop-filter: blur(26px);
-}
-
 .glass,
 .card,
 .search-bar {
@@ -496,7 +489,7 @@ button {
 
 .card {
   border-radius: var(--radius-lg);
-  transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .card:hover {
@@ -520,7 +513,7 @@ button {
   font-size: 0.875rem;
   font-weight: 400;
   line-height: var(--line-height-14);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
   background: var(--color-primary);
   box-shadow: 0 2px 8px var(--shell-primary-shadow);
 }
@@ -596,7 +589,7 @@ button {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--color-surface-hover);
+  background: rgb(224, 228, 237);
   color: var(--color-text);
 }
 
@@ -620,7 +613,7 @@ button {
   font-size: 0.875rem;
   font-weight: 400;
   line-height: var(--line-height-14);
-  transition: background 0.18s ease, opacity 0.18s ease;
+  transition: background 160ms ease, opacity 160ms ease;
   cursor: pointer;
 }
 
@@ -693,7 +686,7 @@ kbd {
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
 .shell-icon-button:hover {
@@ -817,10 +810,6 @@ kbd {
   animation: spin 1s linear infinite;
 }
 
-:root[data-theme='dark'] .shell-card {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
 :root[data-theme='dark'] .card:hover {
   border-color: color-mix(in srgb, var(--color-primary) 32%, transparent);
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
@@ -834,14 +823,12 @@ kbd {
 
 :root[data-theme='dark'] .shell-icon-button:hover {
   background: var(--color-surface-hover);
-  border-color: var(--color-border);
   color: var(--shell-ink);
 }
 
 :root[data-theme='dark'] .btn-primary,
 :root[data-theme='dark'] .capture-button {
   color: #f4fbfb;
-  border: 1px solid rgba(226, 232, 240, 0.1);
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.22);
 }
 
@@ -871,14 +858,12 @@ kbd {
 :root[data-theme='dark'] .close-action-checkbox {
   accent-color: #69b9c0;
   background-color: rgba(10, 15, 22, 0.9);
-  border-color: rgba(170, 181, 195, 0.36);
 }
 
 :root[data-theme='dark'] input,
 :root[data-theme='dark'] select,
 :root[data-theme='dark'] textarea {
   background-color: rgba(20, 27, 37, 0.86);
-  border-color: rgba(226, 232, 240, 0.14);
   color: var(--shell-ink);
 }
 

@@ -233,7 +233,7 @@ const preventOutsideDismiss = (event: Event) => {
           </div>
           <button
             type="button"
-            class="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             :aria-label="t('action.close')"
             :disabled="busy"
             @click="requestCancel"
@@ -285,7 +285,7 @@ const preventOutsideDismiss = (event: Event) => {
                 />
                 <button
                   type="button"
-                  class="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/65 text-white opacity-0 transition focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
+                  class="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/65 text-white opacity-0 transition duration-[160ms] ease-[ease] focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
                   :disabled="busy"
                   :aria-label="t('addMemory.removeImage', { name: images[index]?.name ?? '' })"
                   @click="removeImage(index)"
@@ -295,7 +295,7 @@ const preventOutsideDismiss = (event: Event) => {
               </div>
               <button
                 type="button"
-                class="text-memory-dialog__attach flex aspect-square items-center justify-center rounded-lg border border-dashed text-[var(--shell-muted)] transition hover:text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+                class="text-memory-dialog__attach flex aspect-square items-center justify-center rounded-lg border border-dashed text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
                 :class="dragging ? 'text-memory-dialog__attach--active' : ''"
                 :aria-label="t('addMemory.attachImage')"
                 :title="t('addMemory.attachImage')"

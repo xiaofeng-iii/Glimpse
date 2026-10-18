@@ -488,6 +488,32 @@ describe('memory components', () => {
     wrapper.unmount()
   })
 
+  it('clears only the date period from the filter panel header', async () => {
+    const wrapper = mount(MemoryFilters, {
+      props: {
+        modelValue: {
+          ...createEmptyMemoryFilters(),
+          datePreset: 'custom',
+          dateFrom: '2026-08-01',
+          dateTo: '2026-08-31',
+          contentTypes: ['screenshot'],
+        },
+      },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('.memory-filters__trigger').trigger('click')
+    expect(wrapper.find('.memory-filters__clear-period').exists()).toBe(true)
+    await wrapper.get('.memory-filters__clear-period').trigger('click')
+    expect(wrapper.emitted('apply')![0]![0]).toMatchObject({
+      datePreset: 'all',
+      dateFrom: '',
+      dateTo: '',
+      contentTypes: ['screenshot'],
+    })
+    wrapper.unmount()
+  })
+
   it('applies a content type through the shared memory filter panel', async () => {
     const wrapper = mount(MemoryFilters, {
       props: { modelValue: createEmptyMemoryFilters() },
@@ -495,7 +521,7 @@ describe('memory components', () => {
     })
 
     await wrapper.get('.memory-filters__trigger').trigger('click')
-    const contentTypes = wrapper.findAll<HTMLInputElement>('.memory-filters__content-type')
+    const contentTypes = wrapper.findAll<HTMLInputElement>('.memory-filters__presets .memory-filters__content-type')
     expect(contentTypes.map((input) => input.attributes('type'))).toEqual(['checkbox', 'checkbox'])
     expect(contentTypes.map((input) => input.element.value)).toEqual(['screenshot', 'text'])
     await contentTypes[0].trigger('click')

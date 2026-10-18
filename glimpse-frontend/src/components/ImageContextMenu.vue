@@ -245,7 +245,7 @@ const runCopyAllImages = async () => {
   font-size: 0.875rem;
   line-height: var(--line-height-14);
   text-align: left;
-  transition: background-color 140ms ease, color 140ms ease;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .image-context-menu__item > svg {
@@ -260,7 +260,7 @@ const runCopyAllImages = async () => {
   outline: none;
 }
 
-:global([data-theme='dark']) .image-context-menu {
+:root[data-theme='dark'] .image-context-menu {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
 }
 

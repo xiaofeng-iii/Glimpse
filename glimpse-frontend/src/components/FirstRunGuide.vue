@@ -176,7 +176,7 @@ onBeforeUnmount(() => {
 
           <button
             type="button"
-            class="absolute right-4 top-4 rounded-md p-2 text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
+            class="absolute right-4 top-4 rounded-md p-2 text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
             :aria-label="t('onboarding.dismiss')"
             @click="finish"
           >

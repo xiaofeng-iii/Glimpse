@@ -277,7 +277,7 @@ defineExpose({ focus, clear })
             <button
               v-if="query"
               type="button"
-              class="search-toolbar__detail-control flex h-[22px] min-h-0 w-[22px] flex-none items-center justify-center text-[var(--shell-muted)] transition hover:bg-[var(--shell-control-hover)]"
+              class="search-toolbar__detail-control flex h-[22px] min-h-0 w-[22px] flex-none items-center justify-center text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
               :aria-label="t('search.clear')"
               @click="clear"
             >
@@ -335,7 +335,7 @@ defineExpose({ focus, clear })
         <div class="search-toolbar__actions flex shrink-0 items-center gap-2.5">
           <button
             type="button"
-            class="search-toolbar__control inline-flex h-8 min-h-0 w-8 items-center justify-center bg-[var(--color-surface-subtle)] text-[var(--shell-muted)] transition hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+            class="search-toolbar__control search-toolbar__refresh inline-flex h-8 min-h-0 w-8 items-center justify-center bg-[var(--color-surface-subtle)] text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[rgb(224,228,237)] disabled:opacity-50"
             :aria-label="t('action.refresh')"
             :disabled="refreshing"
             @click="emit('refresh')"
@@ -351,7 +351,7 @@ defineExpose({ focus, clear })
           @toggle="handleDebugToggle"
         >
           <summary
-            class="search-toolbar__control flex h-8 cursor-pointer list-none items-center gap-1.5 bg-amber-50/75 px-3 text-amber-800 transition hover:bg-amber-100"
+            class="search-toolbar__control flex h-8 cursor-pointer list-none items-center gap-1.5 bg-amber-50/75 px-3 text-amber-800 transition duration-[160ms] ease-[ease] hover:bg-amber-100"
             :aria-label="t('search.debugTitle')"
           >
             <AdjustmentsHorizontalIcon class="h-4 w-4 flex-none" aria-hidden="true" />
@@ -456,7 +456,7 @@ defineExpose({ focus, clear })
             <button
               data-testid="show-onboarding"
               type="button"
-              class="mt-4 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-amber-300/80 bg-amber-50 px-3 text-xs text-amber-800 transition hover:bg-amber-100"
+              class="mt-4 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-amber-300/80 bg-amber-50 px-3 text-xs text-amber-800 transition duration-[160ms] ease-[ease] hover:bg-amber-100"
               @click="handleShowOnboarding"
             >
               <QuestionMarkCircleIcon class="h-4 w-4" aria-hidden="true" />
@@ -643,6 +643,7 @@ defineExpose({ focus, clear })
 
 .search-toolbar__source-button {
   position: relative;
+  transition: color 160ms ease;
 }
 
 .search-toolbar__source-button:focus-visible {
@@ -672,6 +673,10 @@ defineExpose({ focus, clear })
   border-radius: var(--search-toolbar-detail-radius);
 }
 
+:root[data-theme='dark'] .search-toolbar__refresh:hover {
+  background: var(--color-surface-hover);
+}
+
 .search-toolbar__actions-divider {
   width: 1px;
   height: 1.25rem;
@@ -684,7 +689,7 @@ defineExpose({ focus, clear })
   z-index: var(--z-popover);
 }
 
-:global(:root[data-theme='dark']) .search-toolbar {
+:root[data-theme='dark'] .search-toolbar {
   --search-toolbar-surface-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
