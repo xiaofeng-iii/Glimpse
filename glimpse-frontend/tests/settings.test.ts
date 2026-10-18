@@ -16,6 +16,7 @@ const apiMocks = vi.hoisted(() => ({
   indexStatus: vi.fn(),
   ocrRepairStatus: vi.fn(),
   ocrRepairStart: vi.fn(),
+  testOcrCloud: vi.fn(),
 }))
 
 const mountedHosts: Array<{ unmount: () => void }> = []
@@ -51,6 +52,7 @@ vi.mock('@/api/client', async (importOriginal) => {
       get: apiMocks.getSettings,
       update: apiMocks.updateSettings,
       reset: apiMocks.resetSettings,
+      testOcrCloud: apiMocks.testOcrCloud,
     },
     indexApi: {
       ...original.indexApi,
@@ -99,6 +101,7 @@ describe('Settings', () => {
       result: null,
       error: null,
     })
+    apiMocks.testOcrCloud.mockResolvedValue({ success: true, message: 'ok' })
     apiMocks.updateSettings.mockResolvedValue({})
   })
 
@@ -148,6 +151,41 @@ describe('Settings', () => {
     expect(wrapper.text()).toContain('正在修复 2 / 4')
     const progress = wrapper.get('[role=progressbar]')
     expect(progress.attributes('aria-valuenow')).toBe('50')
+  })
+
+  it('requires upload confirmation before enabling cloud OCR and saves keys', async () => {
+    const wrapper = await mountSettings()
+    await selectSection(wrapper, 'AI 服务')
+
+    await wrapper.get('[data-testid=ocr-cloud-enable]').setValue(true)
+    await wrapper.get('[data-testid=ocr-api-key]').setValue('api-key')
+    await wrapper.get('[data-testid=ocr-secret-key]').setValue('secret-key')
+
+    await wrapper.get('[data-testid=test-ocr]').trigger('click')
+    await flushPromises()
+    expect(apiMocks.testOcrCloud).toHaveBeenCalledWith('api-key', 'secret-key')
+
+    const save = wrapper.get('[data-testid=save-ocr]')
+    expect((save.element as HTMLButtonElement).disabled).toBe(false)
+    await save.trigger('click')
+    const dialog = wrapper.findAllComponents(ConfirmDialog).find((item) => item.vm.$attrs.id === 'settings-cloud-ocr')!
+    expect(dialog.props('open')).toBe(true)
+    expect(dialog.props('description')).toContain('百度智能云')
+
+    dialog.vm.$emit('confirm')
+    await flushPromises()
+
+    expect(apiMocks.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ocr: expect.objectContaining({
+          mode: 'cloud',
+          provider: 'baidu',
+          api_key: 'api-key',
+          secret_key: 'secret-key',
+          timeout: 30,
+        }),
+      }),
+    )
   })
 
   it('keeps an unchanged save button disabled without presenting it as busy', async () => {

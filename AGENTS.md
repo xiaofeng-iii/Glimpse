@@ -93,7 +93,9 @@ OCR is enabled before AI summarization through the injected `OCREngine`.
 `services/ocr_engine.py` uses RapidOCR 3.9.2 with the bundled
 PP-OCRv5-mobile detection/recognition models and ONNX Runtime CPU. Models are
 fetched into `assets/ocr` at build time and never downloaded at runtime;
-detection boxes are merged into visual lines. OCR failures must not prevent a
+detection boxes are merged into visual lines. An optional Baidu Cloud OCR
+provider can be explicitly enabled in settings; the local engine remains the
+default and the fallback for cloud failures. OCR failures must not prevent a
 memory from being saved. Historical rows are processed only through the manual
 maintenance OCR repair; never add automatic startup backfill.
 

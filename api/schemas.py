@@ -112,9 +112,14 @@ class SettingsResponse(BaseModel):
         "model": "gpt-4o-mini",
         "timeout": 60,
     })
-    ocr: Dict[str, str] = Field(default_factory=lambda: {
+    ocr: Dict[str, Any] = Field(default_factory=lambda: {
         "engine": "rapidocr",
         "language": "ch",
+        "mode": "local",
+        "provider": "baidu",
+        "api_key": "",
+        "secret_key": "",
+        "timeout": 30,
     })
     ui: Dict[str, Any] = Field(default_factory=lambda: {
         "theme": "light",
@@ -136,7 +141,7 @@ class SettingsUpdate(BaseModel):
     hotkeys: Optional[Dict[str, str]] = None
     screenshot: Optional[Dict[str, Any]] = None
     ai: Optional[Dict[str, Any]] = None
-    ocr: Optional[Dict[str, str]] = None
+    ocr: Optional[Dict[str, Any]] = None
     ui: Optional[Dict[str, Any]] = None
     cluster: Optional[Dict[str, Any]] = None
 
@@ -150,6 +155,17 @@ class AITestRequest(BaseModel):
 
 class AITestResponse(BaseModel):
     """AI connection test response"""
+    success: bool
+    message: str
+
+
+class OCRCloudTestRequest(BaseModel):
+    """Baidu Cloud OCR connection test request."""
+    api_key: Optional[str] = None
+    secret_key: Optional[str] = None
+
+
+class OCRCloudTestResponse(BaseModel):
     success: bool
     message: str
 

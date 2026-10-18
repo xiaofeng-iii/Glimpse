@@ -5,6 +5,7 @@ import {
   CameraIcon,
   CheckCircleIcon,
   CircleStackIcon,
+  CloudIcon,
   CpuChipIcon,
   EyeIcon,
   EyeSlashIcon,
@@ -79,10 +80,13 @@ onMounted(() => {
 })
 const loading = ref(true)
 const saving = ref(false)
+const savingOcr = ref(false)
 const savedSnapshot = ref('')
 const savedAiSnapshot = ref('')
+const savedOcrSnapshot = ref('')
 const autoSaveError = ref(false)
 const aiSaveError = ref(false)
+const ocrSaveError = ref(false)
 const resetting = ref(false)
 let writeQueue: Promise<unknown> = Promise.resolve()
 let autoSavePromise: Promise<boolean> | null = null
@@ -108,6 +112,12 @@ const aiApiKey = ref('')
 const aiBaseUrl = ref('https://api.openai.com/v1')
 const aiModel = ref('gpt-4o-mini')
 const aiTimeout = ref(60)
+const ocrMode = ref<'local' | 'cloud'>('local')
+const ocrApiKey = ref('')
+const ocrSecretKey = ref('')
+const showOcrKeys = ref(false)
+const cloudDialogOpen = ref(false)
+const cloudConsentGranted = ref(false)
 const themePreference = ref<ThemePreference>('light')
 const language = ref<LanguagePreference>('zh-CN')
 const closeAction = ref<'ask' | 'minimize' | 'exit'>('ask')
@@ -192,6 +202,8 @@ const updateMirrorModeOptions = computed(() => [
 
 const testingAi = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
+const testingOcr = ref(false)
+const ocrTestResult = ref<{ success: boolean; message: string } | null>(null)
 const indexStatus = ref<IndexRepairStatus | null>(null)
 const confirmAction = ref<ConfirmAction>(null)
 const confirmBusy = ref(false)
@@ -241,10 +253,22 @@ const aiSettings = computed(() => ({
   model: aiModel.value,
   timeout: aiTimeout.value,
 }))
+const ocrSettings = computed(() => ({
+  mode: ocrMode.value,
+  provider: 'baidu' as const,
+  api_key: ocrApiKey.value,
+  secret_key: ocrSecretKey.value,
+  timeout: 30,
+}))
 const formSnapshot = computed(() => JSON.stringify(ordinarySettings.value))
 const aiSnapshot = computed(() => JSON.stringify(aiSettings.value))
+const ocrSnapshot = computed(() => JSON.stringify(ocrSettings.value))
 const dirty = computed(() => Boolean(savedSnapshot.value && formSnapshot.value !== savedSnapshot.value))
 const aiDirty = computed(() => Boolean(savedAiSnapshot.value && aiSnapshot.value !== savedAiSnapshot.value))
+const ocrDirty = computed(() => Boolean(savedOcrSnapshot.value && ocrSnapshot.value !== savedOcrSnapshot.value))
+const activeOcrMode = computed(() =>
+  settingsStore.settings?.ocr?.mode === 'cloud' ? 'cloud' : 'local',
+)
 
 const hotkeyLabels: Record<string, string> = {
   ctrl: 'Ctrl',
@@ -343,6 +367,10 @@ const populateForm = () => {
     aiBaseUrl.value = settings.ai?.base_url ?? 'https://api.openai.com/v1'
     aiModel.value = settings.ai?.model ?? 'gpt-4o-mini'
     aiTimeout.value = settings.ai?.timeout ?? 60
+    ocrMode.value = settings.ocr?.mode === 'cloud' ? 'cloud' : 'local'
+    ocrApiKey.value = settings.ocr?.api_key ?? ''
+    ocrSecretKey.value = settings.ocr?.secret_key ?? ''
+    cloudConsentGranted.value = settings.ocr?.mode === 'cloud'
     themePreference.value = normalizeThemePreference(settings.ui?.theme)
     language.value = normalizeLanguagePreference(settings.ui?.language)
     closeAction.value = settings.ui?.close_action ?? 'ask'
@@ -354,6 +382,7 @@ const populateForm = () => {
     availableUpdate.value = null
     savedSnapshot.value = formSnapshot.value
     savedAiSnapshot.value = aiSnapshot.value
+    savedOcrSnapshot.value = ocrSnapshot.value
   } finally {
     populatingSettings = false
   }
@@ -437,6 +466,75 @@ const handleSaveAi = async () => {
   }
 }
 
+const handleOcrModeChange = (event: Event) => {
+  const enabled = (event.target as HTMLInputElement).checked
+  ocrMode.value = enabled ? 'cloud' : 'local'
+  if (!enabled) cloudConsentGranted.value = false
+}
+
+const saveOcrDraft = async () => {
+  if (savingOcr.value || resetting.value || !ocrDirty.value) return
+  if (ocrMode.value === 'cloud' && (!ocrApiKey.value.trim() || !ocrSecretKey.value.trim())) {
+    ocrSaveError.value = true
+    notifications.show(t('settings.ocrCloudKeysRequired'), 'error', 2800)
+    return
+  }
+  const snapshot = ocrSnapshot.value
+  const draft = {
+    ...ocrSettings.value,
+    api_key: ocrApiKey.value.trim(),
+    secret_key: ocrSecretKey.value.trim(),
+  }
+  savingOcr.value = true
+  ocrSaveError.value = false
+  try {
+    await enqueueWrite(() => settingsStore.update({ ocr: draft }))
+    savedOcrSnapshot.value = snapshot
+    if (ocrMode.value === 'cloud') cloudConsentGranted.value = true
+    notifications.show(t('settings.saved'), 'success', 1800)
+  } catch (error) {
+    logger.error('Failed to save cloud OCR settings: %s', error)
+    ocrSaveError.value = true
+    notifications.show(t('settings.saveFailed'), 'error', 2800)
+  } finally {
+    savingOcr.value = false
+  }
+}
+
+const handleSaveOcr = async () => {
+  if (savingOcr.value || resetting.value || !ocrDirty.value) return
+  if (ocrMode.value === 'cloud' && (!ocrApiKey.value.trim() || !ocrSecretKey.value.trim())) {
+    ocrSaveError.value = true
+    notifications.show(t('settings.ocrCloudKeysRequired'), 'error', 2800)
+    return
+  }
+  if (ocrMode.value === 'cloud' && !cloudConsentGranted.value) {
+    cloudDialogOpen.value = true
+    return
+  }
+  await saveOcrDraft()
+}
+
+const confirmCloudOcr = async () => {
+  cloudConsentGranted.value = true
+  cloudDialogOpen.value = false
+  await saveOcrDraft()
+}
+
+const testOcr = async () => {
+  testingOcr.value = true
+  ocrTestResult.value = null
+  try {
+    ocrTestResult.value = await settingsStore.testOcrCloud(
+      ocrApiKey.value.trim(),
+      ocrSecretKey.value.trim(),
+    )
+  } catch {
+    ocrTestResult.value = { success: false, message: t('settings.testFailed') }
+  } finally {
+    testingOcr.value = false
+  }
+}
 // 检查更新的核心流程，手动点击与进入设置页自动检测共用。
 // notify/silent 控制反馈：手动点击要给"已是最新/失败"提示并弹窗，自动检测静默、只把卡片摆上。
 const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
@@ -551,7 +649,9 @@ const confirmationCopy = computed(() => {
   }
   return {
     title: t('settings.ocrRepair'),
-    description: t('settings.ocrRepairConfirm'),
+    description: activeOcrMode.value === 'cloud'
+      ? `${t('settings.ocrRepairConfirm')} ${t('settings.ocrRepairCloudWarning')}`
+      : t('settings.ocrRepairConfirm'),
     confirm: t('settings.startOcrRepair'),
     destructive: false,
   }
@@ -603,6 +703,12 @@ const resolveDiscard = (confirmed: boolean) => {
     aiBaseUrl.value = saved.base_url
     aiModel.value = saved.model
     aiTimeout.value = saved.timeout
+    const savedOcr = JSON.parse(savedOcrSnapshot.value) as typeof ocrSettings.value
+    ocrMode.value = savedOcr.mode === 'cloud' ? 'cloud' : 'local'
+    ocrApiKey.value = savedOcr.api_key
+    ocrSecretKey.value = savedOcr.secret_key
+    cloudConsentGranted.value = savedOcr.mode === 'cloud'
+    cloudDialogOpen.value = false
   }
   discardResolver?.(confirmed)
   discardResolver = null
@@ -612,7 +718,7 @@ const resolveDiscard = (confirmed: boolean) => {
 const canLeave = async () => {
   await writeQueue
   if (!await flushAutoSave()) return false
-  if (!aiDirty.value) return true
+  if (!aiDirty.value && !ocrDirty.value) return true
   if (pendingDiscardPromise) return pendingDiscardPromise
   discardDialogOpen.value = true
   pendingDiscardPromise = new Promise<boolean>((resolve) => {
@@ -851,8 +957,102 @@ onUnmounted(() => {
                   <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrModel') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">PP-OCRv5-mobile</dd></div>
                   <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrFramework') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">RapidOCR 3.9.2</dd></div>
                   <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrRuntime') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">ONNX Runtime CPU</dd></div>
-                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.dataPrivacy') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">{{ t('settings.localNoUpload') }}</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.dataPrivacy') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">{{ activeOcrMode === 'cloud' ? t('settings.cloudOcrActive') : t('settings.localNoUpload') }}</dd></div>
                 </dl>
+              </div>
+
+              <div class="settings-panel__card bg-[var(--color-surface-subtle)]" data-testid="ocr-cloud-card">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div class="flex items-center gap-2 text-sm font-semibold text-[var(--shell-ink)]">
+                    <CloudIcon class="h-5 w-5 flex-none text-[var(--shell-muted)]" aria-hidden="true" />
+                    {{ t('settings.cloudOcr') }}
+                  </div>
+                  <label class="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      data-testid="ocr-cloud-enable"
+                      class="h-5 w-5 accent-[var(--color-primary)]"
+                      :checked="ocrMode === 'cloud'"
+                      @change="handleOcrModeChange"
+                    />
+                    <span class="setting-label">{{ t('settings.cloudOcrEnable') }}</span>
+                  </label>
+                </div>
+                <p class="setting-help mt-2">{{ t('settings.cloudOcrHint') }}</p>
+                <div class="mt-3 grid gap-3">
+                  <label class="grid gap-1.5">
+                    <span class="setting-label">API Key</span>
+                    <div class="relative w-full max-w-[320px]">
+                      <input
+                        v-model="ocrApiKey"
+                        data-testid="ocr-api-key"
+                        class="setting-input w-full pr-12"
+                        :type="showOcrKeys ? 'text' : 'password'"
+                        autocomplete="off"
+                      />
+                      <button
+                        type="button"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
+                        :aria-label="showOcrKeys ? t('settings.hideKeys') : t('settings.showKeys')"
+                        @click="showOcrKeys = !showOcrKeys"
+                      >
+                        <EyeSlashIcon v-if="showOcrKeys" class="h-5 w-5" aria-hidden="true" />
+                        <EyeIcon v-else class="h-5 w-5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </label>
+                  <label class="grid gap-1.5">
+                    <span class="setting-label">Secret Key</span>
+                    <div class="relative w-full max-w-[320px]">
+                      <input
+                        v-model="ocrSecretKey"
+                        data-testid="ocr-secret-key"
+                        class="setting-input w-full pr-12"
+                        :type="showOcrKeys ? 'text' : 'password'"
+                        autocomplete="off"
+                      />
+                      <button
+                        type="button"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
+                        :aria-label="showOcrKeys ? t('settings.hideKeys') : t('settings.showKeys')"
+                        @click="showOcrKeys = !showOcrKeys"
+                      >
+                        <EyeSlashIcon v-if="showOcrKeys" class="h-5 w-5" aria-hidden="true" />
+                        <EyeIcon v-else class="h-5 w-5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </label>
+                </div>
+                <div class="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    data-testid="test-ocr"
+                    :disabled="testingOcr"
+                    @click="testOcr"
+                  >
+                    {{ testingOcr ? t('settings.testing') : t('settings.test') }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-primary"
+                    data-testid="save-ocr"
+                    :disabled="savingOcr || !ocrDirty || resetting"
+                    :aria-busy="savingOcr"
+                    @click="handleSaveOcr"
+                  >
+                    {{ savingOcr ? t('settings.saving') : t('action.save') }}
+                  </button>
+                  <span v-if="ocrSaveError" role="alert" class="text-sm text-red-600">{{ t('settings.saveFailed') }}</span>
+                  <p
+                    v-if="ocrTestResult"
+                    class="flex items-center gap-2 text-sm"
+                    :class="ocrTestResult.success ? 'text-emerald-600' : 'text-red-600'"
+                  >
+                    <CheckCircleIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+                    {{ ocrTestResult.message }}
+                  </p>
+                </div>
               </div>
             </template>
 
@@ -1103,6 +1303,17 @@ onUnmounted(() => {
       :busy="confirmBusy"
       @confirm="runConfirmedAction"
       @cancel="confirmAction = null"
+    />
+    <ConfirmDialog
+      id="settings-cloud-ocr"
+      :open="cloudDialogOpen"
+      :title="t('settings.cloudOcrConfirmTitle')"
+      :description="t('settings.cloudOcrConfirm')"
+      :confirm-label="t('settings.cloudOcrConfirmAction')"
+      :cancel-label="t('action.cancel')"
+      :busy="savingOcr"
+      @confirm="confirmCloudOcr"
+      @cancel="cloudDialogOpen = false"
     />
     <ConfirmDialog
       id="settings-discard"

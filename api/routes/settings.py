@@ -5,7 +5,14 @@ from fastapi import APIRouter, HTTPException
 import asyncio
 import copy
 
-from api.schemas import SettingsResponse, SettingsUpdate, AITestRequest, AITestResponse
+from api.schemas import (
+    SettingsResponse,
+    SettingsUpdate,
+    AITestRequest,
+    AITestResponse,
+    OCRCloudTestRequest,
+    OCRCloudTestResponse,
+)
 from api.dependencies import (
     get_settings_manager,
     get_ai_client,
@@ -16,6 +23,7 @@ from api.dependencies import (
 from api.hotkeys import reload_global_hotkeys
 from services.bootstrap import configure_ai_client, resolve_ai_configuration
 from services.ai_client import AIClient
+from services.cloud_ocr import BaiduOCREngine
 
 from api.task_ids import (
     INDEX_REPAIR_TASK_ID,
@@ -120,6 +128,11 @@ def get_default_settings() -> dict:
         "ocr": {
             "engine": "rapidocr",
             "language": "ch",
+            "mode": "local",
+            "provider": "baidu",
+            "api_key": "",
+            "secret_key": "",
+            "timeout": 30,
         },
         "ui": {
             "theme": "light",
@@ -281,6 +294,36 @@ async def test_ai_connection(request: AITestRequest = None):
                 )
             return AITestResponse(success=False, message=f"Current AI configuration failed: {message}")
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ocr/cloud/test", response_model=OCRCloudTestResponse)
+async def test_cloud_ocr(request: OCRCloudTestRequest = None):
+    """Validate Baidu OCR credentials without uploading a user image."""
+    try:
+        settings_manager = get_settings_manager()
+        effective = get_effective_settings(settings_manager).get("ocr", {})
+        api_key = (
+            request.api_key if request and request.api_key else effective.get("api_key", "")
+        )
+        secret_key = (
+            request.secret_key if request and request.secret_key else effective.get("secret_key", "")
+        )
+        api_key = str(api_key or "").strip()
+        secret_key = str(secret_key or "").strip()
+        if not api_key or not secret_key:
+            return OCRCloudTestResponse(
+                success=False,
+                message="请先填写 API Key 和 Secret Key",
+            )
+        try:
+            timeout = max(1, int(effective.get("timeout") or 30))
+        except (TypeError, ValueError):
+            timeout = 30
+        engine = BaiduOCREngine(api_key, secret_key, timeout)
+        success, message = await asyncio.to_thread(engine.test_connection)
+        return OCRCloudTestResponse(success=success, message=message)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

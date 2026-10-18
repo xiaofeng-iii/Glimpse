@@ -164,8 +164,11 @@ class DIContainer:
         from services.keyboard_manager import keyboard_manager
         self.register_singleton("keyboard_manager", keyboard_manager)
 
-        from services.ocr_engine import ocr_engine
-        self.register_singleton("ocr_engine", ocr_engine)
+        from services.ocr_router import ConfiguredOCREngine
+        self.register_singleton_factory(
+            "ocr_engine",
+            lambda: ConfiguredOCREngine(self.get("settings_manager")),
+        )
 
         from services.embedding_client import EmbeddingClient
         self.register_singleton_factory("embedding_client", lambda: EmbeddingClient())

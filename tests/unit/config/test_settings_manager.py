@@ -188,6 +188,60 @@ class TestSettingsManagerUpdate:
         # Invalid partial update rejected, original preserved
         assert sm.get("hotkeys.screenshot") == original
 
+    def test_cloud_ocr_defaults_are_local(self, mock_path_manager):
+        from config.settings_manager import SettingsManager
+
+        sm = SettingsManager(mock_path_manager)
+        assert sm.get("ocr.mode") == "local"
+        assert sm.get("ocr.provider") == "baidu"
+        assert sm.get("ocr.api_key") == ""
+        assert sm.get("ocr.secret_key") == ""
+        assert sm.get("ocr.timeout") == 30
+
+    def test_cloud_ocr_requires_credentials(self, mock_path_manager):
+        from config.settings_manager import SettingsManager
+
+        sm = SettingsManager(mock_path_manager)
+        ocr = sm.get("ocr")
+
+        assert sm.update({"ocr": {**ocr, "mode": "cloud"}}) is False
+        assert sm.get("ocr.mode") == "local"
+
+    def test_cloud_ocr_accepts_credentials(self, mock_path_manager):
+        from config.settings_manager import SettingsManager
+
+        sm = SettingsManager(mock_path_manager)
+        ocr = sm.get("ocr")
+
+        assert sm.update({
+            "ocr": {
+                **ocr,
+                "mode": "cloud",
+                "api_key": "api-key",
+                "secret_key": "secret-key",
+            }
+        }) is True
+        assert sm.get("ocr.mode") == "cloud"
+        assert sm.get("ocr.api_key") == "api-key"
+        assert sm.get("ocr.secret_key") == "secret-key"
+
+    @pytest.mark.parametrize(
+        "override",
+        [
+            {"mode": "remote"},
+            {"provider": "tencent"},
+            {"timeout": 0},
+            {"api_key": 123},
+        ],
+    )
+    def test_invalid_cloud_ocr_config_is_rejected(self, mock_path_manager, override):
+        from config.settings_manager import SettingsManager
+
+        sm = SettingsManager(mock_path_manager)
+        ocr = sm.get("ocr")
+
+        assert sm.update({"ocr": {**ocr, **override}}) is False
+
     @pytest.mark.parametrize(
         "ai_settings",
         [

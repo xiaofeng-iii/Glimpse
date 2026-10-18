@@ -66,11 +66,21 @@ export interface Memory {
   search_debug?: SearchDebugInfo | null
 }
 
+export interface OcrSettings {
+  engine?: string
+  language?: string
+  mode?: 'local' | 'cloud'
+  provider?: 'baidu'
+  api_key?: string
+  secret_key?: string
+  timeout?: number
+}
+
 export interface Settings {
   hotkeys: Record<string, string>
   screenshot: Record<string, any>
   ai: Record<string, any>
-  ocr: Record<string, string>
+  ocr: OcrSettings
   ui: Record<string, any> & {
     update_channel?: 'stable' | 'preview'
     update_mirror_mode?: 'auto' | 'direct' | 'mirror'
@@ -265,6 +275,14 @@ export const settingsApi = {
 
   testAi: async (apiKey?: string, baseUrl?: string, model?: string): Promise<{ success: boolean, message: string }> => {
     const response = await api.post('/settings/ai/test', { api_key: apiKey, base_url: baseUrl, model })
+    return response.data
+  },
+
+  testOcrCloud: async (apiKey?: string, secretKey?: string): Promise<{ success: boolean, message: string }> => {
+    const response = await api.post('/settings/ocr/cloud/test', {
+      api_key: apiKey,
+      secret_key: secretKey,
+    })
     return response.data
   },
 }
