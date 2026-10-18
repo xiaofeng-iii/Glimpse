@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowReactive, watch } from 'vue'
 import { ChevronLeftIcon, ChevronRightIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
 import { languagePreference, t } from '@/utils/i18n'
 import { cloneMemoryFilters, toDateInputValue, type MemoryFilters } from '@/utils/memory-filters'
@@ -86,10 +86,72 @@ const chooseWholeMonth = () => {
   )
 }
 
+// 条带滑动小机芯，日历翻月与月份速选翻年共用：新旧两格并排成条带，整体平移
+// 一个视口宽，结束后落回单格渲染；连翻中断时先立即落地当前格再开始下一段。
+// 不依赖 Vue Transition 的离场元素回收，条带内容完全由这里的状态决定
+const createStripSlider = <T,>() => {
+  const state = shallowReactive({ panes: null as T[] | null, offset: 0, animated: false })
+  let fallbackTimer: number | null = null
+  let rafIds: number[] = []
+
+  const commit = () => {
+    if (fallbackTimer !== null) {
+      window.clearTimeout(fallbackTimer)
+      fallbackTimer = null
+    }
+    rafIds.forEach((id) => cancelAnimationFrame(id))
+    rafIds = []
+    state.panes = null
+    state.offset = 0
+    state.animated = false
+  }
+
+  const slide = (delta: number, previous: T, current: T) => {
+    commit()
+    state.panes = delta > 0 ? [previous, current] : [current, previous]
+    state.animated = false
+    state.offset = delta > 0 ? 0 : -100
+    rafIds.push(requestAnimationFrame(() => {
+      rafIds.push(requestAnimationFrame(() => {
+        rafIds = []
+        state.animated = true
+        state.offset = delta > 0 ? -100 : 0
+        // transitionend 在正常路径下先行落地；被中断或 reduced-motion 时由兜底计时收口
+        fallbackTimer = window.setTimeout(commit, 320)
+      }))
+    }))
+  }
+
+  const onTransitionEnd = (event: TransitionEvent) => {
+    if (event.propertyName === 'transform') commit()
+  }
+
+  return {
+    state,
+    get sliding() { return state.panes !== null },
+    commit,
+    slide,
+    onTransitionEnd,
+  }
+}
+
+type CalendarPane = { key: string; cells: WallCalendarCell[] }
+const monthSlider = createStripSlider<CalendarPane>()
+const yearSlider = createStripSlider<{ year: number }>()
+
+const currentPane = computed<CalendarPane>(() => ({
+  key: `${viewYear.value}-${viewMonth.value}`,
+  cells: grid.value.flat(),
+}))
+const renderedPanes = computed(() => monthSlider.state.panes ?? [currentPane.value])
+const renderedYearPanes = computed(() => yearSlider.state.panes ?? [{ year: pickerYear.value }])
+
 const shiftMonth = (delta: number) => {
+  const previous = currentPane.value
   const next = new Date(viewYear.value, viewMonth.value + delta, 1)
   viewYear.value = next.getFullYear()
   viewMonth.value = next.getMonth()
+  monthSlider.slide(delta, previous, currentPane.value)
 }
 
 // 「月份速选」面板：只负责跨年快速跳转视图，不改动已选时段；
@@ -98,20 +160,32 @@ const monthPickerOpen = ref(false)
 const pickerYear = ref(anchor.getFullYear())
 
 const toggleMonthPicker = () => {
+  yearSlider.commit()
   monthPickerOpen.value = !monthPickerOpen.value
   if (monthPickerOpen.value) pickerYear.value = viewYear.value
 }
 
 const shiftPickerYear = (delta: number) => {
   if (delta > 0 && pickerYear.value >= currentNow.value.getFullYear()) return
+  const previous = pickerYear.value
   pickerYear.value += delta
+  yearSlider.slide(delta, { year: previous }, { year: pickerYear.value })
 }
 
 const jumpToMonth = (month: number) => {
+  monthSlider.commit()
+  yearSlider.commit()
   viewYear.value = pickerYear.value
   viewMonth.value = month
   monthPickerOpen.value = false
 }
+
+// 某年某月是否超出当前月（速选格里禁用）；按格所属年份判定，滑动中的旧年格同样正确
+const isFutureMonth = (year: number, month: number) =>
+  year === currentNow.value.getFullYear() && month > currentNow.value.getMonth()
+
+const isCurrentMonth = (year: number, month: number) =>
+  year === currentNow.value.getFullYear() && month === currentNow.value.getMonth()
 
 const yearLabel = computed(() =>
   new Date(pickerYear.value, 0, 1).toLocaleDateString(languagePreference.value, { year: 'numeric' }),
@@ -124,19 +198,21 @@ const monthPickerLabels = computed(() => {
   )
 })
 
-// 滚轮在日历块上翻月；短冷却吸收触控板的连续滚动
+// 滚轮在日历块上翻月、速选面板打开时翻年；短冷却吸收触控板的连续滚动
 let lastWheelAt = 0
 const handleWheel = (event: WheelEvent) => {
-  if (monthPickerOpen.value) return
-  if (event.deltaY > 8) {
-    if (!atCurrentMonth.value && performance.now() - lastWheelAt >= 140) {
-      lastWheelAt = performance.now()
-      shiftMonth(1)
-    }
-  } else if (event.deltaY < -8 && performance.now() - lastWheelAt >= 140) {
+  const delta = event.deltaY > 8 ? 1 : event.deltaY < -8 ? -1 : 0
+  if (delta === 0 || performance.now() - lastWheelAt < 140) return
+  // 向未来翻到当月/本年即边界，挡下且不占用冷却
+  if (monthPickerOpen.value) {
+    if (delta > 0 && pickerYear.value >= currentNow.value.getFullYear()) return
     lastWheelAt = performance.now()
-    shiftMonth(-1)
+    shiftPickerYear(delta)
+    return
   }
+  if (delta > 0 && atCurrentMonth.value) return
+  lastWheelAt = performance.now()
+  shiftMonth(delta)
 }
 
 const onCellPointerDown = (cell: WallCalendarCell) => {
@@ -186,7 +262,11 @@ watch(() => [props.filters.dateFrom, props.filters.dateTo], ([from, to]) => {
 })
 
 onMounted(() => window.addEventListener('pointerup', handleWindowPointerUp))
-onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp))
+onUnmounted(() => {
+  window.removeEventListener('pointerup', handleWindowPointerUp)
+  monthSlider.commit()
+  yearSlider.commit()
+})
 </script>
 
 <template>
@@ -258,19 +338,35 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
             <ChevronRightIcon class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
-        <div class="memory-calendar__month-grid">
-          <button
-            v-for="(label, month) in monthPickerLabels"
-            :key="month"
-            type="button"
-            class="memory-calendar__month-cell"
-            :class="{ 'memory-calendar__month-cell--current': pickerYear === currentNow.getFullYear() && month === currentNow.getMonth() }"
-            :data-month="month"
-            :disabled="pickerYear === currentNow.getFullYear() && month > currentNow.getMonth()"
-            @click="jumpToMonth(month)"
+        <div
+          class="memory-calendar__viewport"
+          :class="{ 'memory-calendar__viewport--sliding': yearSlider.sliding }"
+        >
+          <div
+            class="memory-calendar__strip"
+            :class="{ 'memory-calendar__strip--animated': yearSlider.state.animated }"
+            :style="{ transform: `translateX(${yearSlider.state.offset}%)` }"
+            @transitionend="yearSlider.onTransitionEnd"
           >
-            {{ label }}
-          </button>
+            <div
+              v-for="pane in renderedYearPanes"
+              :key="pane.year"
+              class="memory-calendar__month-grid"
+            >
+              <button
+                v-for="(label, month) in monthPickerLabels"
+                :key="month"
+                type="button"
+                class="memory-calendar__month-cell"
+                :class="{ 'memory-calendar__month-cell--current': isCurrentMonth(pane.year, month) }"
+                :data-month="month"
+                :disabled="isFutureMonth(pane.year, month)"
+                @click="jumpToMonth(month)"
+              >
+                {{ label }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -281,26 +377,44 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
           class="memory-calendar__weekday"
           aria-hidden="true"
         >{{ label }}</span>
-        <button
-          v-for="cell in grid.flat()"
-          :key="cell.dateStr"
-          type="button"
-          class="memory-calendar__day"
-          :class="{
-            'memory-calendar__day--outside': !cell.inMonth,
-            'memory-calendar__day--in-range': cell.inRange && !cell.isEndpoint,
-            'memory-calendar__day--endpoint': cell.isEndpoint,
-            'memory-calendar__day--today': cell.isToday && !cell.isEndpoint,
-          }"
-          :data-date="cell.dateStr"
-          :aria-label="cell.label"
-          :disabled="cell.disabled"
-          @pointerdown="onCellPointerDown(cell)"
-          @pointerenter="onCellPointerEnter(cell)"
-          @click="onCellClick($event, cell)"
+        <div
+          class="memory-calendar__viewport"
+          :class="{ 'memory-calendar__viewport--sliding': monthSlider.sliding }"
         >
-          {{ cell.date.getDate() }}
-        </button>
+          <div
+            class="memory-calendar__strip"
+            :class="{ 'memory-calendar__strip--animated': monthSlider.state.animated }"
+            :style="{ transform: `translateX(${monthSlider.state.offset}%)` }"
+            @transitionend="monthSlider.onTransitionEnd"
+          >
+            <div
+              v-for="pane in renderedPanes"
+              :key="pane.key"
+              class="memory-calendar__days"
+            >
+              <button
+                v-for="cell in pane.cells"
+                :key="cell.dateStr"
+                type="button"
+                class="memory-calendar__day"
+                :class="{
+                  'memory-calendar__day--outside': !cell.inMonth,
+                  'memory-calendar__day--in-range': cell.inRange && !cell.isEndpoint,
+                  'memory-calendar__day--endpoint': cell.isEndpoint,
+                  'memory-calendar__day--today': cell.isToday && !cell.isEndpoint,
+                }"
+                :data-date="cell.dateStr"
+                :aria-label="cell.label"
+                :disabled="cell.disabled"
+                @pointerdown="onCellPointerDown(cell)"
+                @pointerenter="onCellPointerEnter(cell)"
+                @click="onCellClick($event, cell)"
+              >
+                {{ cell.date.getDate() }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -374,6 +488,8 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
 
 .memory-calendar__month-grid {
   display: grid;
+  flex: 0 0 100%;
+  width: 100%;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 2px;
 }
@@ -471,6 +587,39 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   -webkit-user-select: none;
 }
 
+.memory-calendar__viewport {
+  grid-column: 1 / -1;
+}
+
+/* 滑动只在翻月的 200ms 内存在：条带横向溢出由视口裁切、日格暂停响应指针；
+   平时单月渲染不裁切，日格的焦点描边完整可见 */
+.memory-calendar__viewport--sliding {
+  overflow: hidden;
+}
+
+.memory-calendar__viewport--sliding .memory-calendar__day,
+.memory-calendar__viewport--sliding .memory-calendar__month-cell {
+  pointer-events: none;
+}
+
+.memory-calendar__strip {
+  display: flex;
+  width: 100%;
+}
+
+.memory-calendar__strip--animated {
+  /* 与筛选面板 reveal 的高度过渡同一条缓动曲线 */
+  transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.memory-calendar__days {
+  display: grid;
+  flex: 0 0 100%;
+  width: 100%;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
 .memory-calendar__weekday {
   padding: 0.25rem 0;
   color: var(--color-text-muted);
@@ -540,5 +689,11 @@ onUnmounted(() => window.removeEventListener('pointerup', handleWindowPointerUp)
   margin-left: -2px;
   border-radius: 50%;
   background: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .memory-calendar__strip--animated {
+    transition: none;
+  }
 }
 </style>

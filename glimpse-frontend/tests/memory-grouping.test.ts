@@ -165,6 +165,13 @@ describe('memory wall layout & grouping', () => {
     const cell = (wrapper: ReturnType<typeof mountCalendar>, date: string) =>
       wrapper.find(`[data-date="${date}"]`)
 
+    // jsdom 不触发真实过渡：手动派发 transitionend 让条带滑动落地（等同浏览器过渡结束）
+    const commitStripSlide = (wrapper: ReturnType<typeof mountCalendar>) => {
+      wrapper.get('.memory-calendar__strip').element.dispatchEvent(
+        Object.assign(new Event('transitionend'), { propertyName: 'transform' }),
+      )
+    }
+
     const pointerPick = async (
       wrapper: ReturnType<typeof mountCalendar>,
       date: string,
@@ -250,6 +257,31 @@ describe('memory wall layout & grouping', () => {
       expect(wrapper.find('.memory-calendar__month').text()).toBe('2026年9月')
     })
 
+    it('翻月滑动：新旧月并排成条带，过渡结束后落回单月', async () => {
+      const wrapper = mountCalendar(createEmptyMemoryFilters())
+      expect(wrapper.findAll('.memory-calendar__days')).toHaveLength(1)
+
+      await wrapper.find('.memory-calendar__block').trigger('wheel', { deltaY: -120 })
+      // 向过去翻：新月（9 月）在左、旧月（10 月）在右，条带从 -100% 滑到 0%
+      const panes = wrapper.findAll('.memory-calendar__days')
+      expect(panes).toHaveLength(2)
+      expect(panes[0]!.find('.memory-calendar__day').attributes('data-date')).toBe('2026-08-31')
+      expect(panes[1]!.find('.memory-calendar__day').attributes('data-date')).toBe('2026-09-28')
+
+      // 双 rAF 后条带获得过渡并向目标位平移
+      await new Promise((resolve) => window.setTimeout(resolve, 60))
+      const strip = wrapper.get('.memory-calendar__strip')
+      expect(strip.attributes('style')).toContain('translateX(0%)')
+
+      strip.element.dispatchEvent(
+        Object.assign(new Event('transitionend'), { propertyName: 'transform' }),
+      )
+      await flushPromises()
+      expect(wrapper.findAll('.memory-calendar__days')).toHaveLength(1)
+      expect(wrapper.get('.memory-calendar__days .memory-calendar__day').attributes('data-date')).toBe('2026-08-31')
+      expect(wrapper.get('.memory-calendar__month').text()).toBe('2026年9月')
+    })
+
     it('月份标题 = 浏览整月', async () => {
       const wrapper = mountCalendar(createEmptyMemoryFilters())
       await wrapper.find('.memory-calendar__month').trigger('click')
@@ -274,6 +306,8 @@ describe('memory wall layout & grouping', () => {
       expect(wrapper.get('.memory-calendar__year').text()).toContain('2026')
       await wrapper.get('.memory-calendar__year-prev').trigger('click')
       expect(wrapper.get('.memory-calendar__year').text()).toContain('2025')
+      commitStripSlide(wrapper)
+      await flushPromises()
       await wrapper.get('[data-month="2"]').trigger('click')
       expect(wrapper.emitted('apply')).toBeUndefined()
       expect(wrapper.find('.memory-calendar__months').exists()).toBe(false)
@@ -286,6 +320,8 @@ describe('memory wall layout & grouping', () => {
       await cell(wrapper, '2026-10-02').trigger('pointerdown')
       await wrapper.get('.memory-calendar__pick-btn').trigger('click')
       await wrapper.get('.memory-calendar__year-prev').trigger('click')
+      commitStripSlide(wrapper)
+      await flushPromises()
       await wrapper.get('[data-month="8"]').trigger('click')
       await cell(wrapper, '2025-09-15').trigger('pointerdown')
       expect(wrapper.emitted('apply')![0]![0]).toMatchObject({
@@ -302,6 +338,37 @@ describe('memory wall layout & grouping', () => {
       expect(wrapper.get('.memory-calendar__year-next').attributes('disabled')).toBeDefined()
       await wrapper.get('.memory-calendar__year-next').trigger('click')
       expect(wrapper.get('.memory-calendar__year').text()).toContain('2026')
+    })
+
+    it('速选面板滚轮翻年：向上回退、本年向下挡下', async () => {
+      const wrapper = mountCalendar(createEmptyMemoryFilters())
+      await wrapper.get('.memory-calendar__pick-btn').trigger('click')
+      // 当年向下（向未来）翻不动，也不产生滑动
+      await wrapper.find('.memory-calendar__block').trigger('wheel', { deltaY: 120 })
+      expect(wrapper.get('.memory-calendar__year').text()).toContain('2026')
+      expect(wrapper.findAll('.memory-calendar__month-grid')).toHaveLength(1)
+      // 向上翻回 2025，进入双格滑动
+      await wrapper.find('.memory-calendar__block').trigger('wheel', { deltaY: -120 })
+      expect(wrapper.get('.memory-calendar__year').text()).toContain('2025')
+      expect(wrapper.findAll('.memory-calendar__month-grid')).toHaveLength(2)
+    })
+
+    it('速选翻年滑动：新旧年份并排成条带，结束后落回单年', async () => {
+      const wrapper = mountCalendar(createEmptyMemoryFilters())
+      await wrapper.get('.memory-calendar__pick-btn').trigger('click')
+      expect(wrapper.findAll('.memory-calendar__month-grid')).toHaveLength(1)
+
+      await wrapper.get('.memory-calendar__year-prev').trigger('click')
+      // 向过去翻：新年份（2025，11 月可选）在左、旧年份（2026，11 月禁用）在右
+      const panes = wrapper.findAll('.memory-calendar__month-grid')
+      expect(panes).toHaveLength(2)
+      expect(panes[0]!.find('[data-month="11"]').attributes('disabled')).toBeUndefined()
+      expect(panes[1]!.find('[data-month="11"]').attributes('disabled')).toBeDefined()
+
+      commitStripSlide(wrapper)
+      await flushPromises()
+      expect(wrapper.findAll('.memory-calendar__month-grid')).toHaveLength(1)
+      expect(wrapper.get('.memory-calendar__year').text()).toContain('2025')
     })
   })
 })
