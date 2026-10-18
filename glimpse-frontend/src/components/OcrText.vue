@@ -104,7 +104,16 @@ onBeforeUnmount(() => {
     <div class="ocr-text__header mb-2.5 flex items-center justify-between gap-3">
       <h3 class="text-sm font-semibold text-[var(--shell-ink)]">{{ t('memory.text') }}</h3>
       <div v-if="text || memoryId" class="relative flex items-center">
-        <div class="inline-flex h-7 items-center overflow-hidden rounded-md">
+        <span
+          v-if="reocring"
+          class="inline-flex h-7 items-center gap-1.5 text-sm text-[var(--color-primary)]"
+          role="status"
+          aria-live="polite"
+        >
+          <ArrowPathIcon class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
+          {{ t('action.reRecognizing') }}
+        </span>
+        <div v-else class="inline-flex h-7 items-center overflow-hidden rounded-md">
           <button
             v-if="text"
             type="button"
