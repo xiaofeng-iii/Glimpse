@@ -14,7 +14,8 @@ const apiMocks = vi.hoisted(() => ({
   updateSettings: vi.fn(),
   resetSettings: vi.fn(),
   indexStatus: vi.fn(),
-  ocrStatus: vi.fn(),
+  ocrRepairStatus: vi.fn(),
+  ocrRepairStart: vi.fn(),
 }))
 
 const mountedHosts: Array<{ unmount: () => void }> = []
@@ -57,7 +58,8 @@ vi.mock('@/api/client', async (importOriginal) => {
     },
     ocrApi: {
       ...original.ocrApi,
-      status: apiMocks.ocrStatus,
+      repairStatus: apiMocks.ocrRepairStatus,
+      repair: apiMocks.ocrRepairStart,
     },
   }
 })
@@ -90,8 +92,8 @@ describe('Settings', () => {
       result: null,
       error: null,
     })
-    apiMocks.ocrStatus.mockResolvedValue({
-      task_id: 'ocr_backfill',
+    apiMocks.ocrRepairStatus.mockResolvedValue({
+      task_id: 'ocr_repair',
       status: 'idle',
       running: false,
       result: null,
@@ -108,10 +110,44 @@ describe('Settings', () => {
     await aiButton!.trigger('click')
 
     expect(wrapper.text()).toContain('BAAI/bge-small-zh-v1.5')
-    expect(wrapper.text()).toContain('PP-OCRv6-small')
+    expect(wrapper.text()).toContain('PP-OCRv5-mobile')
     expect(wrapper.text()).toContain('RapidOCR 3.9.2')
     expect(wrapper.text()).toContain('ONNX Runtime CPU')
     expect(wrapper.find('input[value="BAAI/bge-small-zh-v1.5"]').exists()).toBe(false)
+  })
+
+  it('warns before a full OCR repair and shows live progress', async () => {
+    const wrapper = await mountSettings()
+    await selectSection(wrapper, '维护')
+    apiMocks.ocrRepairStart.mockResolvedValue({
+      task_id: 'ocr_repair',
+      status: 'running',
+      running: true,
+      result: {
+        status: 'running',
+        mode: 'repair',
+        total: 4,
+        processed: 2,
+        updated: 1,
+        succeeded: 1,
+        skipped: 0,
+        failed: 0,
+        index_failed: 0,
+      },
+      error: null,
+    })
+
+    const button = wrapper.findAll('button').find((node) => node.text() === 'OCR修复')!
+    await button.trigger('click')
+    const dialog = wrapper.findAllComponents(ConfirmDialog).find((item) => item.vm.$attrs.id === 'settings-confirm')!
+    expect(dialog.props('description')).toContain('耗电增加和发热')
+    dialog.vm.$emit('confirm')
+    await flushPromises()
+
+    expect(apiMocks.ocrRepairStart).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('正在修复 2 / 4')
+    const progress = wrapper.get('[role=progressbar]')
+    expect(progress.attributes('aria-valuenow')).toBe('50')
   })
 
   it('keeps an unchanged save button disabled without presenting it as busy', async () => {

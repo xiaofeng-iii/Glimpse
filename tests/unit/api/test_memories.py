@@ -49,6 +49,51 @@ def test_patch_memory_returns_canonical_record_without_duplicate_broadcast():
     )
 
 
+def test_reocr_memory_returns_updated_record():
+    from api.routes.memories import reocr_memory
+
+    memory_service = MagicMock()
+    run_in_threadpool = AsyncMock(return_value=make_memory(status="PENDING"))
+    with (
+        patch("api.routes.memories.get_memory_service", return_value=memory_service),
+        patch("api.routes.memories.run_in_threadpool", run_in_threadpool),
+    ):
+        response = asyncio.run(reocr_memory("memory-1"))
+
+    assert response.text_content == "recognized"
+    assert response.sync_status == "PENDING"
+    run_in_threadpool.assert_awaited_once_with(memory_service.reocr_memory, "memory-1")
+
+
+def test_reocr_memory_missing_returns_404():
+    from api.routes.memories import reocr_memory
+
+    with (
+        patch("api.routes.memories.get_memory_service", return_value=MagicMock()),
+        patch("api.routes.memories.run_in_threadpool", AsyncMock(return_value=None)),
+    ):
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(reocr_memory("missing"))
+
+    assert error.value.status_code == 404
+
+
+def test_reocr_memory_conflicts_with_running_maintenance():
+    from api.routes.memories import reocr_memory
+
+    with (
+        patch("api.routes.memories.get_memory_service", return_value=MagicMock()),
+        patch(
+            "api.routes.memories.run_in_threadpool",
+            AsyncMock(side_effect=RuntimeError("OCR maintenance is running")),
+        ),
+    ):
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(reocr_memory("memory-1"))
+
+    assert error.value.status_code == 409
+
+
 def test_create_text_memory_returns_indexed_text_record_and_broadcasts():
     from api.routes.memories import create_text_memory
 

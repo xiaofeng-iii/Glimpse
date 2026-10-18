@@ -64,6 +64,10 @@ const copySummary = async () => {
   }
 }
 
+const handleOcrUpdated = (updated: Memory) => {
+  memoriesStore.upsert(updated)
+}
+
 const confirmDelete = async () => {
   deleting.value = true
   try {
@@ -140,7 +144,13 @@ defineExpose({ canLeave })
         </button>
       </div>
 
-      <OcrText v-if="!textMemory && !analyzing && !analysisUnavailable" :text="memory.text_content" compact />
+      <OcrText
+        v-if="!textMemory && !analyzing"
+        :text="memory.text_content"
+        :memory-id="memory.id"
+        compact
+        @updated="handleOcrUpdated"
+      />
 
       <button
         v-if="!analyzing"

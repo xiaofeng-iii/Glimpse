@@ -30,6 +30,7 @@ import {
 import { popupDesktopWindowMenu } from '@/platform/window-menu'
 import { useBackendStatusStore } from '@/stores/backendStatus'
 import { useNotificationStore } from '@/stores/notification'
+import { useOcrRepairStore } from '@/stores/ocrRepair'
 import { useSettingsStore } from '@/stores/settings'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
 import { useUpdatesStore } from '@/stores/updates'
@@ -44,6 +45,7 @@ const route = useRoute()
 const router = useRouter()
 const backendStatus = useBackendStatusStore()
 const notificationStore = useNotificationStore()
+const ocrRepair = useOcrRepairStore()
 const settingsStore = useSettingsStore()
 const unsavedChanges = useUnsavedChangesStore()
 const updatesStore = useUpdatesStore()
@@ -57,6 +59,17 @@ const serviceLabel = computed(() => {
   if (backendStatus.aiUnavailable) return t('status.aiDisabled')
   return t('status.ready')
 })
+const showOcrRepair = computed(() =>
+  ocrRepair.running
+  && route.name !== 'settings'
+  && !backendStatus.isOffline
+  && !backendStatus.isStarting,
+)
+const statusLabel = computed(() =>
+  showOcrRepair.value
+    ? t('status.ocrRepair', { percent: ocrRepair.percent })
+    : serviceLabel.value,
+)
 
 const isWindowMaximized = ref(false)
 const closeAction = ref<CloseAction>('ask')
@@ -207,6 +220,7 @@ onMounted(async () => {
 
   await whenBackendRuntimeReady()
   await backendStatus.check()
+  void ocrRepair.ensurePolling()
   void checkUpdatesAtStartup()
   healthPollTimer = window.setInterval(() => {
     void backendStatus.check()
@@ -283,16 +297,21 @@ onUnmounted(() => {
         <div
           class="service-status"
           :class="{
-            'service-status--ready': backendStatus.isReady && !backendStatus.aiUnavailable,
+            'service-status--ready': !showOcrRepair && backendStatus.isReady && !backendStatus.aiUnavailable,
             'service-status--ai-off': backendStatus.aiUnavailable,
-            'service-status--starting': backendStatus.isStarting,
+            'service-status--starting': showOcrRepair || backendStatus.isStarting,
             'service-status--offline': backendStatus.isOffline,
           }"
           role="status"
-          aria-live="polite"
+          :aria-live="showOcrRepair ? 'off' : 'polite'"
         >
+          <ArrowPathIcon
+            v-if="showOcrRepair"
+            class="service-status__icon animate-spin"
+            aria-hidden="true"
+          />
           <CheckCircleIcon
-            v-if="backendStatus.isReady && !backendStatus.aiUnavailable"
+            v-else-if="backendStatus.isReady && !backendStatus.aiUnavailable"
             class="service-status__icon"
             aria-hidden="true"
           />
@@ -306,7 +325,7 @@ onUnmounted(() => {
             class="service-status__icon"
             aria-hidden="true"
           />
-          <span>{{ serviceLabel }}</span>
+          <span>{{ statusLabel }}</span>
         </div>
 
         <div v-if="isDesktop" class="desktop-shell__window-controls">

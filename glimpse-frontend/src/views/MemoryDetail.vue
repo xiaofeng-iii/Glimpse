@@ -11,7 +11,7 @@ import {
   useRoute,
   useRouter,
 } from 'vue-router'
-import { memoriesApi } from '@/api/client'
+import { memoriesApi, type Memory } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { createLogger } from '@/utils/logger'
@@ -83,6 +83,10 @@ const copySummary = async () => {
   } catch {
     notifications.show(t('message.copyFailed'), 'error', 2800)
   }
+}
+
+const handleOcrUpdated = (updated: Memory) => {
+  memoriesStore.upsert(updated)
 }
 
 const confirmDelete = async () => {
@@ -163,8 +167,12 @@ const confirmDelete = async () => {
             {{ t(textMemory || hasNote ? 'action.copyContent' : 'action.copySummary') }}
           </button>
 
-          <div v-if="!textMemory && !analyzing && !analysisUnavailable" class="border-t border-[var(--shell-line)] pt-5">
-            <OcrText :text="memory.text_content" />
+          <div v-if="!textMemory && !analyzing" class="border-t border-[var(--shell-line)] pt-5">
+            <OcrText
+              :text="memory.text_content"
+              :memory-id="memory.id"
+              @updated="handleOcrUpdated"
+            />
           </div>
 
           <p class="text-xs text-[var(--shell-muted)]">

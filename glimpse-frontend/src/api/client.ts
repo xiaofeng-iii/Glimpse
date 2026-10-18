@@ -89,6 +89,7 @@ export interface IndexRepairResult {
 
 export interface OcrBackfillResult {
   status?: string
+  mode?: 'backfill' | 'repair'
   total?: number
   processed: number
   updated?: number
@@ -179,6 +180,13 @@ export const memoriesApi = {
 
   updateUserText: async (id: string, userText: string): Promise<Memory> => {
     const response = await api.patch(`/memories/${id}`, { user_text: userText })
+    return response.data
+  },
+
+  reocr: async (id: string): Promise<Memory> => {
+    // A clustered memory can hold up to ten images; allow the serial OCR pass
+    // to finish instead of cutting it off at the default request timeout.
+    const response = await api.post(`/memories/${id}/ocr`, undefined, { timeout: 180000 })
     return response.data
   },
 }
@@ -283,6 +291,16 @@ export const ocrApi = {
 
   status: async (): Promise<OcrBackfillStatus> => {
     const response = await api.get('/settings/ocr/backfill')
+    return response.data
+  },
+
+  repair: async (): Promise<OcrBackfillStatus> => {
+    const response = await api.post('/settings/ocr/repair')
+    return response.data
+  },
+
+  repairStatus: async (): Promise<OcrBackfillStatus> => {
+    const response = await api.get('/settings/ocr/repair')
     return response.data
   },
 }

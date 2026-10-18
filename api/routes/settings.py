@@ -17,13 +17,26 @@ from api.hotkeys import reload_global_hotkeys
 from services.bootstrap import configure_ai_client, resolve_ai_configuration
 from services.ai_client import AIClient
 
+from api.task_ids import (
+    INDEX_REPAIR_TASK_ID,
+    OCR_BACKFILL_TASK_ID,
+    OCR_REPAIR_TASK_ID,
+)
+
 router = APIRouter(prefix="/settings", tags=["settings"])
-INDEX_REPAIR_TASK_ID = "vector_index_repair_full"
-OCR_BACKFILL_TASK_ID = "ocr_backfill"
 
 
 def task_is_active(task) -> bool:
     return bool(task and task.status.name in {"PENDING", "RUNNING"})
+
+
+def active_ocr_task(task_queue):
+    """Return an active OCR maintenance task, whichever variant started first."""
+    for task_id in (OCR_REPAIR_TASK_ID, OCR_BACKFILL_TASK_ID):
+        task = task_queue.get_task(task_id)
+        if task_is_active(task):
+            return task
+    return None
 
 
 def serialize_index_repair_task(task) -> dict:
@@ -54,10 +67,10 @@ def index_repair_status_response(task=None) -> dict:
     return payload
 
 
-def serialize_ocr_backfill_task(task) -> dict:
+def serialize_ocr_task(task, task_id: str) -> dict:
     if not task:
         return {
-            "task_id": OCR_BACKFILL_TASK_ID,
+            "task_id": task_id,
             "status": "idle",
             "running": False,
             "result": None,
@@ -74,6 +87,14 @@ def serialize_ocr_backfill_task(task) -> dict:
         "result": result,
         "error": task.error,
     }
+
+
+def serialize_ocr_backfill_task(task) -> dict:
+    return serialize_ocr_task(task, OCR_BACKFILL_TASK_ID)
+
+
+def serialize_ocr_repair_task(task) -> dict:
+    return serialize_ocr_task(task, OCR_REPAIR_TASK_ID)
 
 
 def get_default_settings() -> dict:
@@ -272,10 +293,10 @@ async def start_index_repair():
         existing = task_queue.get_task(INDEX_REPAIR_TASK_ID)
         if task_is_active(existing):
             return index_repair_status_response(existing)
-        if task_is_active(task_queue.get_task(OCR_BACKFILL_TASK_ID)):
+        if active_ocr_task(task_queue):
             raise HTTPException(
                 status_code=409,
-                detail="OCR backfill is running; wait before repairing the vector index",
+                detail="OCR maintenance is running; wait before repairing the vector index",
             )
 
         memory_service = get_memory_service()
@@ -309,6 +330,11 @@ async def start_ocr_backfill():
         existing = task_queue.get_task(OCR_BACKFILL_TASK_ID)
         if task_is_active(existing):
             return serialize_ocr_backfill_task(existing)
+        if task_is_active(task_queue.get_task(OCR_REPAIR_TASK_ID)):
+            raise HTTPException(
+                status_code=409,
+                detail="OCR repair is running; wait before starting OCR backfill",
+            )
         if task_is_active(task_queue.get_task(INDEX_REPAIR_TASK_ID)):
             raise HTTPException(
                 status_code=409,
@@ -332,6 +358,46 @@ async def get_ocr_backfill_status():
     try:
         task = get_task_queue().get_task(OCR_BACKFILL_TASK_ID)
         return serialize_ocr_backfill_task(task)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ocr/repair")
+async def start_ocr_repair():
+    """Re-run OCR for every image memory in one background maintenance task."""
+    try:
+        task_queue = get_task_queue()
+        existing = task_queue.get_task(OCR_REPAIR_TASK_ID)
+        if task_is_active(existing):
+            return serialize_ocr_repair_task(existing)
+        if task_is_active(task_queue.get_task(OCR_BACKFILL_TASK_ID)):
+            raise HTTPException(
+                status_code=409,
+                detail="OCR backfill is running; wait before starting OCR repair",
+            )
+        if task_is_active(task_queue.get_task(INDEX_REPAIR_TASK_ID)):
+            raise HTTPException(
+                status_code=409,
+                detail="Vector index repair is running; wait before starting OCR repair",
+            )
+
+        task = task_queue.submit(
+            OCR_REPAIR_TASK_ID,
+            get_memory_service().repair_ocr,
+        )
+        return serialize_ocr_repair_task(task)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ocr/repair")
+async def get_ocr_repair_status():
+    """Return the latest full OCR repair task and live progress counters."""
+    try:
+        task = get_task_queue().get_task(OCR_REPAIR_TASK_ID)
+        return serialize_ocr_repair_task(task)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

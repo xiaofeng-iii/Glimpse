@@ -38,6 +38,27 @@ def test_sidecar_collects_rapidocr_code_models_metadata_and_onnx_runtime():
     assert "onnxruntime" in sidecar.PYINSTALLER_METADATA_PACKAGES
 
 
+def test_legacy_ocr_models_are_excluded_from_sidecar_data():
+    datas = [
+        ("C:/pkg/rapidocr/models/PP-OCRv6_det_small.onnx", "rapidocr/models"),
+        ("C:/pkg/rapidocr/models/PP-OCRv6_rec_small.onnx", "rapidocr/models"),
+        (
+            "C:/pkg/rapidocr/models/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+            "rapidocr/models",
+        ),
+        ("C:/project/assets/ocr/ch_PP-OCRv5_det_mobile.onnx", "assets/ocr"),
+        ("C:/project/assets/ocr/ch_PP-OCRv5_rec_mobile.onnx", "assets/ocr"),
+    ]
+
+    filtered = sidecar.filter_legacy_ocr_models(datas)
+
+    assert [Path(source).name for source, _ in filtered] == [
+        "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+        "ch_PP-OCRv5_det_mobile.onnx",
+        "ch_PP-OCRv5_rec_mobile.onnx",
+    ]
+
+
 def test_read_package_version_reads_canonical_cargo_version(tmp_path: Path):
     manifest = tmp_path / "Cargo.toml"
     _write_manifest(manifest, "3.4.5")

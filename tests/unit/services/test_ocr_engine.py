@@ -1,4 +1,4 @@
-"""Unit tests for the RapidOCR 3.x adapter."""
+"""Unit tests for the RapidOCR adapter and box-to-line merging."""
 
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -14,6 +14,7 @@ from services.ocr_engine import (
     OCREngine,
     RapidOCREngine,
     create_ocr_engine,
+    merge_ocr_lines,
     ocr_engine,
 )
 
@@ -29,17 +30,27 @@ def make_fake_rapidocr_module(tmp_path, rapid_ocr):
         EngineType=SimpleNamespace(ONNXRUNTIME="onnxruntime"),
         LangDet=SimpleNamespace(CH="ch"),
         LangRec=SimpleNamespace(CH="ch"),
-        ModelType=SimpleNamespace(SMALL="small"),
-        OCRVersion=SimpleNamespace(PPOCRV6="PP-OCRv6"),
+        ModelType=SimpleNamespace(MOBILE="mobile"),
+        OCRVersion=SimpleNamespace(PPOCRV5="PP-OCRv5"),
     )
 
 
-def write_bundled_models(module):
+def write_package_models(module):
     model_dir = Path(module.__file__).parent / "models"
     model_dir.mkdir()
-    for filename in RapidOCREngine._MODEL_FILENAMES.values():
-        (model_dir / filename).write_bytes(b"model")
-    return model_dir.resolve()
+    (model_dir / "ch_ppocr_mobile_v2.0_cls_mobile.onnx").write_bytes(b"cls")
+    return model_dir
+
+
+def write_v5_models(model_dir: Path) -> Path:
+    model_dir.mkdir(parents=True, exist_ok=True)
+    (model_dir / "ch_PP-OCRv5_det_mobile.onnx").write_bytes(b"v5det")
+    (model_dir / "ch_PP-OCRv5_rec_mobile.onnx").write_bytes(b"v5rec")
+    return model_dir
+
+
+def rect(x1, y1, x2, y2):
+    return ((x1, y1), (x2, y1), (x2, y2), (x1, y2))
 
 
 class TestOCREngineABC:
@@ -53,6 +64,65 @@ class TestOCREngineABC:
 
         with pytest.raises(TypeError):
             IncompleteEngine()
+
+
+class TestMergeOCRLines:
+    def test_joins_english_word_boxes(self):
+        text = merge_ocr_lines(
+            ("Hello", "World"),
+            (rect(10, 10, 50, 30), rect(60, 10, 120, 30)),
+        )
+        assert text == "Hello World"
+
+    def test_joins_cjk_characters_without_spaces(self):
+        text = merge_ocr_lines(
+            ("你", "好", "世", "界"),
+            (
+                rect(10, 10, 30, 30),
+                rect(32, 10, 52, 30),
+                rect(54, 10, 74, 30),
+                rect(76, 10, 96, 30),
+            ),
+        )
+        assert text == "你好世界"
+
+    def test_keeps_rows_separate(self):
+        text = merge_ocr_lines(
+            ("First", "Second"),
+            (rect(10, 10, 80, 30), rect(10, 50, 100, 70)),
+        )
+        assert text == "First\nSecond"
+
+    def test_splits_large_horizontal_gap(self):
+        text = merge_ocr_lines(
+            ("Left", "Right"),
+            (rect(10, 10, 60, 30), rect(260, 10, 320, 30)),
+        )
+        assert text == "Left\nRight"
+
+    def test_handles_punctuation_without_extra_space(self):
+        text = merge_ocr_lines(
+            ("Hello", ",", "World"),
+            (
+                rect(10, 10, 60, 30),
+                rect(61, 10, 67, 30),
+                rect(70, 10, 130, 30),
+            ),
+        )
+        assert text == "Hello, World"
+
+    def test_falls_back_when_boxes_are_missing(self):
+        assert merge_ocr_lines(("Hello", "World"), None) == "Hello\nWorld"
+
+    def test_falls_back_when_a_box_is_malformed(self):
+        text = merge_ocr_lines(
+            ("bad", "good"),
+            (("invalid",), rect(10, 10, 40, 30)),
+        )
+        assert text == "bad\ngood"
+
+    def test_returns_none_for_empty_texts(self):
+        assert merge_ocr_lines((), ()) is None
 
 
 class TestNativeOCREngine:
@@ -83,10 +153,24 @@ class TestRapidOCREngine:
         with patch.object(engine, "_get_engine", return_value=None):
             assert engine.extract_text("test.png") is None
 
-    def test_extract_text_reads_dataclass_output(self, engine):
+    def test_extract_text_merges_word_boxes(self, engine):
         mock_ocr = MagicMock()
         mock_ocr.return_value = SimpleNamespace(
             txts=(" Hello ", "World", " "),
+            boxes=(
+                rect(10, 10, 50, 30),
+                rect(60, 10, 120, 30),
+                rect(130, 10, 140, 30),
+            ),
+        )
+
+        with patch.object(engine, "_get_engine", return_value=mock_ocr):
+            assert engine.extract_text("test.png") == "Hello World"
+
+    def test_extract_text_falls_back_without_boxes(self, engine):
+        mock_ocr = MagicMock()
+        mock_ocr.return_value = SimpleNamespace(
+            txts=("Hello", "World"),
             boxes=None,
         )
 
@@ -123,7 +207,7 @@ class TestRapidOCREngine:
         mock_ocr = MagicMock()
         mock_ocr.return_value = SimpleNamespace(
             txts=("bad", "good"),
-            boxes=(("invalid",), ((1, 2), (3, 2), (3, 4), (1, 4))),
+            boxes=(("invalid",), rect(1, 2, 3, 4)),
         )
 
         with patch.object(engine, "_get_engine", return_value=mock_ocr):
@@ -160,14 +244,12 @@ class TestRapidOCREngine:
         assert results == ["text", "text"]
         assert max_active == 1
 
-    def test_engine_is_lazy_and_uses_fixed_ppocrv6_cpu_configuration(
-        self,
-        engine,
-        tmp_path,
-    ):
+    def test_engine_uses_v5_mobile_configuration(self, tmp_path):
         rapid_ocr = MagicMock(return_value=MagicMock())
         module = make_fake_rapidocr_module(tmp_path, rapid_ocr)
-        model_dir = write_bundled_models(module)
+        write_package_models(module)
+        model_dir = write_v5_models(tmp_path / "assets" / "ocr")
+        engine = RapidOCREngine(model_dir=model_dir)
 
         assert engine._engine is None
         with patch.dict("sys.modules", {"rapidocr": module}):
@@ -176,37 +258,30 @@ class TestRapidOCREngine:
         assert loaded is rapid_ocr.return_value
         params = rapid_ocr.call_args.kwargs["params"]
         assert params["Det.engine_type"] == "onnxruntime"
-        assert params["Det.model_type"] == "small"
-        assert params["Det.ocr_version"] == "PP-OCRv6"
+        assert params["Det.model_type"] == "mobile"
+        assert params["Det.ocr_version"] == "PP-OCRv5"
+        assert params["Det.limit_side_len"] == 1280
         assert params["Rec.engine_type"] == "onnxruntime"
-        assert params["Rec.model_type"] == "small"
-        assert params["Rec.ocr_version"] == "PP-OCRv6"
+        assert params["Rec.model_type"] == "mobile"
+        assert params["Rec.ocr_version"] == "PP-OCRv5"
+        assert params["Global.max_side_len"] == 4000
         assert params["Det.model_path"] == str(
-            model_dir / "PP-OCRv6_det_small.onnx"
-        )
-        assert params["Cls.model_path"] == str(
-            model_dir / "ch_ppocr_mobile_v2.0_cls_mobile.onnx"
+            (model_dir / "ch_PP-OCRv5_det_mobile.onnx").resolve()
         )
         assert params["Rec.model_path"] == str(
-            model_dir / "PP-OCRv6_rec_small.onnx"
+            (model_dir / "ch_PP-OCRv5_rec_mobile.onnx").resolve()
         )
-        assert all(
-            Path(params[key]).is_absolute()
-            for key in RapidOCREngine._MODEL_FILENAMES
+        assert params["Cls.model_path"] == str(
+            (Path(module.__file__).parent / "models" / "ch_ppocr_mobile_v2.0_cls_mobile.onnx").resolve()
         )
         assert params["EngineConfig.onnxruntime.use_cuda"] is False
         assert params["EngineConfig.onnxruntime.use_dml"] is False
 
-    def test_missing_bundled_model_soft_fails_before_any_network_call(
-        self,
-        engine,
-        tmp_path,
-    ):
+    def test_missing_v5_models_disable_ocr_before_any_network_call(self, tmp_path):
         rapid_ocr = MagicMock()
         module = make_fake_rapidocr_module(tmp_path, rapid_ocr)
-        model_dir = Path(module.__file__).parent / "models"
-        model_dir.mkdir()
-        (model_dir / "PP-OCRv6_det_small.onnx").write_bytes(b"model")
+        write_package_models(module)
+        engine = RapidOCREngine(model_dir=tmp_path / "assets" / "ocr")
 
         with (
             patch.dict("sys.modules", {"rapidocr": module}),

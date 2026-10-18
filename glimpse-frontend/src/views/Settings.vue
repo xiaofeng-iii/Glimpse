@@ -17,11 +17,10 @@ import {
 import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import {
   indexApi,
-  ocrApi,
   type IndexRepairStatus,
-  type OcrBackfillStatus,
 } from '@/api/client'
 import { useNotificationStore } from '@/stores/notification'
+import { useOcrRepairStore } from '@/stores/ocrRepair'
 import { useSettingsStore } from '@/stores/settings'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
 import { DEV_UPDATE_CHANNEL, useUpdatesStore } from '@/stores/updates'
@@ -47,6 +46,7 @@ const logger = createLogger('views/Settings')
 const route = useRoute()
 const settingsStore = useSettingsStore()
 const notifications = useNotificationStore()
+const ocrRepair = useOcrRepairStore()
 const unsavedChanges = useUnsavedChangesStore()
 const updatesStore = useUpdatesStore()
 
@@ -193,7 +193,6 @@ const updateMirrorModeOptions = computed(() => [
 const testingAi = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
 const indexStatus = ref<IndexRepairStatus | null>(null)
-const ocrStatus = ref<OcrBackfillStatus | null>(null)
 const confirmAction = ref<ConfirmAction>(null)
 const confirmBusy = ref(false)
 const discardDialogOpen = ref(false)
@@ -203,7 +202,7 @@ let unregisterGuard: (() => boolean) | null = null
 let maintenanceTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const currentSection = computed(() => sections.find((section) => section.id === activeSection.value) ?? sections[0])
-const maintenanceRunning = computed(() => Boolean(indexStatus.value?.running || ocrStatus.value?.running))
+const maintenanceRunning = computed(() => Boolean(indexStatus.value?.running || ocrRepair.running))
 // 索引计数行只在「已加载且不同步」时高亮：running/result 占位期间保持 muted，
 // 避免刚点完「修复索引」还在跑就先亮警告色。
 const indexOutOfSync = computed(() =>
@@ -246,9 +245,6 @@ const formSnapshot = computed(() => JSON.stringify(ordinarySettings.value))
 const aiSnapshot = computed(() => JSON.stringify(aiSettings.value))
 const dirty = computed(() => Boolean(savedSnapshot.value && formSnapshot.value !== savedSnapshot.value))
 const aiDirty = computed(() => Boolean(savedAiSnapshot.value && aiSnapshot.value !== savedAiSnapshot.value))
-const ocrSucceeded = computed(() =>
-  ocrStatus.value?.result?.succeeded ?? ocrStatus.value?.result?.updated ?? 0,
-)
 
 const hotkeyLabels: Record<string, string> = {
   ctrl: 'Ctrl',
@@ -371,14 +367,16 @@ const loadSettings = async () => {
 }
 
 const refreshMaintenance = async () => {
-  const [nextIndex, nextOcr] = await Promise.allSettled([indexApi.status(), ocrApi.status()])
-  if (nextIndex.status === 'fulfilled') indexStatus.value = nextIndex.value
-  if (nextOcr.status === 'fulfilled') ocrStatus.value = nextOcr.value
+  try {
+    indexStatus.value = await indexApi.status()
+  } catch (error) {
+    logger.warn('Index repair status failed: %s', error)
+  }
 }
 
 const scheduleMaintenancePoll = () => {
   if (maintenanceTimer) window.clearTimeout(maintenanceTimer)
-  if (!maintenanceRunning.value) return
+  if (!indexStatus.value?.running) return
   maintenanceTimer = window.setTimeout(async () => {
     await refreshMaintenance()
     scheduleMaintenancePoll()
@@ -552,9 +550,9 @@ const confirmationCopy = computed(() => {
     }
   }
   return {
-    title: t('settings.ocrBackfill'),
-    description: t('settings.ocrBackfillConfirm'),
-    confirm: t('settings.startBackfill'),
+    title: t('settings.ocrRepair'),
+    description: t('settings.ocrRepairConfirm'),
+    confirm: t('settings.startOcrRepair'),
     destructive: false,
   }
 })
@@ -580,9 +578,8 @@ const runConfirmedAction = async () => {
       notifications.show(t('message.indexRepairStarted'), 'success', 1800)
       scheduleMaintenancePoll()
     } else {
-      ocrStatus.value = await ocrApi.backfill()
-      notifications.show(t('message.ocrBackfillStarted'), 'success', 1800)
-      scheduleMaintenancePoll()
+      await ocrRepair.start()
+      notifications.show(t('message.ocrRepairStarted'), 'success', 1800)
     }
     confirmAction.value = null
   } catch (error) {
@@ -649,6 +646,7 @@ onMounted(async () => {
   // 但共享 store 里已发现的更新（含进行中的下载）总是同步进来展示。
   adoptStoreUpdate()
   scheduleMaintenancePoll()
+  void ocrRepair.ensurePolling()
 })
 
 onUnmounted(() => {
@@ -850,7 +848,7 @@ onUnmounted(() => {
                   {{ t('settings.localOcr') }}
                 </div>
                 <dl class="mt-3 grid gap-2.5 text-sm sm:grid-cols-2">
-                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrModel') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">PP-OCRv6-small</dd></div>
+                  <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrModel') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">PP-OCRv5-mobile</dd></div>
                   <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrFramework') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">RapidOCR 3.9.2</dd></div>
                   <div><dt class="text-[var(--shell-muted)]">{{ t('settings.ocrRuntime') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">ONNX Runtime CPU</dd></div>
                   <div><dt class="text-[var(--shell-muted)]">{{ t('settings.dataPrivacy') }}</dt><dd class="mt-0.5 text-[var(--shell-ink)]">{{ t('settings.localNoUpload') }}</dd></div>
@@ -1023,30 +1021,47 @@ onUnmounted(() => {
                 <div class="flex items-start gap-3.5">
                   <CpuChipIcon class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
                   <div class="min-w-0 flex-1">
-                    <h3 class="setting-label">{{ t('settings.ocrBackfill') }}</h3>
-                    <p class="setting-help">{{ t('settings.ocrBackfillHint') }}</p>
-                    <p v-if="ocrStatus?.running" class="mt-3 text-xs text-[var(--color-primary)]">
-                      {{ t('settings.ocrBackfillRunning', {
-                        processed: ocrStatus.result?.processed ?? 0,
-                        total: ocrStatus.result?.total ?? 0,
+                    <h3 class="setting-label">{{ t('settings.ocrRepair') }}</h3>
+                    <p class="setting-help">{{ t('settings.ocrRepairHint') }}</p>
+                    <div v-if="ocrRepair.running" class="mt-3">
+                      <p class="text-xs text-[var(--color-primary)]">
+                        {{ t('settings.ocrRepairRunning', {
+                          processed: ocrRepair.processed,
+                          total: ocrRepair.total,
+                        }) }}
+                      </p>
+                      <div
+                        class="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--shell-control-hover)]"
+                        role="progressbar"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        :aria-valuenow="ocrRepair.percent"
+                      >
+                        <div
+                          class="h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-300 ease-[ease]"
+                          :style="{ width: `${ocrRepair.percent}%` }"
+                        />
+                      </div>
+                    </div>
+                    <p v-else-if="ocrRepair.result" class="mt-3 text-xs text-[var(--shell-muted)]">
+                      {{ t('settings.ocrRepairResult', {
+                        processed: ocrRepair.result.processed,
+                        updated: ocrRepair.result.updated ?? ocrRepair.result.succeeded ?? 0,
+                        skipped: ocrRepair.result.skipped,
+                        failed: ocrRepair.result.failed,
                       }) }}
                     </p>
-                    <p v-else-if="ocrStatus?.result" class="mt-3 text-xs text-[var(--shell-muted)]">
-                      {{ t('settings.ocrBackfillResult', {
-                        processed: ocrStatus.result.processed,
-                        succeeded: ocrSucceeded,
-                        skipped: ocrStatus.result.skipped,
-                        failed: ocrStatus.result.failed,
-                      }) }}
+                    <p v-else-if="ocrRepair.status?.status === 'failed'" class="mt-3 text-xs text-[var(--color-danger)]">
+                      {{ t('message.ocrRepairFailed') }}
                     </p>
                   </div>
                   <button
                     type="button"
                     class="btn-secondary"
-                    :disabled="maintenanceRunning"
+                    :disabled="maintenanceRunning || ocrRepair.starting"
                     @click="openConfirmation('ocr')"
                   >
-                    {{ ocrStatus?.running ? t('settings.backfillingOcr') : t('settings.startBackfill') }}
+                    {{ ocrRepair.running ? t('settings.repairingOcr') : t('settings.ocrRepair') }}
                   </button>
                 </div>
               </div>

@@ -29,6 +29,7 @@ const apiMocks = vi.hoisted(() => ({
   get: vi.fn(),
   updateSummary: vi.fn(),
   updateUserText: vi.fn(),
+  reocr: vi.fn(),
 }))
 
 vi.mock('@/api/client', async (importOriginal) => {
@@ -40,6 +41,7 @@ vi.mock('@/api/client', async (importOriginal) => {
       get: apiMocks.get,
       updateSummary: apiMocks.updateSummary,
       updateUserText: apiMocks.updateUserText,
+      reocr: apiMocks.reocr,
     },
   }
 })
@@ -679,7 +681,7 @@ describe('memory components', () => {
     })
 
     const editButton = wrapper.get('.summary-editor__edit-action')
-    expect(editButton.classes()).toEqual(expect.arrayContaining(['h-8', 'font-normal']))
+    expect(editButton.classes()).toEqual(expect.arrayContaining(['h-7', 'min-h-7', 'font-normal']))
 
     await editButton.trigger('click')
     await flushPromises()
@@ -688,7 +690,7 @@ describe('memory components', () => {
     expect(frame.attributes('style')).toContain('height: 220px')
     expect(document.activeElement).toBe(originalControl)
     for (const button of wrapper.findAll('.summary-editor__edit-action')) {
-      expect(button.classes()).toEqual(expect.arrayContaining(['!h-8']))
+      expect(button.classes()).toEqual(expect.arrayContaining(['!h-7', '!min-h-7']))
     }
 
     measuredHeight = 600
@@ -962,6 +964,23 @@ describe('窗口级关闭叉号统一规格', () => {
     expect(close?.querySelector('svg[viewBox="0 0 12 12"]')).toBeNull()
     assertUnifiedCloseGlyph(document, close)
 
+    wrapper.unmount()
+  })
+
+  it('识别文本的更多菜单可以重新识别单条记忆', async () => {
+    setLanguagePreference('zh-CN')
+    apiMocks.reocr.mockResolvedValue(createMemory({ text_content: 'new text' }))
+    const wrapper = mount(OcrText, {
+      props: { text: 'old text', memoryId: 'memory-1' },
+    })
+
+    await wrapper.get('[aria-label="更多操作"]').trigger('click')
+    expect(wrapper.text()).toContain('重新识别')
+    await wrapper.get('[role="menuitem"]').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.reocr).toHaveBeenCalledWith('memory-1')
+    expect(wrapper.emitted('updated')?.[0]?.[0]).toMatchObject({ text_content: 'new text' })
     wrapper.unmount()
   })
 })
