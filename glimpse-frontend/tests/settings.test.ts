@@ -188,6 +188,28 @@ describe('Settings', () => {
     )
   })
 
+  it('toggles key field visibility independently per field', async () => {
+    const wrapper = await mountSettings()
+    await selectSection(wrapper, 'AI 服务')
+
+    const fields = ['#ai-api-key', '[data-testid=ocr-api-key]', '[data-testid=ocr-secret-key]']
+    const types = () => fields.map((selector) => wrapper.get(selector).attributes('type'))
+    expect(types()).toEqual(['password', 'password', 'password'])
+
+    await wrapper.get('button[aria-label="显示 API Key"]').trigger('click')
+    expect(types()).toEqual(['text', 'password', 'password'])
+
+    const ocrEyes = wrapper.findAll('button[aria-label="显示密钥"]')
+    await ocrEyes[1]!.trigger('click')
+    expect(types()).toEqual(['text', 'password', 'text'])
+
+    await wrapper.get('button[aria-label="隐藏 API Key"]').trigger('click')
+    expect(types()).toEqual(['password', 'password', 'text'])
+
+    // WebView2 自带的密码显示按钮必须保持关闭，否则与自绘眼睛重影
+    expect(appStyles).toContain('::-ms-reveal')
+  })
+
   it('keeps an unchanged save button disabled without presenting it as busy', async () => {
     const wrapper = await mountSettings()
     await selectSection(wrapper, 'AI 服务')

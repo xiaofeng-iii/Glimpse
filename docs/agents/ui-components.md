@@ -35,7 +35,8 @@
 
 | 场景 | 类名 | 规格 |
 |---|---|---|
-| 设置区输入框 | `.setting-input`（Settings.vue 局部） | 32px（`--control-h-md`）、文本框限宽 320px、数字框限宽 120px、聚焦只变边框色 |
+| 设置区输入框 | `.setting-input`（main.css 全局） | 32px（`--control-h-md`）、文本框限宽 320px、数字框限宽 120px、聚焦只变边框色 |
+| 密钥/密码输入框 | `SecretInput.vue` | `.setting-input` 规格 + 尾部 24px 显隐眼睛；显隐为组件内部状态，各实例独立不联动；WebView2 原生眼睛由全局 `::-ms-reveal` 关闭 |
 | 设置区三段式切换器 | `.theme-switcher`（Settings.vue 局部） | 32px 高、扁平线框浅底+独立平移滑块 |
 | 侧栏内嵌块（摘要/识别文本） | `SummaryEditor.vue` compact / `OcrText.vue` compact | `surface-subtle` 10px 圆角无框内衬约 12px；块头行内操作 28px；编辑态白底框浮起 |
 | 搜索工具区控件 | SearchToolbar 内部 | 紧凑 32px 档 |

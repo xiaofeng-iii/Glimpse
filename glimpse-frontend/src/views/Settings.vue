@@ -7,8 +7,7 @@ import {
   CircleStackIcon,
   CloudIcon,
   CpuChipIcon,
-  EyeIcon,
-  EyeSlashIcon,
+  ExclamationCircleIcon,
   CommandLineIcon,
   LockClosedIcon,
   PaintBrushIcon,
@@ -40,6 +39,7 @@ import { createLogger } from '@/utils/logger'
 import { isDesktopShell } from '@/platform/desktop'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppSelect from '@/components/AppSelect.vue'
+import SecretInput from '@/components/SecretInput.vue'
 import UpdateNotesContent from '@/components/UpdateNotesContent.vue'
 import UpdateNotesPopover from '@/components/UpdateNotesPopover.vue'
 
@@ -97,8 +97,6 @@ const enqueueWrite = <T,>(operation: () => Promise<T>): Promise<T> => {
   writeQueue = result.catch(() => undefined)
   return result
 }
-const showApiKey = ref(false)
-
 const screenshotHotkey = ref('')
 const recordingHotkey = ref(false)
 const captureLimitWindowSeconds = ref(5)
@@ -115,7 +113,6 @@ const aiTimeout = ref(60)
 const ocrMode = ref<'local' | 'cloud'>('local')
 const ocrApiKey = ref('')
 const ocrSecretKey = ref('')
-const showOcrKeys = ref(false)
 const cloudDialogOpen = ref(false)
 const cloudConsentGranted = ref(false)
 const themePreference = ref<ThemePreference>('light')
@@ -885,24 +882,12 @@ onUnmounted(() => {
                   <label for="ai-api-key" class="setting-label">API Key</label>
                   <p class="setting-help">{{ t('settings.localOnly') }}</p>
                 </div>
-                <div class="relative w-full max-w-[320px]">
-                  <input
-                    id="ai-api-key"
-                    v-model="aiApiKey"
-                    class="setting-input w-full pr-12"
-                    :type="showApiKey ? 'text' : 'password'"
-                    autocomplete="off"
-                  />
-                  <button
-                    type="button"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
-                    :aria-label="showApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')"
-                    @click="showApiKey = !showApiKey"
-                  >
-                    <EyeSlashIcon v-if="showApiKey" class="h-5 w-5" aria-hidden="true" />
-                    <EyeIcon v-else class="h-5 w-5" aria-hidden="true" />
-                  </button>
-                </div>
+                <SecretInput
+                  id="ai-api-key"
+                  v-model="aiApiKey"
+                  :show-label="t('settings.showApiKey')"
+                  :hide-label="t('settings.hideApiKey')"
+                />
               </div>
               <label class="setting-row">
                 <span class="setting-label">Base URL</span>
@@ -943,7 +928,8 @@ onUnmounted(() => {
                   class="flex items-center gap-2 text-sm"
                   :class="aiTestResult.success ? 'text-emerald-600' : 'text-red-600'"
                 >
-                  <CheckCircleIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+                  <CheckCircleIcon v-if="aiTestResult.success" class="h-5 w-5 flex-none" aria-hidden="true" />
+                  <ExclamationCircleIcon v-else class="h-5 w-5 flex-none" aria-hidden="true" />
                   {{ aiTestResult.message }}
                 </p>
               </div>
@@ -982,45 +968,21 @@ onUnmounted(() => {
                 <div class="mt-3 grid gap-3">
                   <label class="grid gap-1.5">
                     <span class="setting-label">API Key</span>
-                    <div class="relative w-full max-w-[320px]">
-                      <input
-                        v-model="ocrApiKey"
-                        data-testid="ocr-api-key"
-                        class="setting-input w-full pr-12"
-                        :type="showOcrKeys ? 'text' : 'password'"
-                        autocomplete="off"
-                      />
-                      <button
-                        type="button"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
-                        :aria-label="showOcrKeys ? t('settings.hideKeys') : t('settings.showKeys')"
-                        @click="showOcrKeys = !showOcrKeys"
-                      >
-                        <EyeSlashIcon v-if="showOcrKeys" class="h-5 w-5" aria-hidden="true" />
-                        <EyeIcon v-else class="h-5 w-5" aria-hidden="true" />
-                      </button>
-                    </div>
+                    <SecretInput
+                      v-model="ocrApiKey"
+                      data-testid="ocr-api-key"
+                      :show-label="t('settings.showKeys')"
+                      :hide-label="t('settings.hideKeys')"
+                    />
                   </label>
                   <label class="grid gap-1.5">
                     <span class="setting-label">Secret Key</span>
-                    <div class="relative w-full max-w-[320px]">
-                      <input
-                        v-model="ocrSecretKey"
-                        data-testid="ocr-secret-key"
-                        class="setting-input w-full pr-12"
-                        :type="showOcrKeys ? 'text' : 'password'"
-                        autocomplete="off"
-                      />
-                      <button
-                        type="button"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
-                        :aria-label="showOcrKeys ? t('settings.hideKeys') : t('settings.showKeys')"
-                        @click="showOcrKeys = !showOcrKeys"
-                      >
-                        <EyeSlashIcon v-if="showOcrKeys" class="h-5 w-5" aria-hidden="true" />
-                        <EyeIcon v-else class="h-5 w-5" aria-hidden="true" />
-                      </button>
-                    </div>
+                    <SecretInput
+                      v-model="ocrSecretKey"
+                      data-testid="ocr-secret-key"
+                      :show-label="t('settings.showKeys')"
+                      :hide-label="t('settings.hideKeys')"
+                    />
                   </label>
                 </div>
                 <div class="mt-3 flex flex-wrap items-center gap-3">
@@ -1049,7 +1011,8 @@ onUnmounted(() => {
                     class="flex items-center gap-2 text-sm"
                     :class="ocrTestResult.success ? 'text-emerald-600' : 'text-red-600'"
                   >
-                    <CheckCircleIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+                    <CheckCircleIcon v-if="ocrTestResult.success" class="h-5 w-5 flex-none" aria-hidden="true" />
+                    <ExclamationCircleIcon v-else class="h-5 w-5 flex-none" aria-hidden="true" />
                     {{ ocrTestResult.message }}
                   </p>
                 </div>
@@ -1531,43 +1494,10 @@ onUnmounted(() => {
   color: var(--shell-muted);
 }
 
-.setting-input,
-.setting-readonly {
-  width: 100%;
-  max-width: 320px;
-  height: var(--control-h-md);
-  min-height: var(--control-h-md);
-  border: 1px solid var(--shell-line);
-  border-radius: var(--radius-md);
-  background: var(--shell-control-bg);
-  padding: 0 .65rem;
-  font-size: .875rem;
-  color: var(--shell-ink);
-  outline: none;
-  transition: border-color 140ms ease, background-color 140ms ease;
-}
-
-.setting-input[type='number'] {
-  max-width: 120px;
-}
-
-.setting-input:focus {
-  border-color: var(--color-primary);
-  box-shadow: none;
-  background: var(--shell-control-bg);
-}
-
 .setting-input--recording {
   border-color: var(--color-primary);
   background: var(--shell-control-bg);
   box-shadow: none;
-}
-
-.setting-readonly {
-  display: flex;
-  align-items: center;
-  color: var(--shell-muted);
-  cursor: default;
 }
 
 /* 扁平化三段式主题切换器：保持线框浅底外观 + 独立平移滑块动效与遮罩文字变色 */
