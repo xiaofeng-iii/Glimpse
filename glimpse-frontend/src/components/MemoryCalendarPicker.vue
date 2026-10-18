@@ -281,12 +281,16 @@ onUnmounted(() => {
         <button
           type="button"
           class="memory-calendar__nav-btn"
-          :aria-label="t('wall.prevMonth')"
-          @click="shiftMonth(-1)"
+          :class="{ 'memory-calendar__year-prev': monthPickerOpen }"
+          :aria-label="t(monthPickerOpen ? 'wall.prevYear' : 'wall.prevMonth')"
+          @click="monthPickerOpen ? shiftPickerYear(-1) : shiftMonth(-1)"
         >
           <ChevronLeftIcon class="h-4 w-4" aria-hidden="true" />
         </button>
+        <!-- 速选打开时正中改显示年份：此时用户不需要看到当前选中月份（那是日历主界面的信息） -->
+        <span v-if="monthPickerOpen" class="memory-calendar__year" aria-live="polite">{{ yearLabel }}</span>
         <button
+          v-else
           type="button"
           class="memory-calendar__month"
           :title="t('wall.browseWholeMonth')"
@@ -308,9 +312,10 @@ onUnmounted(() => {
           <button
             type="button"
             class="memory-calendar__nav-btn"
-            :aria-label="t('wall.nextMonth')"
-            :disabled="atCurrentMonth"
-            @click="shiftMonth(1)"
+            :class="{ 'memory-calendar__year-next': monthPickerOpen }"
+            :aria-label="t(monthPickerOpen ? 'wall.nextYear' : 'wall.nextMonth')"
+            :disabled="monthPickerOpen ? pickerYear >= currentNow.getFullYear() : atCurrentMonth"
+            @click="monthPickerOpen ? shiftPickerYear(1) : shiftMonth(1)"
           >
             <ChevronRightIcon class="h-4 w-4" aria-hidden="true" />
           </button>
@@ -318,26 +323,6 @@ onUnmounted(() => {
       </div>
 
       <div v-if="monthPickerOpen" class="memory-calendar__months" role="group" :aria-label="t('wall.pickMonth')">
-        <div class="memory-calendar__year-nav">
-          <button
-            type="button"
-            class="memory-calendar__nav-btn memory-calendar__year-prev"
-            :aria-label="t('wall.prevYear')"
-            @click="shiftPickerYear(-1)"
-          >
-            <ChevronLeftIcon class="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-          <span class="memory-calendar__year" aria-hidden="true">{{ yearLabel }}</span>
-          <button
-            type="button"
-            class="memory-calendar__nav-btn memory-calendar__year-next"
-            :aria-label="t('wall.nextYear')"
-            :disabled="pickerYear >= currentNow.getFullYear()"
-            @click="shiftPickerYear(1)"
-          >
-            <ChevronRightIcon class="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        </div>
         <div
           class="memory-calendar__viewport"
           :class="{ 'memory-calendar__viewport--sliding': yearSlider.sliding }"
@@ -462,27 +447,13 @@ onUnmounted(() => {
 .memory-calendar__months {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
 }
 
-.memory-calendar__year-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0 0.25rem;
-}
-
-/* 年份步进是速选面板里的次级导航：尺寸与内缩都弱于主导航箭头 */
-.memory-calendar__year-nav .memory-calendar__nav-btn {
-  width: 1.5rem;
-  height: 1.5rem;
-}
-
+/* 速选打开时主导航正中显示年份：与月份标题同位同号，仅展示不可点 */
 .memory-calendar__year {
-  flex: 1;
+  padding: 0.25rem 0.625rem;
   color: var(--color-text);
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   text-align: center;
 }
 
