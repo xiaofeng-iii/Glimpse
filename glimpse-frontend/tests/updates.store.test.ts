@@ -49,27 +49,6 @@ describe('updates store', () => {
     } as never
   })
 
-  it('marks just updated only when the stored version differs', () => {
-    const store = useUpdatesStore()
-
-    store.recordCurrentVersion('0.3.2')
-    expect(store.justUpdated).toBe(false)
-
-    store.recordCurrentVersion('0.3.3')
-    expect(store.justUpdated).toBe(true)
-    expect(store.showJustUpdatedBadge).toBe(true)
-
-    store.dismissJustUpdated()
-    expect(store.showJustUpdatedBadge).toBe(false)
-  })
-
-  it('does not treat the very first launch as an update', () => {
-    const store = useUpdatesStore()
-    store.recordCurrentVersion('0.3.2')
-    expect(store.justUpdated).toBe(false)
-    expect(window.localStorage.getItem('glimpse.lastRunVersion')).toBe('0.3.2')
-  })
-
   it('stores the available update and aggregates its notes', async () => {
     const store = useUpdatesStore()
     store.recordCurrentVersion('0.3.2')
@@ -80,8 +59,6 @@ describe('updates store', () => {
     expect(apiMocks.invoke).toHaveBeenCalledWith('check_for_update', { channel: 'stable' })
     expect(target?.version).toBe('0.3.3')
     expect(store.showAvailableBadge).toBe(true)
-    // 有新版本时不再同时显示"刚升级"徽章。
-    expect(store.showJustUpdatedBadge).toBe(false)
 
     await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
     expect(store.updateNotes?.sections.features).toContain('0.3.3 新能力')

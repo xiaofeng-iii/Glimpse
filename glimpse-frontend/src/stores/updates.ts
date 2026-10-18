@@ -12,7 +12,6 @@ import {
 
 const logger = createLogger('stores/updates')
 
-export const LAST_RUN_VERSION_STORAGE_KEY = 'glimpse.lastRunVersion'
 // 开发假通道的标识，与 @/dev/fakeUpdateChannel 配套；生产构建里所有引用都会被 DEV 常量折叠掉。
 export const DEV_UPDATE_CHANNEL = 'dev-test'
 export const DEV_UPDATE_CHANNEL_STORAGE_KEY = 'glimpse.devUpdateChannel'
@@ -48,22 +47,6 @@ export interface AvailableUpdate {
   notes: string | null
 }
 
-const readLastRunVersion = () => {
-  try {
-    return window.localStorage.getItem(LAST_RUN_VERSION_STORAGE_KEY)
-  } catch {
-    return null
-  }
-}
-
-const writeLastRunVersion = (version: string) => {
-  try {
-    window.localStorage.setItem(LAST_RUN_VERSION_STORAGE_KEY, version)
-  } catch {
-    // localStorage 不可用时本次会话仍提示，下次启动再试。
-  }
-}
-
 export const useUpdatesStore = defineStore('updates', () => {
   const settingsStore = useSettingsStore()
 
@@ -72,8 +55,6 @@ export const useUpdatesStore = defineStore('updates', () => {
   const checking = ref(false)
   const installing = ref(false)
   const installFailed = ref(false)
-  const justUpdated = ref(false)
-  const justUpdatedNotesSeen = ref(false)
 
   const updateNotes = ref<Notes | null>(null)
   const updateNotesLoading = ref(false)
@@ -87,9 +68,6 @@ export const useUpdatesStore = defineStore('updates', () => {
   let currentNotesRequested = false
 
   const showAvailableBadge = computed(() => Boolean(availableUpdate.value))
-  const showJustUpdatedBadge = computed(
-    () => !availableUpdate.value && justUpdated.value && !justUpdatedNotesSeen.value,
-  )
 
   const devChannel = ref(readDevChannelEnabled())
 
@@ -125,11 +103,6 @@ export const useUpdatesStore = defineStore('updates', () => {
   const recordCurrentVersion = (version: string) => {
     if (!version) return
     currentVersion.value = version
-    const lastRun = readLastRunVersion()
-    if (lastRun === version) return
-    // 首次启动不写回：lastRun 为空不算"刚更新"，只建立基线。
-    if (lastRun) justUpdated.value = true
-    writeLastRunVersion(version)
   }
 
   const checkForUpdate = async (): Promise<AvailableUpdate | null> => {
@@ -246,19 +219,13 @@ export const useUpdatesStore = defineStore('updates', () => {
     })
   }
 
-  const dismissJustUpdated = () => {
-    justUpdatedNotesSeen.value = true
-  }
-
   return {
     currentVersion,
     availableUpdate,
     checking,
     installing,
     installFailed,
-    justUpdated,
     showAvailableBadge,
-    showJustUpdatedBadge,
     updateNotes,
     updateNotesLoading,
     updateNotesPartial,
@@ -271,7 +238,6 @@ export const useUpdatesStore = defineStore('updates', () => {
     checkForUpdate,
     installUpdate,
     loadCurrentNotes,
-    dismissJustUpdated,
     refreshUpdateNotes,
   }
 })
