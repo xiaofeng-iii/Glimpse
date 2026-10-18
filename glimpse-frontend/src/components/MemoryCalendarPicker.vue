@@ -146,6 +146,15 @@ const currentPane = computed<CalendarPane>(() => ({
 const renderedPanes = computed(() => monthSlider.state.panes ?? [currentPane.value])
 const renderedYearPanes = computed(() => yearSlider.state.panes ?? [{ year: pickerYear.value }])
 
+// 滑动期间视口高度钉在目标月份：条带高度取决于新旧两格的较高者，不钉的话
+// 从高月份切到低月份时容器要等旧格被移除才收缩。行数可精确算出（行 × 2rem
+// 日格 + 行间 2px 间隙），钉上后外层 reveal 的高度过渡在两个方向都随切换同步开始
+const slideViewportHeight = computed(() => {
+  if (!monthSlider.state.panes) return undefined
+  const rows = currentPane.value.cells.length / 7
+  return `calc(${rows} * 2rem + ${rows - 1} * 2px)`
+})
+
 const shiftMonth = (delta: number) => {
   const previous = currentPane.value
   const next = new Date(viewYear.value, viewMonth.value + delta, 1)
@@ -365,6 +374,7 @@ onUnmounted(() => {
         <div
           class="memory-calendar__viewport"
           :class="{ 'memory-calendar__viewport--sliding': monthSlider.sliding }"
+          :style="{ height: slideViewportHeight }"
         >
           <div
             class="memory-calendar__strip"
@@ -576,6 +586,7 @@ onUnmounted(() => {
 .memory-calendar__strip {
   display: flex;
   width: 100%;
+  align-items: flex-start;
 }
 
 .memory-calendar__strip--animated {

@@ -340,6 +340,26 @@ describe('memory wall layout & grouping', () => {
       expect(wrapper.get('.memory-calendar__year').text()).toContain('2026')
     })
 
+    it('翻月滑动期间视口高度钉在目标月份，高切低也即时收缩', async () => {
+      // 2026 年 3 月 6 行、4 月 5 行：高切低
+      const wrapper = mountCalendar({
+        ...createEmptyMemoryFilters(),
+        dateFrom: '2026-03-10',
+        dateTo: '2026-03-10',
+      })
+      await wrapper.find('.memory-calendar__block').trigger('wheel', { deltaY: 120 })
+      // jsdom 会把 calc 规格化（5 行 × 2rem + 4 间隙 × 2px → calc(8px + 10rem)）
+      const slideStyle = wrapper.get('.memory-calendar__viewport').attributes('style') ?? ''
+      expect(slideStyle).toContain('calc(')
+      expect(slideStyle).toContain('10rem')
+
+      commitStripSlide(wrapper)
+      await flushPromises()
+      expect(
+        wrapper.get('.memory-calendar__viewport').attributes('style') ?? '',
+      ).not.toContain('height')
+    })
+
     it('速选面板滚轮翻年：向上回退、本年向下挡下', async () => {
       const wrapper = mountCalendar(createEmptyMemoryFilters())
       await wrapper.get('.memory-calendar__pick-btn').trigger('click')
