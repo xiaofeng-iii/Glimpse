@@ -160,6 +160,7 @@ body {
 .memory-card,
 .memory-detail,
 .notes-popover__body,
+.ocr-text,
 input,
 textarea,
 [contenteditable] {
