@@ -8,9 +8,12 @@ from fastapi import HTTPException
 from api.routes.settings import (
     INDEX_REPAIR_TASK_ID,
     OCR_BACKFILL_TASK_ID,
+    OCR_REPAIR_TASK_ID,
     get_ocr_backfill_status,
+    get_ocr_repair_status,
     start_index_repair,
     start_ocr_backfill,
+    start_ocr_repair,
 )
 from core.task_queue import TaskStatus
 
@@ -103,3 +106,85 @@ def test_get_ocr_backfill_status_uses_completed_result():
     assert response["running"] is False
     assert response["status"] == "completed"
     assert response["result"]["updated"] == 2
+
+
+def test_start_ocr_repair_returns_live_progress():
+    queue = MagicMock()
+    submitted = task(OCR_REPAIR_TASK_ID, TaskStatus.PENDING)
+    queue.get_task.return_value = None
+    queue.submit.return_value = submitted
+    memory_service = MagicMock()
+    memory_service.get_ocr_backfill_progress.return_value = {
+        "status": "running",
+        "mode": "repair",
+        "total": 5,
+        "processed": 2,
+        "updated": 2,
+        "succeeded": 2,
+        "skipped": 0,
+        "failed": 0,
+        "index_failed": 0,
+    }
+
+    with (
+        patch("api.routes.settings.get_task_queue", return_value=queue),
+        patch(
+            "api.routes.settings.get_memory_service",
+            return_value=memory_service,
+        ),
+    ):
+        response = asyncio.run(start_ocr_repair())
+
+    assert response["task_id"] == OCR_REPAIR_TASK_ID
+    assert response["running"] is True
+    assert response["result"]["processed"] == 2
+    queue.submit.assert_called_once_with(
+        OCR_REPAIR_TASK_ID,
+        memory_service.repair_ocr,
+    )
+
+
+def test_ocr_repair_conflicts_with_index_repair():
+    queue = MagicMock()
+
+    def get_task(task_id):
+        if task_id == INDEX_REPAIR_TASK_ID:
+            return task(task_id, TaskStatus.RUNNING)
+        return None
+
+    queue.get_task.side_effect = get_task
+    with patch("api.routes.settings.get_task_queue", return_value=queue):
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(start_ocr_repair())
+    assert error.value.status_code == 409
+
+
+def test_ocr_repair_conflicts_with_backfill():
+    queue = MagicMock()
+
+    def get_task(task_id):
+        if task_id == OCR_BACKFILL_TASK_ID:
+            return task(task_id, TaskStatus.RUNNING)
+        return None
+
+    queue.get_task.side_effect = get_task
+    with patch("api.routes.settings.get_task_queue", return_value=queue):
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(start_ocr_repair())
+    assert error.value.status_code == 409
+
+
+def test_get_ocr_repair_status_uses_completed_result():
+    queue = MagicMock()
+    queue.get_task.return_value = task(
+        OCR_REPAIR_TASK_ID,
+        TaskStatus.COMPLETED,
+        result={"status": "completed", "mode": "repair", "processed": 3, "updated": 3},
+    )
+
+    with patch("api.routes.settings.get_task_queue", return_value=queue):
+        response = asyncio.run(get_ocr_repair_status())
+
+    assert response["running"] is False
+    assert response["status"] == "completed"
+    assert response["result"]["updated"] == 3

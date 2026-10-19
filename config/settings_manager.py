@@ -92,7 +92,12 @@ class SettingsManager:
             },
             "ocr": {
                 "engine": "rapidocr",
-                "language": "ch"
+                "language": "ch",
+                "mode": "local",
+                "provider": "baidu",
+                "api_key": "",
+                "secret_key": "",
+                "timeout": 30,
             },
             "database": {
                 "sqlite_timeout": 30,
@@ -292,6 +297,21 @@ class SettingsManager:
             return False
         if "language" in section and not isinstance(section["language"], str):
             return False
+        if "mode" in section and section["mode"] not in {"local", "cloud"}:
+            return False
+        if "provider" in section and section["provider"] not in {"baidu"}:
+            return False
+        for key in ("api_key", "secret_key"):
+            if key in section and not isinstance(section[key], str):
+                return False
+        if "timeout" in section:
+            if not isinstance(section["timeout"], int) or section["timeout"] <= 0:
+                return False
+        if section.get("mode") == "cloud":
+            if not str(section.get("api_key") or "").strip():
+                return False
+            if not str(section.get("secret_key") or "").strip():
+                return False
         return True
 
     def _validate_database(self, section: Dict[str, Any], required_keys: bool = False) -> bool:

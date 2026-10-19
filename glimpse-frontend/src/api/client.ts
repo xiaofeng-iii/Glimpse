@@ -82,11 +82,21 @@ export interface Memory {
   tags?: MemoryTag[]
 }
 
+export interface OcrSettings {
+  engine?: string
+  language?: string
+  mode?: 'local' | 'cloud'
+  provider?: 'baidu'
+  api_key?: string
+  secret_key?: string
+  timeout?: number
+}
+
 export interface Settings {
   hotkeys: Record<string, string>
   screenshot: Record<string, any>
   ai: Record<string, any>
-  ocr: Record<string, any>
+  ocr: OcrSettings
   ui: Record<string, any> & {
     update_channel?: 'stable' | 'preview'
     update_mirror_mode?: 'auto' | 'direct' | 'mirror'
@@ -105,6 +115,7 @@ export interface IndexRepairResult {
 
 export interface OcrBackfillResult {
   status?: string
+  mode?: 'backfill' | 'repair'
   total?: number
   processed: number
   updated?: number
@@ -206,6 +217,13 @@ export const memoriesApi = {
     const response = await api.patch(`/memories/${id}`, { tags })
     return response.data
   },
+
+  reocr: async (id: string): Promise<Memory> => {
+    // A clustered memory can hold up to ten images; allow the serial OCR pass
+    // to finish instead of cutting it off at the default request timeout.
+    const response = await api.post(`/memories/${id}/ocr`, undefined, { timeout: 180000 })
+    return response.data
+  },
 }
 
 // Tags API
@@ -295,6 +313,14 @@ export const settingsApi = {
     const response = await api.post('/settings/ai/test', { api_key: apiKey, base_url: baseUrl, model })
     return response.data
   },
+
+  testOcrCloud: async (apiKey?: string, secretKey?: string): Promise<{ success: boolean, message: string }> => {
+    const response = await api.post('/settings/ocr/cloud/test', {
+      api_key: apiKey,
+      secret_key: secretKey,
+    })
+    return response.data
+  },
 }
 
 // Index maintenance API
@@ -319,6 +345,16 @@ export const ocrApi = {
 
   status: async (): Promise<OcrBackfillStatus> => {
     const response = await api.get('/settings/ocr/backfill')
+    return response.data
+  },
+
+  repair: async (): Promise<OcrBackfillStatus> => {
+    const response = await api.post('/settings/ocr/repair')
+    return response.data
+  },
+
+  repairStatus: async (): Promise<OcrBackfillStatus> => {
+    const response = await api.get('/settings/ocr/repair')
     return response.data
   },
 }

@@ -689,6 +689,21 @@ class SQLiteManager:
         )
         return [MemoryRecord.from_row(row) for row in cursor.fetchall()]
 
+    def get_all_image_memories(self) -> List[MemoryRecord]:
+        """Return every settled image-backed memory for a full OCR repair."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            SELECT * FROM memories
+            WHERE memory_type != 'text'
+              AND analysis_status != 'PROCESSING'
+              AND image_path IS NOT NULL
+              AND TRIM(image_path) != ''
+            ORDER BY created_at ASC, id ASC
+            """
+        )
+        return [MemoryRecord.from_row(row) for row in cursor.fetchall()]
+
     def delete_memory(self, memory_id: str) -> bool:
         with self._write_lock:
             try:

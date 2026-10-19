@@ -66,6 +66,10 @@ const copySummary = async () => {
   }
 }
 
+const handleOcrUpdated = (updated: Memory) => {
+  memoriesStore.upsert(updated)
+}
+
 const confirmDelete = async () => {
   deleting.value = true
   try {
@@ -148,7 +152,13 @@ defineExpose({ canLeave })
       <!-- 标签与分析状态无关：分析进行中同样可编辑。 -->
       <MemoryTagsEditor ref="tagsEditor" :memory="memory" compact />
 
-      <OcrText v-if="!textMemory && !analyzing && !analysisUnavailable" :text="memory.text_content" compact />
+      <OcrText
+        v-if="!textMemory && !analyzing && !analysisUnavailable"
+        :text="memory.text_content"
+        :memory-id="memory.id"
+        compact
+        @updated="handleOcrUpdated"
+      />
 
       <button
         v-if="!analyzing"

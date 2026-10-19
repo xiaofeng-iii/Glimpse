@@ -44,6 +44,10 @@ export const useSettingsStore = defineStore('settings', () => {
     return settingsApi.testAi(apiKey, baseUrl, model)
   }
 
+  const testOcrCloud = async (apiKey?: string, secretKey?: string) => {
+    return settingsApi.testOcrCloud(apiKey, secretKey)
+  }
+
   return {
     settings,
     isLoading,
@@ -51,5 +55,6 @@ export const useSettingsStore = defineStore('settings', () => {
     update,
     reset,
     testAi,
+    testOcrCloud,
   }
 })

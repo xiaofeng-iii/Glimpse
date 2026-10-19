@@ -124,6 +124,13 @@ def mock_services():
         for record in records.values()
         if not (record.text_content or "").strip()
     ]
+    sqlite_mgr.get_all_image_memories.side_effect = lambda: [
+        copy.deepcopy(record)
+        for record in records.values()
+        if getattr(record, "memory_type", "screenshot") != "text"
+        and getattr(record, "analysis_status", "COMPLETED") != "PROCESSING"
+        and (record.image_path or "").strip()
+    ]
     sqlite_mgr.delete_memory.side_effect = lambda memory_id: records.pop(
         memory_id, None
     ) is not None
@@ -678,6 +685,7 @@ class TestOCRBackfill:
 
         assert result == {
             "status": "completed",
+            "mode": "backfill",
             "total": 1,
             "processed": 1,
             "succeeded": 1,
@@ -732,6 +740,137 @@ class TestOCRBackfill:
         assert result["skipped"] == 1
         assert result["updated"] == 0
         mock_services["ocr_engine"].extract_text.assert_not_called()
+
+
+class TestOCRRepair:
+    def test_repair_updates_existing_text_and_reindexes(self, mock_services):
+        add_record(
+            mock_services,
+            text_content="old text",
+            extra_images=json.dumps(["second.png"]),
+            sync_status="SYNCED",
+        )
+        mock_services["ocr_engine"].extract_text.side_effect = ["first", "second"]
+        service = make_service(mock_services)
+
+        result = service.repair_ocr()
+
+        assert result["status"] == "completed"
+        assert result["mode"] == "repair"
+        assert result["total"] == 1
+        assert result["processed"] == 1
+        assert result["updated"] == 1
+        assert result["failed"] == 0
+        record = mock_services["sqlite_manager"]._records["memory-1"]
+        assert record.text_content == "first\n\nsecond"
+        assert record.sync_status == "SYNCED"
+        mock_services["chroma_manager"].upsert_memory.assert_called_once()
+
+    def test_repair_skips_unchanged_text(self, mock_services):
+        add_record(mock_services, text_content="same text")
+        mock_services["ocr_engine"].extract_text.return_value = "same text"
+        service = make_service(mock_services)
+
+        result = service.repair_ocr()
+
+        assert result["processed"] == 1
+        assert result["skipped"] == 1
+        assert result["updated"] == 0
+        mock_services["chroma_manager"].upsert_memory.assert_not_called()
+
+    def test_repair_skips_text_memories(self, mock_services):
+        add_record(
+            mock_services,
+            image_path="",
+            text_content="manual",
+            memory_type="text",
+        )
+        service = make_service(mock_services)
+
+        result = service.repair_ocr()
+
+        assert result["total"] == 0
+        mock_services["ocr_engine"].extract_text.assert_not_called()
+
+    def test_repair_preserves_summary(self, mock_services):
+        add_record(mock_services, text_content="old text", ai_summary="user summary")
+        mock_services["ocr_engine"].extract_text.return_value = "new text"
+        service = make_service(mock_services)
+
+        service.repair_ocr()
+
+        record = mock_services["sqlite_manager"]._records["memory-1"]
+        assert record.ai_summary == "user summary"
+        assert record.text_content == "new text"
+
+    def test_repair_counts_ocr_failures(self, mock_services):
+        add_record(mock_services, text_content="old text")
+        mock_services["ocr_engine"].extract_text.side_effect = RuntimeError("bad image")
+        service = make_service(mock_services)
+
+        result = service.repair_ocr()
+
+        assert result["processed"] == 1
+        assert result["failed"] == 1
+        assert result["updated"] == 0
+        assert mock_services["sqlite_manager"]._records["memory-1"].text_content == "old text"
+
+
+class TestReocrMemory:
+    def test_reocr_updates_text_and_schedules_reindex(self, mock_services):
+        add_record(mock_services, text_content="old text")
+        mock_services["ocr_engine"].extract_text.return_value = "new text"
+        service = make_service(mock_services, with_queue=True)
+
+        updated = service.reocr_memory("memory-1")
+
+        assert updated is not None
+        assert updated.text_content == "new text"
+        assert updated.sync_status == "PENDING"
+        mock_services["task_queue"].submit.assert_called_once()
+
+    def test_reocr_preserves_summary(self, mock_services):
+        add_record(mock_services, text_content="old text", ai_summary="user summary")
+        mock_services["ocr_engine"].extract_text.return_value = "new text"
+        service = make_service(mock_services, with_queue=True)
+
+        updated = service.reocr_memory("memory-1")
+
+        assert updated is not None
+        assert updated.ai_summary == "user summary"
+        assert updated.text_content == "new text"
+
+    def test_reocr_rejects_text_memory(self, mock_services):
+        add_record(mock_services, image_path="", memory_type="text")
+        service = make_service(mock_services)
+
+        with pytest.raises(ValueError):
+            service.reocr_memory("memory-1")
+
+    def test_reocr_returns_none_for_missing_memory(self, mock_services):
+        service = make_service(mock_services)
+
+        assert service.reocr_memory("missing") is None
+
+    def test_reocr_refuses_while_maintenance_is_running(self, mock_services):
+        add_record(mock_services)
+        service = make_service(mock_services)
+        service._maintenance_lock.acquire()
+        try:
+            with pytest.raises(RuntimeError, match="maintenance is running"):
+                service.reocr_memory("memory-1")
+        finally:
+            service._maintenance_lock.release()
+
+    def test_reocr_raises_when_no_text_is_recognized(self, mock_services):
+        add_record(mock_services, text_content="old text")
+        mock_services["ocr_engine"].extract_text.return_value = None
+        service = make_service(mock_services)
+
+        with pytest.raises(RuntimeError, match="No text recognized"):
+            service.reocr_memory("memory-1")
+
+        assert mock_services["sqlite_manager"]._records["memory-1"].text_content == "old text"
 
 
 class TestMemoryServiceQueryAndDelete:

@@ -63,6 +63,7 @@ class MemoryService:
     def _empty_ocr_backfill_progress() -> dict:
         return {
             "status": "idle",
+            "mode": "backfill",
             "total": 0,
             "processed": 0,
             "succeeded": 0,
@@ -881,6 +882,110 @@ class MemoryService:
             progress["status"] = "completed"
             self._set_ocr_backfill_progress(progress)
             return dict(progress)
+
+    def repair_ocr(self) -> dict:
+        """Re-run OCR for every image memory and refresh text plus search index."""
+        with self._maintenance_lock:
+            memories = self._sqlite_manager.get_all_image_memories()
+            progress = self._empty_ocr_backfill_progress()
+            progress.update({"status": "running", "mode": "repair", "total": len(memories)})
+            self._set_ocr_backfill_progress(progress)
+
+            for snapshot in memories:
+                current = self._sqlite_manager.get_memory_by_id(snapshot.id)
+                if current is None:
+                    progress["processed"] += 1
+                    progress["skipped"] += 1
+                    self._set_ocr_backfill_progress(progress)
+                    continue
+                if getattr(current, "memory_type", "screenshot") == "text":
+                    progress["processed"] += 1
+                    progress["skipped"] += 1
+                    self._set_ocr_backfill_progress(progress)
+                    continue
+                image_paths = self._memory_image_paths(current)
+                if not image_paths:
+                    progress["processed"] += 1
+                    progress["skipped"] += 1
+                    self._set_ocr_backfill_progress(progress)
+                    continue
+
+                text_content, ocr_failures = self._extract_ocr_text(image_paths)
+                progress["processed"] += 1
+                if not text_content:
+                    if ocr_failures:
+                        progress["failed"] += 1
+                    else:
+                        progress["skipped"] += 1
+                    self._set_ocr_backfill_progress(progress)
+                    continue
+                if (current.text_content or "").strip() == text_content.strip():
+                    progress["skipped"] += 1
+                    self._set_ocr_backfill_progress(progress)
+                    continue
+
+                updated_ok = self._sqlite_manager.update_memory_text_content(
+                    current.id,
+                    text_content,
+                    sync_status="PENDING",
+                )
+                if not updated_ok:
+                    progress["failed"] += 1
+                    self._set_ocr_backfill_progress(progress)
+                    continue
+
+                progress["succeeded"] += 1
+                progress["updated"] += 1
+                pending = self._sqlite_manager.get_memory_by_id(current.id)
+                self._emit_memory_updated(pending)
+                if not self._reindex_memory(current.id):
+                    progress["index_failed"] += 1
+                self._set_ocr_backfill_progress(progress)
+
+            progress["status"] = "completed"
+            self._set_ocr_backfill_progress(progress)
+            return dict(progress)
+
+    def reocr_memory(self, memory_id: str):
+        """Re-run OCR for one image memory without changing its caption."""
+        acquired = self._maintenance_lock.acquire(blocking=False)
+        if not acquired:
+            raise RuntimeError("OCR maintenance is running")
+
+        try:
+            memory = self._sqlite_manager.get_memory_by_id(memory_id)
+            if memory is None:
+                return None
+            if getattr(memory, "memory_type", "screenshot") == "text":
+                raise ValueError("Text memories do not have OCR text")
+            image_paths = self._memory_image_paths(memory)
+            if not image_paths:
+                raise ValueError("Memory has no images")
+
+            text_content, ocr_failures = self._extract_ocr_text(image_paths)
+            if not text_content:
+                if ocr_failures:
+                    raise RuntimeError("OCR failed")
+                raise RuntimeError("No text recognized")
+
+            with self._get_memory_reindex_lock(memory_id):
+                current = self._sqlite_manager.get_memory_by_id(memory_id)
+                if current is None:
+                    return None
+                updated_ok = self._sqlite_manager.update_memory_text_content(
+                    memory_id,
+                    text_content,
+                    sync_status="PENDING",
+                )
+                if not updated_ok:
+                    raise RuntimeError("Failed to update OCR text")
+                updated = self._sqlite_manager.get_memory_by_id(memory_id)
+                self._emit_memory_updated(updated)
+
+            self.schedule_memory_reindex(memory_id)
+            return self._sqlite_manager.get_memory_by_id(memory_id) or updated
+        finally:
+            self._maintenance_lock.release()
 
     def _set_ocr_backfill_progress(self, progress: dict) -> None:
         with self._ocr_progress_lock:

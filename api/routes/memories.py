@@ -293,6 +293,27 @@ async def get_memory(memory_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/{memory_id}/ocr", response_model=MemoryResponse)
+async def reocr_memory(memory_id: str):
+    """Re-run OCR for one image memory and queue its semantic reindex."""
+    try:
+        memory_service = get_memory_service()
+        memory = await run_in_threadpool(memory_service.reocr_memory, memory_id)
+        if memory is None:
+            raise HTTPException(status_code=404, detail=f"Memory {memory_id} not found")
+        return MemoryResponse(**memory_to_response(memory))
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        if "maintenance is running" in str(exc):
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.patch("/{memory_id}", response_model=MemoryResponse)
 async def update_memory(memory_id: str, request: MemoryUpdateRequest):
     """Update user-editable memory fields and queue semantic reindexing."""

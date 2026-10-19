@@ -18,8 +18,10 @@ from pathlib import Path
 
 if __package__:
     from .set_version import VersionSyncError, validate_version
+    from .fetch_ocr_models import ensure_ocr_models
 else:
     from set_version import VersionSyncError, validate_version
+    from fetch_ocr_models import ensure_ocr_models
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -52,6 +54,8 @@ HASH_INPUTS = [
     "runtime_env.py",
     "requirements*.txt",
     "assets/icons/glimpse.ico",
+    "assets/ocr",
+    "scripts/fetch_ocr_models.py",
     "glimpse-frontend/src-tauri/Cargo.toml",
     "scripts/build_backend_sidecar.py",
 ]
@@ -66,6 +70,13 @@ EXCLUDED_DIR_NAMES = {
 EXCLUDED_FILE_PATTERNS = {
     "*.pyc",
     "*.pyo",
+}
+
+# RapidOCR still ships PP-OCRv6-small inside its wheel. Glimpse now uses
+# PP-OCRv5-mobile from assets/ocr, so keep only the shared classifier.
+LEGACY_OCR_MODEL_FILES = {
+    "PP-OCRv6_det_small.onnx",
+    "PP-OCRv6_rec_small.onnx",
 }
 
 PYINSTALLER_DYNAMIC_PACKAGES = (
@@ -145,6 +156,16 @@ def dedupe(items: list[str]) -> list[str]:
             seen.add(item)
             ordered.append(item)
     return ordered
+
+
+def filter_legacy_ocr_models(
+    datas: list[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    return [
+        (source, destination)
+        for source, destination in datas
+        if Path(source).name not in LEGACY_OCR_MODEL_FILES
+    ]
 
 
 def resource_separator() -> str:
@@ -434,7 +455,11 @@ def collect_pyinstaller_resources() -> tuple[list[str], list[tuple[str, str]], l
         except Exception as exc:
             print(f"[warn] Unable to copy package metadata for {package}: {exc}")
 
-    return dedupe(hiddenimports), datas, binaries
+    ocr_model_dir = PROJECT_ROOT / "assets" / "ocr"
+    for model_path in sorted(ocr_model_dir.glob("*.onnx")):
+        datas.append((str(model_path), "assets/ocr"))
+
+    return dedupe(hiddenimports), filter_legacy_ocr_models(datas), binaries
 
 
 def packaging_python_candidates() -> list[Path]:
@@ -510,6 +535,7 @@ def build_pyinstaller_args(
 
 
 def build_backend_sidecar(build_name: str, build_hash: str) -> int:
+    ensure_ocr_models(PROJECT_ROOT / "assets" / "ocr")
 
     try:
         import PyInstaller.__main__
@@ -565,6 +591,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     build_name = BUILD_NAME
+    ensure_ocr_models(PROJECT_ROOT / "assets" / "ocr")
     build_hash = compute_backend_hash()
 
     if args.if_needed and sidecar_is_current(build_hash, build_name):

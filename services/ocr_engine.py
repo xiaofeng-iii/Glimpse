@@ -3,14 +3,160 @@ OCR Engine - OCR 抽象类与具体实现
 """
 from abc import ABC, abstractmethod
 import math
+import sys
 from pathlib import Path
 from threading import Lock
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from utils.logger import get_logger
 
 
 logger = get_logger(__name__)
+
+
+def _is_cjk(char: str) -> bool:
+    if not char:
+        return False
+    code = ord(char)
+    return (
+        0x3400 <= code <= 0x9FFF
+        or 0xF900 <= code <= 0xFAFF
+        or 0x3000 <= code <= 0x303F
+        or 0xFF00 <= code <= 0xFFEF
+    )
+
+
+def _box_to_rect(points) -> Optional[Tuple[float, float, float, float]]:
+    try:
+        xs = [float(point[0]) for point in points]
+        ys = [float(point[1]) for point in points]
+    except (TypeError, ValueError, IndexError):
+        return None
+    if not xs or not ys:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _join_line_items(items: Sequence[dict]) -> str:
+    if not items:
+        return ""
+    result = items[0]["text"]
+    previous = items[0]
+    for item in items[1:]:
+        text = item["text"]
+        if not text:
+            continue
+        left = result[-1] if result else ""
+        right = text[0]
+        separator = ""
+        if not _is_cjk(left) and not _is_cjk(right):
+            if right in ",.;:!?%)]}":
+                separator = ""
+            elif left in "([{":
+                separator = ""
+            elif left in ",;:!?.":
+                separator = " "
+            elif left in "-'/@":
+                separator = ""
+            elif len(previous["text"]) >= 2 and len(text) >= 3:
+                # PP-OCRv5 word boxes often touch; rely on word length rather
+                # than the detected gap so "Operating" + "System" keeps a space.
+                separator = " "
+        result += separator + text
+        previous = item
+    return result.strip()
+
+
+def merge_ocr_lines(texts: Sequence[str], boxes) -> Optional[str]:
+    """Merge word/character boxes into visual lines.
+
+    PP-OCRv5 mobile often emits word-level boxes. Joining ``txts`` directly
+    produces one word per line; grouping by vertical overlap restores the
+    visual line and keeps CJK text free of artificial spaces.
+    """
+    normalized = [str(text).strip() for text in texts if str(text).strip()]
+    if not normalized:
+        return None
+    if boxes is None or len(boxes) != len(texts):
+        return "\n".join(normalized)
+
+    items: List[dict] = []
+    malformed = False
+    for text, points in zip(texts, boxes):
+        value = str(text).strip()
+        if not value:
+            continue
+        rect = _box_to_rect(points)
+        if rect is None:
+            malformed = True
+            break
+        x1, y1, x2, y2 = rect
+        items.append(
+            {
+                "text": value,
+                "x1": x1,
+                "y1": y1,
+                "x2": x2,
+                "y2": y2,
+                "h": max(1.0, y2 - y1),
+                "cy": (y1 + y2) / 2.0,
+            }
+        )
+    if malformed:
+        return "\n".join(normalized)
+    if not items:
+        return None
+
+    items.sort(key=lambda item: (item["cy"], item["x1"]))
+    lines: List[dict] = []
+    for item in items:
+        target = None
+        for line in lines:
+            overlap = min(item["y2"], line["y2"]) - max(item["y1"], line["y1"])
+            line_height = max(1.0, line["y2"] - line["y1"])
+            min_height = min(item["h"], line_height)
+            if min_height <= 0:
+                continue
+            if overlap / min_height < 0.5:
+                continue
+            if abs(item["cy"] - line["cy"]) > max(item["h"], line_height) * 0.75:
+                continue
+            target = line
+            break
+
+        if target is None:
+            lines.append(
+                {
+                    "y1": item["y1"],
+                    "y2": item["y2"],
+                    "cy": item["cy"],
+                    "items": [item],
+                }
+            )
+            continue
+
+        target["items"].append(item)
+        target["y1"] = min(target["y1"], item["y1"])
+        target["y2"] = max(target["y2"], item["y2"])
+        target["cy"] = (target["y1"] + target["y2"]) / 2.0
+
+    lines.sort(key=lambda line: (line["y1"], min(item["x1"] for item in line["items"])))
+    output: List[str] = []
+    for line in lines:
+        line_items = sorted(line["items"], key=lambda item: item["x1"])
+        average_height = sum(item["h"] for item in line_items) / len(line_items)
+        max_gap = max(average_height * 4.0, 24.0)
+        segments: List[List[dict]] = [[line_items[0]]]
+        for item in line_items[1:]:
+            if item["x1"] - segments[-1][-1]["x2"] > max_gap:
+                segments.append([item])
+            else:
+                segments[-1].append(item)
+        for segment in segments:
+            joined = _join_line_items(segment)
+            if joined:
+                output.append(joined)
+    return "\n".join(output) if output else None
 
 
 class OCREngine(ABC):
@@ -54,47 +200,61 @@ class NativeOCREngine(OCREngine):
 
 
 class RapidOCREngine(OCREngine):
-    """RapidOCR 3.x engine using the bundled PP-OCRv6-small ONNX models."""
+    """RapidOCR 3.x engine using bundled PP-OCRv5-mobile ONNX models."""
 
-    _MODEL_FILENAMES = {
-        "Det.model_path": "PP-OCRv6_det_small.onnx",
-        "Cls.model_path": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
-        "Rec.model_path": "PP-OCRv6_rec_small.onnx",
-    }
+    _DET_FILENAME = "ch_PP-OCRv5_det_mobile.onnx"
+    _REC_FILENAME = "ch_PP-OCRv5_rec_mobile.onnx"
+    _CLS_FILENAME = "ch_ppocr_mobile_v2.0_cls_mobile.onnx"
 
-    def __init__(self):
+    def __init__(self, model_dir: Optional[Path] = None):
+        self._model_dir = Path(model_dir) if model_dir else self._default_model_dir()
         self._engine = None
         self._initialization_attempted = False
         self._initialization_lock = Lock()
         self._inference_lock = Lock()
 
-    @classmethod
-    def _resolve_bundled_model_paths(cls, rapidocr_module) -> Optional[Dict[str, str]]:
-        """Resolve only the models shipped inside the installed RapidOCR package.
+    @staticmethod
+    def _default_model_dir() -> Path:
+        if getattr(sys, "frozen", False):
+            base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+        else:
+            base = Path(__file__).resolve().parent.parent
+        return base / "assets" / "ocr"
 
-        RapidOCR downloads a default model when ``model_path`` is omitted.  The
-        desktop runtime must remain fully offline, so initialization is aborted
-        before constructing RapidOCR unless every fixed model asset is present.
-        """
+    @classmethod
+    def _resolve_model_paths(cls, rapidocr_module, model_dir: Path) -> Optional[Dict[str, str]]:
+        """Resolve bundled models without ever allowing a runtime download."""
         package_file = getattr(rapidocr_module, "__file__", None)
         if not package_file:
             logger.warning("RapidOCR package path is unavailable; OCR is disabled")
             return None
 
-        model_dir = (Path(package_file).resolve().parent / "models").resolve()
-        resolved = {
-            key: (model_dir / filename).resolve()
-            for key, filename in cls._MODEL_FILENAMES.items()
-        }
-        missing = [path.name for path in resolved.values() if not path.is_file()]
-        if missing:
-            logger.warning(
-                "Bundled RapidOCR models are incomplete; OCR is disabled (missing: %s)",
-                ", ".join(missing),
-            )
-            return None
+        package_dir = (Path(package_file).resolve().parent / "models").resolve()
+        cls_path = package_dir / cls._CLS_FILENAME
+        det_path = (model_dir / cls._DET_FILENAME).resolve()
+        rec_path = (model_dir / cls._REC_FILENAME).resolve()
+        if det_path.is_file() and rec_path.is_file() and cls_path.is_file():
+            return {
+                "Det.model_path": str(det_path),
+                "Rec.model_path": str(rec_path),
+                "Cls.model_path": str(cls_path),
+                "variant": "PP-OCRv5-mobile",
+            }
 
-        return {key: str(path) for key, path in resolved.items()}
+        missing = [
+            path.name
+            for path, exists in (
+                (det_path, det_path.is_file()),
+                (rec_path, rec_path.is_file()),
+                (cls_path, cls_path.is_file()),
+            )
+            if not exists
+        ]
+        logger.warning(
+            "Bundled PP-OCRv5-mobile models are incomplete; OCR is disabled (missing: %s)",
+            ", ".join(missing),
+        )
+        return None
 
     def _get_engine(self):
         if self._engine is not None:
@@ -120,28 +280,39 @@ class RapidOCREngine(OCREngine):
                     RapidOCR,
                 )
 
-                model_paths = self._resolve_bundled_model_paths(rapidocr)
+                model_paths = self._resolve_model_paths(rapidocr, self._model_dir)
                 if model_paths is None:
                     return None
 
                 self._engine = RapidOCR(
                     params={
                         "Global.log_level": "warning",
+                        "Global.max_side_len": 4000,
+                        "Global.use_preprocess_img": True,
                         "Det.engine_type": EngineType.ONNXRUNTIME,
                         "Det.lang_type": LangDet.CH,
-                        "Det.model_type": ModelType.SMALL,
-                        "Det.ocr_version": OCRVersion.PPOCRV6,
+                        "Det.model_type": ModelType.MOBILE,
+                        "Det.ocr_version": OCRVersion.PPOCRV5,
+                        "Det.limit_side_len": 1280,
+                        "Det.limit_type": "min",
+                        "Det.model_path": model_paths["Det.model_path"],
                         "Cls.engine_type": EngineType.ONNXRUNTIME,
+                        "Cls.model_path": model_paths["Cls.model_path"],
                         "Rec.engine_type": EngineType.ONNXRUNTIME,
                         "Rec.lang_type": LangRec.CH,
-                        "Rec.model_type": ModelType.SMALL,
-                        "Rec.ocr_version": OCRVersion.PPOCRV6,
-                        **model_paths,
+                        "Rec.model_type": ModelType.MOBILE,
+                        "Rec.ocr_version": OCRVersion.PPOCRV5,
+                        "Rec.model_path": model_paths["Rec.model_path"],
                         "EngineConfig.onnxruntime.use_cuda": False,
                         "EngineConfig.onnxruntime.use_dml": False,
                         "EngineConfig.onnxruntime.use_cann": False,
                         "EngineConfig.onnxruntime.use_coreml": False,
                     }
+                )
+                logger.info(
+                    "RapidOCR initialized with %s models from %s",
+                    model_paths["variant"],
+                    self._model_dir,
                 )
             except Exception as exc:
                 logger.warning("RapidOCR initialization failed: %s", exc)
@@ -170,9 +341,7 @@ class RapidOCREngine(OCREngine):
         texts = getattr(result, "txts", None)
         if not texts:
             return None
-
-        normalized = [str(text).strip() for text in texts if str(text).strip()]
-        return "\n".join(normalized) if normalized else None
+        return merge_ocr_lines(texts, getattr(result, "boxes", None))
 
     def extract_text_boxes(self, image_path: str) -> List[Tuple[str, Tuple[int, int, int, int]]]:
         result = self._run(image_path)
@@ -189,22 +358,17 @@ class RapidOCREngine(OCREngine):
             normalized_text = str(text).strip()
             if not normalized_text:
                 continue
-            try:
-                xs = [float(point[0]) for point in points]
-                ys = [float(point[1]) for point in points]
-            except (TypeError, ValueError, IndexError):
+            rect = _box_to_rect(points)
+            if rect is None:
                 logger.warning("Ignoring malformed RapidOCR box: %r", points)
                 continue
-            if not xs or not ys:
-                continue
-
-            rectangle = (
-                math.floor(min(xs)),
-                math.floor(min(ys)),
-                math.ceil(max(xs)),
-                math.ceil(max(ys)),
+            x1, y1, x2, y2 = rect
+            results.append(
+                (
+                    normalized_text,
+                    (math.floor(x1), math.floor(y1), math.ceil(x2), math.ceil(y2)),
+                )
             )
-            results.append((normalized_text, rectangle))
         return results
 
 
