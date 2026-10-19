@@ -228,6 +228,172 @@ def test_memory_update_schema_rejects_invalid_summary(summary):
         MemoryUpdateRequest(ai_summary=summary)
 
 
+def _tagged_memory(*tag_names):
+    from db.sqlite_manager import TagRecord
+
+    memory = make_memory()
+    memory.tags = [
+        TagRecord(id=index + 1, name=name)
+        for index, name in enumerate(tag_names)
+    ]
+    return memory
+
+
+def test_patch_memory_without_tags_field_leaves_tags_untouched():
+    from api.routes.memories import update_memory
+
+    memory_service = MagicMock()
+    memory_service.update_memory_summary.return_value = _tagged_memory("工作")
+
+    with patch(
+        "api.routes.memories.get_memory_service",
+        return_value=memory_service,
+    ):
+        response = asyncio.run(
+            update_memory(
+                "memory-1",
+                MemoryUpdateRequest(ai_summary="updated"),
+            )
+        )
+
+    memory_service.update_memory_tags.assert_not_called()
+    assert [tag.name for tag in response.tags] == ["工作"]
+
+
+def test_patch_memory_replaces_tags_and_returns_them():
+    from api.routes.memories import update_memory
+
+    memory_service = MagicMock()
+    memory_service.update_memory_tags.return_value = _tagged_memory("工作", "灵感")
+
+    with patch(
+        "api.routes.memories.get_memory_service",
+        return_value=memory_service,
+    ):
+        response = asyncio.run(
+            update_memory(
+                "memory-1",
+                MemoryUpdateRequest(tags=[" 工作 ", "灵感"]),
+            )
+        )
+
+    # schema 先完成规范化，service 收到的是去空白后的名称。
+    memory_service.update_memory_tags.assert_called_once_with(
+        "memory-1",
+        ["工作", "灵感"],
+    )
+    memory_service.update_memory_summary.assert_not_called()
+    memory_service.update_memory_user_text.assert_not_called()
+    assert [tag.model_dump() for tag in response.tags] == [
+        {"id": 1, "name": "工作"},
+        {"id": 2, "name": "灵感"},
+    ]
+
+
+def test_patch_memory_with_empty_tags_clears():
+    from api.routes.memories import update_memory
+
+    memory_service = MagicMock()
+    memory_service.update_memory_tags.return_value = _tagged_memory()
+
+    with patch(
+        "api.routes.memories.get_memory_service",
+        return_value=memory_service,
+    ):
+        response = asyncio.run(
+            update_memory("memory-1", MemoryUpdateRequest(tags=[]))
+        )
+
+    memory_service.update_memory_tags.assert_called_once_with("memory-1", [])
+    assert response.tags == []
+
+
+def test_patch_memory_tags_missing_returns_404():
+    from api.routes.memories import update_memory
+
+    memory_service = MagicMock()
+    memory_service.update_memory_tags.return_value = None
+
+    with patch(
+        "api.routes.memories.get_memory_service",
+        return_value=memory_service,
+    ):
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(
+                update_memory("missing", MemoryUpdateRequest(tags=["工作"]))
+            )
+
+    assert error.value.status_code == 404
+
+
+def test_patch_memory_tag_validation_failure_returns_422():
+    from api.routes.memories import update_memory
+
+    memory_service = MagicMock()
+    memory_service.update_memory_tags.side_effect = ValueError("bad tag")
+
+    with patch(
+        "api.routes.memories.get_memory_service",
+        return_value=memory_service,
+    ):
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(
+                update_memory("memory-1", MemoryUpdateRequest(tags=["ok"]))
+            )
+
+    assert error.value.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        ["   "],  # 空白名称
+        ["x" * 25],  # 超长名称
+        ["bad\x00name"],  # 控制字符
+        [f"tag-{i}" for i in range(11)],  # 超过 10 个
+        "not-a-list",
+    ],
+)
+def test_memory_update_schema_rejects_invalid_tags(tags):
+    with pytest.raises(ValidationError):
+        MemoryUpdateRequest(tags=tags)
+
+
+def test_list_memories_forwards_tag_ids_to_browse_and_count():
+    from api.routes.memories import list_memories
+
+    tagged = _tagged_memory("工作")
+    tagged.user_text = "列表备注"
+    search_service = MagicMock()
+    search_service.get_recent_memories.return_value = [tagged]
+    search_service.get_recent_memories_count.return_value = 1
+
+    with patch("api.routes.memories.get_search_service", return_value=search_service):
+        response = asyncio.run(
+            list_memories(
+                limit=100,
+                offset=0,
+                tag_ids=[7],
+            )
+        )
+
+    assert response.total == 1
+    assert [tag.name for tag in response.memories[0].tags] == ["工作"]
+    assert response.memories[0].user_text == "列表备注"
+    search_service.get_recent_memories.assert_called_once_with(
+        limit=100,
+        offset=0,
+        created_after=None,
+        created_before=None,
+        tag_ids=[7],
+    )
+    search_service.get_recent_memories_count.assert_called_once_with(
+        created_after=None,
+        created_before=None,
+        tag_ids=[7],
+    )
+
+
 def make_upload(name, data):
     return UploadFile(file=io.BytesIO(data), filename=name)
 

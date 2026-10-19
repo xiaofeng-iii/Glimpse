@@ -16,6 +16,7 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import MediaGallery from './MediaGallery.vue'
 import OcrText from './OcrText.vue'
 import SummaryEditor from './SummaryEditor.vue'
+import MemoryTagsEditor from './MemoryTagsEditor.vue'
 import MemoryAnalysisState from './MemoryAnalysisState.vue'
 
 const props = defineProps<{
@@ -30,6 +31,7 @@ const emit = defineEmits<{
 const memoriesStore = useMemoriesStore()
 const notifications = useNotificationStore()
 const summaryEditor = ref<InstanceType<typeof SummaryEditor> | null>(null)
+const tagsEditor = ref<InstanceType<typeof MemoryTagsEditor> | null>(null)
 const deleteDialogOpen = ref(false)
 const deleting = ref(false)
 const textMemory = computed(() => isTextMemory(props.memory))
@@ -78,7 +80,10 @@ const confirmDelete = async () => {
   }
 }
 
-const canLeave = () => summaryEditor.value?.canLeave() ?? Promise.resolve(true)
+const canLeave = async () => {
+  if (!(await (summaryEditor.value?.canLeave() ?? true))) return false
+  return (await tagsEditor.value?.canLeave()) ?? true
+}
 defineExpose({ canLeave })
 </script>
 
@@ -125,6 +130,9 @@ defineExpose({ canLeave })
         :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"
       />
       <SummaryEditor v-else ref="summaryEditor" :memory="memory" compact />
+
+      <!-- 标签与分析状态无关：分析进行中同样可编辑。 -->
+      <MemoryTagsEditor ref="tagsEditor" :memory="memory" compact />
 
       <div
         class="memory-inspector__summary-actions grid gap-2.5"

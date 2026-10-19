@@ -5,6 +5,8 @@ from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 
+from utils.tag_names import normalize_tag_names
+
 
 MemoryType = Literal["screenshot", "text"]
 
@@ -16,6 +18,12 @@ class SearchDebugInfo(BaseModel):
     semantic_rank: Optional[int] = None
     semantic_distance: Optional[float] = None
     rrf_score: Optional[float] = None
+
+
+class MemoryTagResponse(BaseModel):
+    """One tag attached to a memory."""
+    id: int
+    name: str
 
 
 class MemoryResponse(BaseModel):
@@ -33,6 +41,7 @@ class MemoryResponse(BaseModel):
     memory_type: MemoryType = "screenshot"
     match_sources: List[str] = Field(default_factory=list)
     search_debug: Optional[SearchDebugInfo] = None
+    tags: List[MemoryTagResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -65,6 +74,8 @@ class MemoryUpdateRequest(BaseModel):
 
     ai_summary: Optional[str] = Field(default=None, min_length=1, max_length=4000)
     user_text: Optional[str] = Field(default=None, min_length=1, max_length=4000)
+    # None = 不修改标签；[] = 清空全部标签；非空 = 整体替换。
+    tags: Optional[List[str]] = None
 
     @field_validator("ai_summary", "user_text", mode="before")
     @classmethod
@@ -78,12 +89,31 @@ class MemoryUpdateRequest(BaseModel):
             raise ValueError("editable text fields must not be blank")
         return normalized
 
+    @field_validator("tags", mode="before")
+    @classmethod
+    def normalize_tags(cls, value):
+        if value is None:
+            return None
+        return normalize_tag_names(value)
+
 
 class SearchQuery(BaseModel):
     """Search request parameters"""
     query: str
     source: str = "all"  # all, exact, semantic
     limit: int = 20
+
+
+class TagSummaryResponse(BaseModel):
+    """One tag with its distinct memory count."""
+    id: int
+    name: str
+    memory_count: int
+
+
+class TagListResponse(BaseModel):
+    """All tags, including ones not linked to any memory."""
+    tags: List[TagSummaryResponse]
 
 
 class SearchResult(BaseModel):

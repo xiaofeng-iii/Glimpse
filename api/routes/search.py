@@ -1,12 +1,15 @@
 """
 Search Routes - Search functionality
 """
-from fastapi import APIRouter, HTTPException, Query
 from datetime import date
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query
 
 from api.schemas import MemoryResponse, MemoryType, SearchResult
 from api.dependencies import get_search_service, get_task_queue
 from api.memory_filters import normalize_memory_date_range
+from api.serializers import memory_to_response
 
 router = APIRouter(prefix="/search", tags=["search"])
 SEARCH_WARMUP_TASK_ID = "semantic_search_warmup"
@@ -39,24 +42,6 @@ def serialize_warmup_task(task) -> dict:
     }
 
 
-def memory_to_response(memory) -> dict:
-    """Convert MemoryRecord to dict for API response"""
-    return {
-        "id": memory.id,
-        "created_at": memory.created_at,
-        "image_path": memory.image_path,
-        "ai_summary": memory.ai_summary,
-        "app_name": memory.app_name,
-        "text_content": memory.text_content,
-        "extra_images": memory.extra_images,
-        "sync_status": getattr(memory, "sync_status", "PENDING"),
-        "analysis_status": getattr(memory, "analysis_status", "COMPLETED"),
-        "memory_type": getattr(memory, "memory_type", "screenshot"),
-        "match_sources": getattr(memory, "match_sources", []),
-        "search_debug": getattr(memory, "search_debug", None),
-    }
-
-
 @router.get("", response_model=SearchResult)
 async def search(
     q: str = Query(..., min_length=1, description="Search query"),
@@ -79,6 +64,7 @@ async def search(
     date_from: date | None = None,
     date_to: date | None = None,
     memory_type: MemoryType | None = None,
+    tag_ids: Annotated[list[int] | None, Query()] = None,
 ):
     """Search memories by query"""
     try:
@@ -99,6 +85,8 @@ async def search(
             )
         if memory_type:
             search_options["memory_type"] = memory_type
+        if tag_ids:
+            search_options["tag_ids"] = tag_ids
         memories = search_service.search(
             q,
             **search_options,

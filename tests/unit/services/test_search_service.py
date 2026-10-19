@@ -486,3 +486,159 @@ class TestSearchServiceQuery:
         mock_services["sqlite_manager"].get_memory_by_id.return_value = "fake_memory"
         result = ss.get_memory_by_id("test-id")
         assert result == "fake_memory"
+
+
+class TestSearchServiceTagFilter:
+    def test_text_search_with_only_tag_ids_still_takes_filtered_branch(
+        self, mock_services
+    ):
+        from services.search_service import SearchService
+
+        service = SearchService(**mock_services)
+        service.set_search_mode("text")
+        service.search("test", tag_ids=[1, 2])
+
+        mock_services["sqlite_manager"].search_memories.assert_called_once_with(
+            "test",
+            limit=20,
+            created_after=None,
+            created_before=None,
+            tag_ids=[1, 2],
+        )
+
+    def test_semantic_tag_filter_is_applied_inside_the_vector_query(
+        self, mock_services
+    ):
+        from services.search_service import SearchService
+
+        mock_services["sqlite_manager"].get_memory_ids.return_value = ["tagged-1"]
+        mock_services["chroma_manager"].search_similar.return_value = []
+
+        results = SearchService(**mock_services).search(
+            "test",
+            source_filter="semantic",
+            tag_ids=[9],
+        )
+
+        assert results == []
+        mock_services["sqlite_manager"].get_memory_ids.assert_called_once_with(
+            tag_ids=[9],
+        )
+        mock_services["chroma_manager"].search_similar.assert_called_once_with(
+            mock_services["embedding_client"].get_embedding.return_value,
+            n_results=40,
+            where={"memory_id": {"$in": ["tagged-1"]}},
+        )
+
+    def test_semantic_tag_filter_empty_candidate_set_short_circuits(
+        self, mock_services
+    ):
+        from services.search_service import SearchService
+
+        mock_services["sqlite_manager"].get_memory_ids.return_value = []
+
+        results = SearchService(**mock_services).search(
+            "test",
+            source_filter="semantic",
+            tag_ids=[9],
+        )
+
+        assert results == []
+        mock_services["chroma_manager"].search_similar.assert_not_called()
+
+    def test_semantic_memory_filter_matches_any_selected_tag(self, mock_services):
+        from db.sqlite_manager import MemoryRecord, TagRecord
+        from services.search_service import SearchService
+
+        tagged = MemoryRecord(
+            id="tagged",
+            created_at="now",
+            image_path="path",
+            ai_summary="sum",
+            app_name="app",
+            sync_status="SYNCED",
+            tags=[TagRecord(id=1, name="工作"), TagRecord(id=2, name="灵感")],
+        )
+        untagged = MemoryRecord(
+            id="untagged",
+            created_at="now",
+            image_path="path",
+            ai_summary="sum",
+            app_name="app",
+            sync_status="SYNCED",
+        )
+        records = {"tagged": tagged, "untagged": untagged}
+        mock_services["sqlite_manager"].get_memory_by_id.side_effect = records.get
+        mock_services["chroma_manager"].search_similar.return_value = [
+            {"id": "tagged", "distance": 0.5},
+            {"id": "untagged", "distance": 0.4},
+        ]
+
+        results = SearchService(**mock_services).search(
+            "test",
+            source_filter="semantic",
+            tag_ids=[2],
+        )
+
+        assert [memory.id for memory in results] == ["tagged"]
+
+    def test_hybrid_passes_tag_ids_to_text_and_vector_candidates(
+        self, mock_services
+    ):
+        from services.search_service import SearchService
+
+        mock_services["sqlite_manager"].get_memory_ids.return_value = ["tagged-1"]
+
+        SearchService(**mock_services).search("test", tag_ids=[3])
+
+        mock_services["sqlite_manager"].search_memories.assert_called_once_with(
+            "test",
+            limit=40,
+            created_after=None,
+            created_before=None,
+            tag_ids=[3],
+        )
+        mock_services["sqlite_manager"].get_memory_ids.assert_called_once_with(
+            tag_ids=[3],
+        )
+
+    def test_empty_query_browse_forwards_tag_ids(self, mock_services):
+        from services.search_service import SearchService
+
+        SearchService(**mock_services).search("", tag_ids=[5])
+
+        mock_services["sqlite_manager"].get_all_memories.assert_called_once_with(
+            limit=20,
+            offset=0,
+            created_after=None,
+            created_before=None,
+            tag_ids=[5],
+        )
+
+    def test_recent_memories_count_with_only_tag_ids_takes_filtered_branch(
+        self, mock_services
+    ):
+        from services.search_service import SearchService
+
+        SearchService(**mock_services).get_recent_memories_count(tag_ids=[5])
+
+        mock_services["sqlite_manager"].get_memories_count.assert_called_once_with(
+            created_after=None,
+            created_before=None,
+            tag_ids=[5],
+        )
+
+    def test_get_recent_memories_with_only_tag_ids_takes_filtered_branch(
+        self, mock_services
+    ):
+        from services.search_service import SearchService
+
+        SearchService(**mock_services).get_recent_memories(limit=50, tag_ids=[5])
+
+        mock_services["sqlite_manager"].get_all_memories.assert_called_once_with(
+            limit=50,
+            offset=0,
+            created_after=None,
+            created_before=None,
+            tag_ids=[5],
+        )

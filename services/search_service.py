@@ -72,6 +72,7 @@ class SearchService:
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
+        tag_ids: Optional[List[int]] = None,
     ) -> List:
         if not query.strip():
             return self.get_recent_memories(
@@ -79,6 +80,7 @@ class SearchService:
                 created_after=created_after,
                 created_before=created_before,
                 memory_type=memory_type,
+                tag_ids=tag_ids,
             )
 
         threshold = (
@@ -107,6 +109,7 @@ class SearchService:
                 created_after,
                 created_before,
                 memory_type,
+                tag_ids,
             )
         elif mode == "vector":
             return self._search_vector(
@@ -118,6 +121,7 @@ class SearchService:
                 created_after,
                 created_before,
                 memory_type,
+                tag_ids,
             )
         else:
             return self._search_hybrid(
@@ -130,6 +134,7 @@ class SearchService:
                 created_after,
                 created_before,
                 memory_type,
+                tag_ids,
             )
 
     @staticmethod
@@ -164,8 +169,10 @@ class SearchService:
         created_after: Optional[str],
         created_before: Optional[str],
         memory_type: Optional[str],
+        tag_ids: Optional[List[int]] = None,
     ) -> List:
-        if created_after or created_before or memory_type:
+        # 任何一组筛选条件存在都必须走带筛选的分支，仅传 tag_ids 也不例外。
+        if created_after or created_before or memory_type or tag_ids:
             options = {
                 "limit": limit,
                 "created_after": created_after,
@@ -173,6 +180,8 @@ class SearchService:
             }
             if memory_type:
                 options["memory_type"] = memory_type
+            if tag_ids:
+                options["tag_ids"] = tag_ids
             return self._sqlite_manager.search_memories(query, **options)
         return self._sqlite_manager.search_memories(query, limit=limit)
 
@@ -182,6 +191,7 @@ class SearchService:
         created_after: Optional[str],
         created_before: Optional[str],
         memory_type: Optional[str],
+        tag_ids: Optional[List[int]] = None,
     ) -> bool:
         matches_date = not (
             (created_after and memory.created_at < created_after)
@@ -190,15 +200,20 @@ class SearchService:
         matches_type = not memory_type or (
             getattr(memory, "memory_type", "screenshot") == memory_type
         )
-        return matches_date and matches_type
+        # 标签组内为 OR：记忆关联任意一个选中标签即通过。
+        matches_tags = not tag_ids or any(
+            tag.id in tag_ids for tag in getattr(memory, "tags", None) or []
+        )
+        return matches_date and matches_type and matches_tags
 
     def _build_vector_filter(
         self,
         created_after: Optional[str],
         created_before: Optional[str],
         memory_type: Optional[str],
+        tag_ids: Optional[List[int]] = None,
     ) -> tuple[Optional[Dict], bool]:
-        if not created_after and not created_before and not memory_type:
+        if not created_after and not created_before and not memory_type and not tag_ids:
             return None, True
         options = {}
         if created_after or created_before:
@@ -208,6 +223,8 @@ class SearchService:
             )
         if memory_type:
             options["memory_type"] = memory_type
+        if tag_ids:
+            options["tag_ids"] = tag_ids
         memory_ids = self._sqlite_manager.get_memory_ids(**options)
         if not memory_ids:
             return None, False
@@ -221,6 +238,7 @@ class SearchService:
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
+        tag_ids: Optional[List[int]] = None,
     ) -> List:
         results = self._search_memory_records(
             query,
@@ -228,6 +246,7 @@ class SearchService:
             created_after,
             created_before,
             memory_type,
+            tag_ids,
         )
         for rank, memory in enumerate(results, start=1):
             self._set_search_metadata(
@@ -249,6 +268,7 @@ class SearchService:
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
+        tag_ids: Optional[List[int]] = None,
     ) -> List:
         embedding = self._embedding_client.get_embedding(query)
         if not embedding:
@@ -258,6 +278,7 @@ class SearchService:
             created_after,
             created_before,
             memory_type,
+            tag_ids,
         )
         if not has_filter_candidates:
             return []
@@ -286,6 +307,7 @@ class SearchService:
                     created_after,
                     created_before,
                     memory_type,
+                    tag_ids,
                 )
             ):
                 self._set_search_metadata(
@@ -313,6 +335,7 @@ class SearchService:
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
+        tag_ids: Optional[List[int]] = None,
     ) -> List:
         candidate_limit = limit * candidate_multiplier
         text_results = self._search_memory_records(
@@ -321,6 +344,7 @@ class SearchService:
             created_after,
             created_before,
             memory_type,
+            tag_ids,
         )
 
         embedding = self._embedding_client.get_embedding(query)
@@ -339,6 +363,7 @@ class SearchService:
             created_after,
             created_before,
             memory_type,
+            tag_ids,
         )
         if has_filter_candidates:
             vector_options = {"n_results": candidate_limit}
@@ -372,6 +397,7 @@ class SearchService:
                     created_after,
                     created_before,
                     memory_type,
+                    tag_ids,
                 )
             ):
                 continue
@@ -430,8 +456,9 @@ class SearchService:
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
+        tag_ids: Optional[List[int]] = None,
     ) -> List:
-        if created_after or created_before or offset or memory_type:
+        if created_after or created_before or offset or memory_type or tag_ids:
             options = {
                 "limit": limit,
                 "offset": offset,
@@ -440,6 +467,8 @@ class SearchService:
             }
             if memory_type:
                 options["memory_type"] = memory_type
+            if tag_ids:
+                options["tag_ids"] = tag_ids
             return self._sqlite_manager.get_all_memories(**options)
         return self._sqlite_manager.get_all_memories(limit=limit)
 
@@ -448,14 +477,17 @@ class SearchService:
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
+        tag_ids: Optional[List[int]] = None,
     ) -> int:
-        if created_after or created_before or memory_type:
+        if created_after or created_before or memory_type or tag_ids:
             options = {
                 "created_after": created_after,
                 "created_before": created_before,
             }
             if memory_type:
                 options["memory_type"] = memory_type
+            if tag_ids:
+                options["tag_ids"] = tag_ids
             return self._sqlite_manager.get_memories_count(**options)
         return self._sqlite_manager.get_memories_count()
 

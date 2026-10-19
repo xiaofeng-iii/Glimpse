@@ -6,6 +6,8 @@ const apiMocks = vi.hoisted(() => ({
   list: vi.fn(),
   search: vi.fn(),
   updateSummary: vi.fn(),
+  updateTags: vi.fn(),
+  listTags: vi.fn(),
   delete: vi.fn(),
 }))
 
@@ -17,16 +19,22 @@ vi.mock('@/api/client', async (importOriginal) => {
       ...original.memoriesApi,
       list: apiMocks.list,
       updateSummary: apiMocks.updateSummary,
+      updateTags: apiMocks.updateTags,
       delete: apiMocks.delete,
     },
     searchApi: {
       ...original.searchApi,
       search: apiMocks.search,
     },
+    tagsApi: {
+      ...original.tagsApi,
+      list: apiMocks.listTags,
+    },
   }
 })
 
 import { useMemoriesStore } from '@/stores/memories'
+import { createEmptyMemoryFilters } from '@/utils/memory-filters'
 
 const memory = (id: string, summary = `summary-${id}`): Memory => ({
   id,
@@ -172,6 +180,7 @@ describe('memories store', () => {
       dateTo: '2026-08-24',
       sourceChannels: [],
       contentTypes: ['text'],
+      tagIds: [],
     })
 
     expect(apiMocks.list).toHaveBeenCalledWith(expect.objectContaining({
@@ -199,6 +208,7 @@ describe('memories store', () => {
       dateTo: '',
       sourceChannels: [],
       contentTypes: ['screenshot'],
+      tagIds: [],
     })
     store.upsert({
       ...memory('text-1'),
@@ -265,5 +275,94 @@ describe('memories store', () => {
     expect(store.memories.map((item) => item.id)).toEqual(['2'])
     expect(store.selectedMemory?.id).toBe('1')
     expect(store.selectedOutsideSearch).toBe(false)
+  })
+
+  it('updateTags merges the returned memory and refreshes the tag catalog', async () => {
+    apiMocks.list.mockResolvedValue({ memories: [memory('1')], total: 1 })
+    apiMocks.updateTags.mockResolvedValue({
+      ...memory('1'),
+      tags: [{ id: 1, name: '工作' }],
+    })
+    apiMocks.listTags.mockResolvedValue({
+      tags: [{ id: 1, name: '工作', memory_count: 1 }],
+    })
+
+    const store = useMemoriesStore()
+    await store.load()
+    const updated = await store.updateTags('1', ['工作'])
+
+    expect(apiMocks.updateTags).toHaveBeenCalledWith('1', ['工作'])
+    expect(updated?.tags?.map((tag) => tag.name)).toEqual(['工作'])
+    expect(store.selectedMemory?.tags?.[0]?.name).toBe('工作')
+    await vi.waitFor(() => expect(apiMocks.listTags).toHaveBeenCalledTimes(1))
+    expect(store.tags).toEqual([{ id: 1, name: '工作', memory_count: 1 }])
+    // 浏览态且无标签筛选：结果集成员不变，无需重跑查询
+    expect(apiMocks.list).toHaveBeenCalledTimes(1)
+  })
+
+  it('updateTags re-runs the active search so filtered results stay consistent', async () => {
+    apiMocks.search.mockResolvedValue({ memories: [memory('1')], query: 'q', source: 'all' })
+    apiMocks.updateTags.mockResolvedValue({ ...memory('1'), tags: [] })
+    apiMocks.listTags.mockResolvedValue({ tags: [] })
+
+    const store = useMemoriesStore()
+    await store.search('q')
+    await store.updateTags('1', [])
+
+    expect(apiMocks.search).toHaveBeenCalledTimes(2)
+  })
+
+  it('updateTags reloads browse results when the active filter uses tags', async () => {
+    apiMocks.list.mockResolvedValue({ memories: [], total: 0 })
+    apiMocks.updateTags.mockResolvedValue({ ...memory('1'), tags: [] })
+    apiMocks.listTags.mockResolvedValue({ tags: [] })
+
+    const store = useMemoriesStore()
+    await store.applyFilters({ ...createEmptyMemoryFilters(), tagIds: [1] })
+    await store.updateTags('1', [])
+
+    // applyFilters 一次 + updateTags 触发一次
+    expect(apiMocks.list).toHaveBeenCalledTimes(2)
+    expect(apiMocks.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ tagIds: [1] }),
+    )
+  })
+
+  it('updateTags propagates failures without merging anything', async () => {
+    apiMocks.list.mockResolvedValue({ memories: [memory('1')], total: 1 })
+    apiMocks.updateTags.mockRejectedValue(new Error('network down'))
+
+    const store = useMemoriesStore()
+    await store.load()
+    await expect(store.updateTags('1', ['工作'])).rejects.toThrow('network down')
+    expect(store.entities['1']?.tags).toBeUndefined()
+  })
+
+  it('loadTags dedupes concurrent requests and caches the catalog', async () => {
+    const pending = deferred<{ tags: Array<{ id: number; name: string; memory_count: number }> }>()
+    apiMocks.listTags.mockReturnValue(pending.promise)
+
+    const store = useMemoriesStore()
+    const first = store.loadTags()
+    const second = store.loadTags()
+    pending.resolve({ tags: [{ id: 1, name: '工作', memory_count: 2 }] })
+    await Promise.all([first, second])
+
+    expect(apiMocks.listTags).toHaveBeenCalledTimes(1)
+    expect(store.tagsLoaded).toBe(true)
+
+    await store.loadTags()
+    expect(apiMocks.listTags).toHaveBeenCalledTimes(1)
+  })
+
+  it('loadTags keeps the previous catalog when the request fails', async () => {
+    apiMocks.listTags.mockRejectedValue(new Error('offline'))
+
+    const store = useMemoriesStore()
+    const result = await store.loadTags()
+
+    expect(result).toEqual([])
+    expect(store.tags).toEqual([])
+    expect(store.tagsLoaded).toBe(false)
   })
 })

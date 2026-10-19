@@ -1,6 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { memoriesApi, searchApi, type Memory, type SearchOptions } from '@/api/client'
+import {
+  memoriesApi,
+  searchApi,
+  tagsApi,
+  type Memory,
+  type SearchOptions,
+  type TagSummary,
+} from '@/api/client'
 import { useNotificationStore } from '@/stores/notification'
 import { t } from '@/utils/i18n'
 import { createLogger } from '@/utils/logger'
@@ -214,6 +221,47 @@ export const useMemoriesStore = defineStore('memories', () => {
     return entities.value[id]
   }
 
+  const tags = ref<TagSummary[]>([])
+  const tagsLoaded = ref(false)
+  let tagsRequest: Promise<TagSummary[]> | null = null
+
+  // 与列表加载同一套去重思路：在途请求复用，失败只记日志、保留旧目录。
+  const loadTags = (force = false): Promise<TagSummary[]> => {
+    if (!force && tagsLoaded.value) return Promise.resolve(tags.value)
+    if (tagsRequest) return tagsRequest
+    tagsRequest = tagsApi
+      .list()
+      .then((result) => {
+        tags.value = result.tags
+        tagsLoaded.value = true
+        return result.tags
+      })
+      .catch((error) => {
+        logger.error('Failed to load tags: %s', error)
+        return tags.value
+      })
+      .finally(() => {
+        tagsRequest = null
+      })
+    return tagsRequest
+  }
+
+  const updateTags = async (id: string, tagNames: string[]) => {
+    const updated = await memoriesApi.updateTags(id, tagNames)
+    mergeMemory(updated)
+    selectedId.value = id
+
+    if (searchQuery.value) {
+      await executeSearch(searchQuery.value, searchSource.value, searchOptions.value, id)
+    } else if (activeFilters.value.tagIds.length) {
+      // 浏览态且当前筛选依赖标签：结果集与计数都可能变化，重跑当前浏览查询。
+      await load()
+    }
+    void loadTags(true)
+
+    return entities.value[id]
+  }
+
   const remove = async (id: string) => {
     try {
       await memoriesApi.delete(id)
@@ -260,6 +308,8 @@ export const useMemoriesStore = defineStore('memories', () => {
     isLoading,
     total,
     hasMemories,
+    tags,
+    tagsLoaded,
     invalidatePendingRequests,
     load,
     search,
@@ -267,6 +317,8 @@ export const useMemoriesStore = defineStore('memories', () => {
     upsert,
     updateSummary,
     updateUserText,
+    updateTags,
+    loadTags,
     remove,
     refresh,
     applyFilters,

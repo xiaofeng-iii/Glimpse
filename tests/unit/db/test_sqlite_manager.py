@@ -491,3 +491,255 @@ class TestSQLiteManagerGlobal:
     def test_global_is_none_initially(self):
         from db.sqlite_manager import sqlite_manager
         assert sqlite_manager is None
+
+
+def _insert(mgr, memory_id, **overrides):
+    from db.sqlite_manager import MemoryRecord
+
+    values = {
+        "id": memory_id,
+        "created_at": "2026-01-01 12:00:00",
+        "image_path": "/img.png",
+        "ai_summary": f"summary of {memory_id}",
+        "app_name": "test",
+    }
+    values.update(overrides)
+    assert mgr.insert_memory(MemoryRecord(**values)) is True
+
+
+class TestSQLiteManagerTags:
+    def test_init_is_idempotent_and_migrates_legacy_database(self, mock_path_manager):
+        import sqlite3 as sqlite
+
+        connection = sqlite.connect(str(mock_path_manager.sqlite_path))
+        connection.execute(
+            """
+            CREATE TABLE memories (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                image_path TEXT NOT NULL,
+                ai_summary TEXT,
+                app_name TEXT,
+                text_content TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO memories
+            (id, created_at, image_path, ai_summary, app_name, text_content)
+            VALUES ('legacy', '2026-01-01', 'legacy.png', 'summary', 'app', '')
+            """
+        )
+        connection.commit()
+        connection.close()
+
+        from db.sqlite_manager import SQLiteManager
+
+        first = SQLiteManager(mock_path_manager)
+        first.close()
+        mgr = SQLiteManager(mock_path_manager)
+
+        tables = {
+            row[0]
+            for row in mgr._conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        assert {"tags", "memory_tags"}.issubset(tables)
+        assert mgr.get_memory_by_id("legacy").tags == []
+        mgr.close()
+
+    def test_set_tags_reuses_entities_case_insensitively(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        _insert(mgr, "m-1")
+        _insert(mgr, "m-2")
+
+        first = mgr.set_memory_tags("m-1", ["Work", "灵感"])
+        second = mgr.set_memory_tags("m-2", ["work"])
+
+        assert [tag.name for tag in first.tags] == ["Work", "灵感"]
+        # 第二条记忆复用已存在的 "Work" 实体（ASCII 大小写不敏感）。
+        assert [tag.id for tag in second.tags] == [first.tags[0].id]
+        assert {tag["name"] for tag in mgr.get_all_tags()} == {"Work", "灵感"}
+        mgr.close()
+
+    def test_set_tags_replaces_all_and_empty_list_clears(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        _insert(mgr, "m-1")
+
+        mgr.set_memory_tags("m-1", ["a", "b"])
+        replaced = mgr.set_memory_tags("m-1", ["c"])
+        assert [tag.name for tag in replaced.tags] == ["c"]
+
+        cleared = mgr.set_memory_tags("m-1", [])
+        assert cleared.tags == []
+        mgr.close()
+
+    def test_unlinked_tag_entity_survives_with_zero_count(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        _insert(mgr, "m-1")
+        _insert(mgr, "m-2")
+
+        mgr.set_memory_tags("m-1", ["shared"])
+        mgr.set_memory_tags("m-2", ["shared", "solo"])
+        mgr.set_memory_tags("m-1", [])
+
+        tags = {tag["name"]: tag for tag in mgr.get_all_tags()}
+        assert tags["shared"]["memory_count"] == 1
+        assert tags["solo"]["memory_count"] == 1
+
+        mgr.set_memory_tags("m-2", [])
+        tags = {tag["name"]: tag for tag in mgr.get_all_tags()}
+        assert tags["shared"]["memory_count"] == 0
+        assert tags["solo"]["memory_count"] == 0
+        mgr.close()
+
+    def test_delete_memory_removes_links_but_keeps_tag_entities(
+        self, mock_path_manager
+    ):
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        _insert(mgr, "m-1")
+        _insert(mgr, "m-2")
+        mgr.set_memory_tags("m-1", ["shared"])
+        mgr.set_memory_tags("m-2", ["shared"])
+
+        assert mgr.delete_memory("m-1") is True
+
+        links = list(
+            mgr._conn.execute(
+                "SELECT memory_id FROM memory_tags WHERE memory_id = 'm-1'"
+            )
+        )
+        assert links == []
+        assert mgr.get_memory_by_id("m-2").tags[0].name == "shared"
+        tags = {tag["name"]: tag for tag in mgr.get_all_tags()}
+        assert tags["shared"]["memory_count"] == 1
+        mgr.close()
+
+    def test_set_tags_on_missing_memory_returns_none(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        assert mgr.set_memory_tags("missing", ["a"]) is None
+        assert mgr.get_all_tags() == []
+        mgr.close()
+
+    def test_set_tags_rejects_invalid_names(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        _insert(mgr, "m-1")
+        with pytest.raises(ValueError):
+            mgr.set_memory_tags("m-1", ["  "])
+        with pytest.raises(ValueError):
+            mgr.set_memory_tags("m-1", [f"t{i}" for i in range(11)])
+        mgr.close()
+
+    def test_tag_update_does_not_touch_content_fts_or_sync_status(
+        self, mock_path_manager
+    ):
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        _insert(
+            mgr,
+            "m-1",
+            ai_summary="stable unique phrase",
+            sync_status="SYNCED",
+        )
+
+        mgr.set_memory_tags("m-1", ["工作"])
+        updated = mgr.get_memory_by_id("m-1")
+
+        assert updated.sync_status == "SYNCED"
+        assert updated.ai_summary == "stable unique phrase"
+        # FTS 内容未因标签变更而重写，搜索依旧命中同一行。
+        assert [m.id for m in mgr.search_memories("stable unique")] == ["m-1"]
+        mgr.close()
+
+    def test_read_paths_return_hydrated_tags(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        _insert(mgr, "m-1", ai_summary="hydration probe keyword")
+        mgr.set_memory_tags("m-1", ["beta", "Alpha"])
+
+        expected = ["Alpha", "beta"]  # 按 name COLLATE NOCASE 排序
+        assert [t.name for t in mgr.get_memory_by_id("m-1").tags] == expected
+        assert [t.name for t in mgr.get_all_memories()[0].tags] == expected
+        assert [t.name for t in mgr.search_memories("hydration probe")[0].tags] == expected
+        # LIKE 回退路径同样返回标签。
+        assert [t.name for t in mgr.search_memories("hydration probe keyword")[0].tags] == expected
+
+        d = mgr.get_memory_by_id("m-1").to_dict()
+        assert d["tags"] == [
+            {"id": d["tags"][0]["id"], "name": "Alpha"},
+            {"id": d["tags"][1]["id"], "name": "beta"},
+        ]
+        mgr.close()
+
+    def test_tag_filter_or_semantics_and_and_combination(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        _insert(mgr, "m-work", created_at="2026-08-01 10:00:00")
+        _insert(mgr, "m-idea", created_at="2026-08-02 10:00:00")
+        _insert(mgr, "m-both", created_at="2026-08-03 10:00:00")
+        _insert(mgr, "m-none", created_at="2026-08-04 10:00:00")
+
+        work = mgr.set_memory_tags("m-work", ["工作"]).tags[0]
+        idea = mgr.set_memory_tags("m-idea", ["灵感"]).tags[0]
+        mgr.set_memory_tags("m-both", ["工作", "灵感"])
+
+        # 多标签 OR：关联任意一个选中标签即命中。
+        or_ids = {
+            m.id
+            for m in mgr.get_all_memories(tag_ids=[work.id, idea.id])
+        }
+        assert or_ids == {"m-work", "m-idea", "m-both"}
+        assert mgr.get_memories_count(tag_ids=[work.id, idea.id]) == 3
+        assert set(mgr.get_memory_ids(tag_ids=[work.id, idea.id])) == or_ids
+
+        # 标签条件与日期条件之间为 AND。
+        narrowed = {
+            m.id
+            for m in mgr.get_all_memories(
+                created_after="2026-08-02 00:00:00",
+                created_before="2026-08-04 00:00:00",
+                tag_ids=[work.id, idea.id],
+            )
+        }
+        assert narrowed == {"m-idea", "m-both"}
+        assert mgr.get_memories_count(
+            created_after="2026-08-02 00:00:00",
+            created_before="2026-08-04 00:00:00",
+            tag_ids=[work.id, idea.id],
+        ) == 2
+
+        # 搜索路径同样应用标签过滤。
+        searched = {
+            m.id
+            for m in mgr.search_memories("summary", tag_ids=[idea.id])
+        }
+        assert searched == {"m-idea", "m-both"}
+
+        # 中文查询走 LIKE 回退，标签过滤依然生效。
+        _insert(mgr, "m-zh", ai_summary="周会纪要")
+        mgr.set_memory_tags("m-zh", ["灵感"])
+        assert [m.id for m in mgr.search_memories("周会", tag_ids=[idea.id])] == [
+            "m-zh"
+        ]
+        assert mgr.search_memories("周会", tag_ids=[work.id]) == []
+
+        # 空列表等同于无标签筛选。
+        assert mgr.get_memories_count(tag_ids=[]) == 5
+        mgr.close()
