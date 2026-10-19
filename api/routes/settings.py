@@ -16,6 +16,9 @@ from api.dependencies import (
 from api.hotkeys import reload_global_hotkeys
 from services.bootstrap import configure_ai_client, resolve_ai_configuration
 from services.ai_client import AIClient
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 INDEX_REPAIR_TASK_ID = "vector_index_repair_full"
@@ -156,6 +159,7 @@ async def get_settings():
         return SettingsResponse(**settings)
     except Exception as e:
         # Return defaults if settings not available
+        logger.warning("GET /settings fell back to defaults: %s", e)
         return SettingsResponse(**get_default_settings())
 
 

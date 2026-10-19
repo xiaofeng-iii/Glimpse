@@ -82,6 +82,29 @@ class TestAPIServer:
         data = response.json()
         assert data["success"] == True
 
+        # 回读必须拿到刚写入的值：GET 若静默退回默认块，theme 会变回 light。
+        readback = client.get("/api/settings")
+        assert readback.status_code == 200
+        assert readback.json()["ui"]["theme"] == "dark"
+
+    def test_settings_response_accepts_non_string_ocr_values(self):
+        """ocr 配置含数值/布尔项（云端模式 timeout 等），响应模型不得拒绝"""
+        from api.schemas import SettingsResponse
+
+        payload = {
+            "ocr": {
+                "engine": "rapidocr",
+                "language": "ch",
+                "mode": "cloud",
+                "timeout": 30,
+                "enabled": True,
+            },
+            "ui": {"theme": "dark"},
+        }
+        response = SettingsResponse(**payload)
+        assert response.ocr["timeout"] == 30
+        assert response.ui["theme"] == "dark"
+
     def test_cluster_status(self, client):
         """Test cluster status endpoint"""
         response = client.get("/api/cluster/status")

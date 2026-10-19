@@ -142,7 +142,9 @@ class SettingsResponse(BaseModel):
         "model": "gpt-4o-mini",
         "timeout": 60,
     })
-    ocr: Dict[str, str] = Field(default_factory=lambda: {
+    # ocr 配置含数值/布尔项（云端模式的 timeout 等），不能用 Dict[str, str] 约束，
+    # 否则响应模型校验失败、GET /settings 静默退回默认值。
+    ocr: Dict[str, Any] = Field(default_factory=lambda: {
         "engine": "rapidocr",
         "language": "ch",
     })
@@ -166,7 +168,7 @@ class SettingsUpdate(BaseModel):
     hotkeys: Optional[Dict[str, str]] = None
     screenshot: Optional[Dict[str, Any]] = None
     ai: Optional[Dict[str, Any]] = None
-    ocr: Optional[Dict[str, str]] = None
+    ocr: Optional[Dict[str, Any]] = None
     ui: Optional[Dict[str, Any]] = None
     cluster: Optional[Dict[str, Any]] = None
 
