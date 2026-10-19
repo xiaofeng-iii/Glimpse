@@ -63,6 +63,6 @@ const copyText = async () => {
    三块的标题、按钮、文字左缘逐边对齐 */
 .ocr-text--compact .ocr-text__header {
   min-height: 2rem;
-  margin-bottom: 0.375rem;
+  margin-bottom: 0.25rem;
 }
 </style>

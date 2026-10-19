@@ -108,7 +108,7 @@ defineExpose({ canLeave })
 
     <div class="memory-inspector__divider" aria-hidden="true"></div>
 
-    <div class="memory-inspector__body min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-clip px-5 py-4">
+    <div class="memory-inspector__body min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-clip px-5 py-4">
       <MediaGallery v-if="!textMemory" :memory="memory" compact />
 
       <div
@@ -131,9 +131,6 @@ defineExpose({ canLeave })
       />
       <SummaryEditor v-else ref="summaryEditor" :memory="memory" compact />
 
-      <!-- 标签与分析状态无关：分析进行中同样可编辑。 -->
-      <MemoryTagsEditor ref="tagsEditor" :memory="memory" compact />
-
       <div
         class="memory-inspector__summary-actions grid gap-2.5"
         :class="displayText ? 'grid-cols-2' : 'grid-cols-1'"
@@ -147,6 +144,9 @@ defineExpose({ canLeave })
           {{ t('action.viewDetail') }}
         </button>
       </div>
+
+      <!-- 标签与分析状态无关：分析进行中同样可编辑。 -->
+      <MemoryTagsEditor ref="tagsEditor" :memory="memory" compact />
 
       <OcrText v-if="!textMemory && !analyzing && !analysisUnavailable" :text="memory.text_content" compact />
 

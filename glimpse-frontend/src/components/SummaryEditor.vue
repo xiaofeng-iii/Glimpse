@@ -415,7 +415,7 @@ defineExpose({
 /* 侧栏紧凑形态：块直接平铺在侧栏白底上（无内嵌灰底），
    标题与只读正文顶到同一内容缘；编辑时白底框浮起、框内恢复缩进。 */
 .summary-editor--compact .summary-editor__header {
-  margin-bottom: 0.375rem;
+  margin-bottom: 0.25rem;
 }
 
 .summary-editor--compact .summary-editor__edit-action {
@@ -428,7 +428,10 @@ defineExpose({
   padding-inline: 0;
 }
 
-.summary-editor--compact .summary-editor__compact-frame--active .summary-editor__compact-control {
+/* 编辑框向外扩（负边距 + 框内衬），而不是把文字向内推进框里：
+   进入/退出编辑时文字位置零移动，消除平铺形态下的跳动 */
+.summary-editor--compact .summary-editor__compact-frame--active {
+  margin-inline: -0.75rem;
   padding-inline: 0.75rem;
 }
 </style>
