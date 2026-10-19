@@ -239,12 +239,12 @@ defineExpose({
 
 <template>
   <section class="tags-editor" :class="{ 'tags-editor--compact': compact }" :aria-label="t('tags.title')">
-    <div class="tags-editor__header mb-2 flex min-h-7 items-center justify-between gap-3">
+    <div class="tags-editor__header mb-2.5 flex min-h-8 items-center justify-between gap-3">
       <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ t('tags.title') }}</h3>
       <button
         v-if="!editing"
         type="button"
-        class="tags-editor__edit-action inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 text-sm font-normal text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
+        class="tags-editor__edit-action inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] px-3 text-sm font-normal text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
         @click="startEditing"
       >
         <PencilSquareIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
@@ -253,7 +253,7 @@ defineExpose({
       <div v-else class="tags-editor__edit-actions flex flex-none items-center gap-2">
         <button
           type="button"
-          class="tags-editor__edit-action btn-secondary !h-7 !min-h-7 px-2.5 text-sm"
+          class="tags-editor__edit-action btn-secondary !h-8 !min-h-8 px-2.5 text-sm"
           :disabled="saving"
           @click="cancelEditing"
         >
@@ -261,7 +261,7 @@ defineExpose({
         </button>
         <button
           type="button"
-          class="tags-editor__edit-action btn-primary !h-7 !min-h-7 gap-1.5 px-3 text-sm"
+          class="tags-editor__edit-action btn-primary !h-8 !min-h-8 gap-1.5 px-3 text-sm"
           :disabled="!canSave"
           @click="save"
         >
@@ -407,8 +407,13 @@ defineExpose({
   transition: background-color 160ms ease, color 160ms ease;
 }
 
+/* chip 本体是 surface-subtle 灰底：hover 走灰底档（224），暗色用 token 覆盖 */
 .tags-editor__chip-remove:hover {
   color: var(--shell-ink);
+  background: rgb(224, 228, 237);
+}
+
+:root[data-theme='dark'] .tags-editor__chip-remove:hover {
   background: var(--color-surface-hover);
 }
 
@@ -470,39 +475,29 @@ defineExpose({
   white-space: nowrap;
 }
 
+/* 建议按钮同 chip：灰底控件 hover 走 224 档 */
 .tags-editor__suggestion:hover {
-  background: var(--color-surface-hover);
+  background: rgb(224, 228, 237);
   color: var(--shell-ink);
+}
+
+:root[data-theme='dark'] .tags-editor__suggestion:hover {
+  background: var(--color-surface-hover);
 }
 
 .tags-editor__feedback {
   margin-bottom: 0;
 }
 
-/* 侧栏紧凑形态：与 SummaryEditor compact 同款的 subtle 内嵌块。 */
-.tags-editor--compact {
-  padding: 0.625rem 0.75rem 0.75rem;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-subtle);
-}
-
+/* 侧栏紧凑形态：与摘要/识别文本块同构平铺，标题与 chips 顶到侧栏内容缘；
+   块头行内操作降 28px 档。 */
 .tags-editor--compact .tags-editor__header {
   margin-bottom: 0.375rem;
-  padding-inline: 0.75rem;
 }
 
-.tags-editor--compact .tags-editor__chip,
-.tags-editor--compact .tags-editor__suggestion {
-  background: var(--color-surface);
-}
-
-.tags-editor--compact .tags-editor__chip-remove:hover,
-.tags-editor--compact .tags-editor__suggestion:hover {
-  background: rgb(224, 228, 237);
-}
-
-:root[data-theme='dark'] .tags-editor--compact .tags-editor__chip-remove:hover,
-:root[data-theme='dark'] .tags-editor--compact .tags-editor__suggestion:hover {
-  background: var(--color-surface-hover);
+.tags-editor--compact .tags-editor__edit-action {
+  height: 1.75rem;
+  min-height: 1.75rem;
+  padding-inline: 0.625rem;
 }
 </style>

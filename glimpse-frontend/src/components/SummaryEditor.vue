@@ -287,8 +287,8 @@ defineExpose({
       class="summary-editor__compact-frame relative isolate min-h-20 overflow-hidden rounded-lg border transition-[border-color,background-color,box-shadow]"
       :class="editing
         ? validationMessage
-          ? 'border-red-400 bg-[var(--shell-control-bg)]'
-          : 'summary-editor__compact-frame--editing border-[var(--shell-line)] bg-[var(--shell-control-bg)]'
+          ? 'summary-editor__compact-frame--active border-red-400 bg-[var(--shell-control-bg)]'
+          : 'summary-editor__compact-frame--active summary-editor__compact-frame--editing border-[var(--shell-line)] bg-[var(--shell-control-bg)]'
         : compactOverflowing
           ? 'summary-editor__compact-frame--scrollable border-transparent bg-transparent'
           : 'border-transparent bg-transparent'"
@@ -412,18 +412,10 @@ defineExpose({
   }
 }
 
-/* 侧栏紧凑形态：整个编辑器成为一块 subtle 内嵌面（设置页信息卡同饰），
-   标题行与正文共享块内缩进；编辑时白底框在块内浮起。仅 compact 生效，
-   详情页的非紧凑布局不受影响。 */
-.summary-editor--compact {
-  padding: 0.625rem 0.75rem 0.75rem;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-subtle);
-}
-
+/* 侧栏紧凑形态：块直接平铺在侧栏白底上（无内嵌灰底），
+   标题与只读正文顶到同一内容缘；编辑时白底框浮起、框内恢复缩进。 */
 .summary-editor--compact .summary-editor__header {
   margin-bottom: 0.375rem;
-  padding-inline: 0.75rem;
 }
 
 .summary-editor--compact .summary-editor__edit-action {
@@ -432,11 +424,11 @@ defineExpose({
   padding-inline: 0.625rem;
 }
 
-.summary-editor--compact .summary-editor__edit-action:hover {
-  background: rgb(224, 228, 237);
+.summary-editor--compact .summary-editor__compact-control {
+  padding-inline: 0;
 }
 
-:root[data-theme='dark'] .summary-editor--compact .summary-editor__edit-action:hover {
-  background: var(--color-surface-hover);
+.summary-editor--compact .summary-editor__compact-frame--active .summary-editor__compact-control {
+  padding-inline: 0.75rem;
 }
 </style>

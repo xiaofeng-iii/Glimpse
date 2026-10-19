@@ -37,7 +37,7 @@
 |---|---|---|
 | 设置区输入框 | `.setting-input`（Settings.vue 局部） | 32px（`--control-h-md`）、文本框限宽 320px、数字框限宽 120px、聚焦只变边框色 |
 | 设置区三段式切换器 | `.theme-switcher`（Settings.vue 局部） | 32px 高、扁平线框浅底+独立平移滑块 |
-| 侧栏内嵌块（摘要/识别文本） | `SummaryEditor.vue` compact / `OcrText.vue` compact | `surface-subtle` 10px 圆角无框内衬约 12px；块头行内操作 28px；编辑态白底框浮起 |
+| 侧栏平铺块（摘要/标签/识别文本） | `SummaryEditor.vue` compact / `MemoryTagsEditor.vue` compact / `OcrText.vue` compact | 无底色直铺侧栏：标题行与正文顶到侧栏内容缘，三块左缘逐边对齐；块头行内操作 28px；编辑态白底框浮起；chip 级小控件灰底、hover 走 224 档 |
 | 搜索工具区控件 | SearchToolbar 内部 | 紧凑 32px 档 |
 
 ## 尺寸/形状/z 档位（镜像 token，以 main.css 为准）

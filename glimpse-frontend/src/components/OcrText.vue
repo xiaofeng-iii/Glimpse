@@ -6,7 +6,7 @@ import { t } from '@/utils/i18n'
 const props = withDefaults(
   defineProps<{
     text?: string
-    /** 侧栏内嵌形态：去描边、subtle 底，与摘要块同饰；详情页保持白底线框 */
+    /** 侧栏平铺形态：无底色直铺侧栏，与摘要/标签块同饰；详情页保持白底线框 */
     compact?: boolean
   }>(),
   { compact: false },
@@ -30,7 +30,7 @@ const copyText = async () => {
   <section
     class="ocr-text rounded-lg"
     :class="compact
-      ? 'ocr-text--compact bg-[var(--color-surface-subtle)]'
+      ? 'ocr-text--compact'
       : 'border border-[var(--shell-line)] bg-[var(--shell-control-bg)] p-3.5'"
   >
     <div class="ocr-text__header mb-2.5 flex items-center justify-between gap-3">
@@ -50,39 +50,19 @@ const copyText = async () => {
     <p
       v-if="text"
       class="max-h-64 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--shell-ink)] [overflow-wrap:anywhere]"
-      :class="compact ? 'ocr-text__body--compact' : ''"
     >
       {{ text }}
     </p>
-    <p v-else class="text-sm text-[var(--shell-muted)]" :class="compact ? 'ocr-text__body--compact' : ''">{{ t('memory.noRecognizedText') }}</p>
+    <p v-else class="text-sm text-[var(--shell-muted)]">{{ t('memory.noRecognizedText') }}</p>
   </section>
 </template>
 
 <style scoped>
 
-/* 紧凑形态与摘要块同构：容器内衬 10/12/12，标题行与正文再让出同样的内衬，
-   两块的标题、按钮、文字到灰边的距离逐边一致 */
-.ocr-text--compact {
-  padding: 0.625rem 0.75rem 0.75rem;
-}
-
+/* 紧凑形态与摘要/标签块同构平铺：无底色，标题行与正文顶到侧栏内容缘，
+   三块的标题、按钮、文字左缘逐边对齐 */
 .ocr-text--compact .ocr-text__header {
   min-height: 2rem;
   margin-bottom: 0.375rem;
-  padding-inline: 0.75rem;
-}
-
-.ocr-text__body--compact {
-  /* 摘要块的文本框带 1px 透明边框占位，识别文本同构补齐，四向距离逐像素一致 */
-  border: 1px solid transparent;
-  padding: 0.5rem 0.75rem 1.75rem;
-}
-
-.ocr-text--compact .ocr-text__copy:hover {
-  background: rgb(224, 228, 237);
-}
-
-:root[data-theme='dark'] .ocr-text--compact .ocr-text__copy:hover {
-  background: var(--color-surface-hover);
 }
 </style>
