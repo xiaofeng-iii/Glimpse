@@ -995,7 +995,11 @@ describe('memory components', () => {
     wrapper.unmount()
   })
 
-  it('lets the inspector edit tags and guards leaving with a dirty tags draft', async () => {
+  it('lets the inspector add tags with immediate save and leave freely', async () => {
+    apiMocks.updateTags.mockImplementation(async (id: string, tags: string[]) => ({
+      ...createMemory({ id }),
+      tags: tags.map((name, index) => ({ id: index + 1, name })),
+    }))
     const memory = createMemory({ tags: [{ id: 1, name: '工作' }] })
     const inspector = mount(MemoryInspector, { props: { memory } })
 
@@ -1003,19 +1007,15 @@ describe('memory components', () => {
     expect(tagsEditor.exists()).toBe(true)
     expect(tagsEditor.text()).toContain('工作')
 
-    await tagsEditor.get('.tags-editor__edit-action').trigger('click')
+    await tagsEditor.get('.tags-editor__add').trigger('click')
     await tagsEditor.get('.tags-editor__input').setValue('灵感')
     await tagsEditor.get('.tags-editor__input').trigger('keydown', { key: 'Enter' })
 
-    // 摘要编辑器干净但标签草稿脏：检查器仍应拦下离开。
+    // 即时保存：回车即整体替换提交，没有草稿也就没有离开拦截
+    expect(apiMocks.updateTags).toHaveBeenCalledWith('memory-1', ['工作', '灵感'])
     const leaveRequest = (inspector.vm as unknown as { canLeave: () => Promise<boolean> }).canLeave()
-    await flushPromises()
-    const dialog = document.querySelector<HTMLElement>('[role="alertdialog"]')
-    expect(dialog).not.toBeNull()
-    const discardButton = [...dialog!.querySelectorAll('button')]
-      .find((button) => button.textContent?.includes('放弃修改'))
-    discardButton!.click()
     await expect(leaveRequest).resolves.toBe(true)
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
   })
 
   it('renders the shared tags editor on the detail page too', async () => {
