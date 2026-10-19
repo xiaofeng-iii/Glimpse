@@ -101,7 +101,7 @@ describe('updates store', () => {
     expect(store.checking).toBe(false)
   })
 
-  it('serves the fake dev-channel update without calling the desktop shell', async () => {
+  it('serves the fake dev-channel beta update without calling the desktop shell', async () => {
     const store = useUpdatesStore()
     store.recordCurrentVersion('0.4.1')
     store.setDevChannel(true)
@@ -109,13 +109,25 @@ describe('updates store', () => {
     const target = await store.checkForUpdate()
 
     expect(apiMocks.invoke).not.toHaveBeenCalled()
-    expect(target?.version).toBe('1.0.0')
+    expect(apiMocks.fetchIndex).not.toHaveBeenCalled()
+    expect(target?.version).toBe('1.0.0-beta.1')
     expect(store.showAvailableBadge).toBe(true)
     await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
+    expect(store.updateNotesPartial).toBe(false)
     expect(store.updateNotes?.sections.features).toContain('记忆墙支持自定义排序')
     expect(store.updateNotes?.sections.features).toContain('新增记忆连拍合并开关')
-    // 被 1.0.0 正式版覆盖的预览条目按截断规则剔除，不该混进聚合结果。
     expect(store.updateNotes?.sections.features).not.toContain('仅预览版测试条目（聚合时应被剔除）')
+    expect(store.updateNotes?.miscellaneous).toEqual([])
+  })
+
+  it.each(['1.0.0-beta.1', '1.0.0-beta.2', '1.0.0'])('does not offer the dev beta when already running %s', async (version) => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion(version)
+    store.setDevChannel(true)
+
+    expect(await store.checkForUpdate()).toBeNull()
+    expect(store.showAvailableBadge).toBe(false)
+    expect(apiMocks.invoke).not.toHaveBeenCalled()
   })
 
   it('fails the simulated dev-channel install without touching the updater', async () => {

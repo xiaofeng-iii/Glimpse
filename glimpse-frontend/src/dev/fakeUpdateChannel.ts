@@ -1,10 +1,10 @@
-// 源码启动（tauri dev）专用的假更新通道：只提供 1.0.0 的版本信息与更新日志，
+// 源码启动（tauri dev）专用的假更新通道：只提供 1.0.0-beta.1 的版本信息与更新日志，
 // 没有可下载的安装包，用于检查更新相关页面的呈现。
 // 通道标识见 @/stores/updates 的 DEV_UPDATE_CHANNEL；本模块只在 import.meta.env.DEV
 // 分支里被动态导入，生产构建不会产出它。
 import { compareKeys, versionKey, type ReleaseNotes } from '@/utils/updateNotes'
 
-export const DEV_UPDATE_VERSION = '1.0.0'
+export const DEV_UPDATE_VERSION = '1.0.0-beta.1'
 
 // 让"下载并安装"的忙碌态可见，随后按无安装包失败。
 const INSTALL_SIMULATION_MS = 900
@@ -48,7 +48,7 @@ const targetNotes = `**新特性**
 - 优化键盘连续操作，可以从搜索框进入结果、打开详情、查看较长正文，再返回同一条记录；焦点位置与当前选中的内容保持一致，使用键盘阅读时不必每完成一个操作就重新定位到页面顶部。
 - 优化浅色与深色主题中的次级文字、分隔线和浮层背景，长时间阅读更新说明时保持清楚的层级；同一份超长内容切换主题后不会改变段落顺序或丢失当前阅读位置，也不会出现只有浅色背景下才能看清的文字。
 - 优化中英文术语与长标识的换行示例，保留完整名称供对照：ScreenshotMemoryAnalysisAndSemanticSearchSynchronizationConfigurationReference；该名称较长且没有空格，用于检查说明中的英文内容能否留在阅读区域内，而不是撑宽整个窗口。
-- 优化参考链接的展示示例，较长的地址也应能完整阅读：https://github.com/xiaofeng-iii/Glimpse/compare/v0.4.0-preview.20261001...v1.0.0?view=complete-release-notes&include=features-improvements-fixes&source=development-update-channel。
+- 优化参考链接的展示示例，较长的地址也应能完整阅读：https://github.com/xiaofeng-iii/Glimpse/compare/v0.4.0-preview.20261001...v1.0.0-beta.1?view=complete-release-notes&include=features-improvements-fixes&source=development-update-channel。
 - 优化连续阅读大量更新项目时的布局稳定性，打开说明后可以从第一项一直滚动到最后一项，再回到标题附近；在这个过程中，说明所在的窗口不应不断长高，正文也不应挤走关闭入口或让背景页面跟着意外滚动。
 - 优化长段落说明示例：如果用户在较小的桌面窗口里查看本次更新，正文可能需要多次滚动才能读完，而同一份内容在宽窗口里又可能减少很多换行。因此这里同时保留短句、一般长度的条目和一段跨越多行的完整说明，检查阅读区能否适应不同宽度。理想情况下，中文标点不会被粗暴拆开，英文标识不会伸出右边界，最后一项的底部不会被窗口边缘裁掉；用户读到末尾后仍能找到相关操作，关闭说明时也能回到原来的触发按钮，继续之前的浏览，不需要重新寻找设置入口。
 
@@ -70,14 +70,14 @@ const targetNotes = `**新特性**
 // 假索引故意混入一条被最新正式版覆盖的预览条目：聚合结果里不该出现它。
 export const devReleaseNotes = (): ReleaseNotes[] => [
   release(DEV_UPDATE_VERSION, targetNotes),
-  release('0.5.1-beta.1', '**新特性**\n- 仅预览版测试条目（聚合时应被剔除）'),
+  release('0.5.0-beta.1', '**新特性**\n- 仅预览版测试条目（聚合时应被剔除）'),
   release('0.5.0', '**新特性**\n- 新增记忆连拍合并开关\n\n**优化**\n- 启动速度更快'),
 ]
 
 export const devCheckForUpdate = (currentVersion: string): DevAvailableUpdate | null => {
   const current = versionKey(currentVersion)
   const target = versionKey(DEV_UPDATE_VERSION)
-  // 仓库版本真的到 1.0.0 后不再谎报有更新。
+  // 仓库版本真的到 1.0.0-beta.1 后不再谎报有更新。
   if (!target || (current && compareKeys(current, target) >= 0)) return null
   return { version: DEV_UPDATE_VERSION, notes: targetNotes }
 }

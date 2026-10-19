@@ -279,7 +279,7 @@ describe('Settings update notes', () => {
     expect(payloads.some((payload) => payload.includes('dev-test'))).toBe(false)
   })
 
-  it('checks the dev channel in place: fake 1.0.0 with aggregated notes', async () => {
+  it('checks the dev channel in place: fake 1.0.0-beta.1 with aggregated notes', async () => {
     window.localStorage.setItem('glimpse.devUpdateChannel', '1')
     const wrapper = await openUpdates(await mountSettings())
 
@@ -290,11 +290,14 @@ describe('Settings update notes', () => {
     await flushPromises()
 
     expect(apiMocks.invoke).not.toHaveBeenCalled()
-    expect(dialog.props('title')).toContain('1.0.0')
+    expect(dialog.props('title')).toContain('1.0.0-beta.1')
     const bodyText = document.body.textContent ?? ''
     expect(bodyText).toContain('记忆墙支持自定义排序')
     expect(bodyText).toContain('新增记忆连拍合并开关')
     expect(bodyText).not.toContain('仅预览版测试条目（聚合时应被剔除）')
+    expect(bodyText).not.toContain('部分版本说明获取失败')
+    expect(bodyText).not.toContain('**新特性**')
+    expect(bodyText).not.toContain('Full Changelog')
   })
 
   it('turns the dialog busy in place when installing and resets after failure', async () => {
