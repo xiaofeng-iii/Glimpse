@@ -222,9 +222,9 @@ onUnmounted(() => {
           </div>
           <button
             ref="closeButton"
+            v-hint-tooltip="t('action.close')"
             type="button"
             class="inline-flex h-8 w-8 min-h-0 flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
-            :title="t('action.close')"
             :aria-label="t('action.close')"
             @click="previewStore.close"
           >
@@ -235,9 +235,9 @@ onUnmounted(() => {
         <div class="image-preview-stage" @contextmenu.prevent="openImageMenu">
           <button
             v-if="hasMultiple"
+            v-hint-tooltip="t('preview.previous')"
             type="button"
             class="image-preview-stage__arrow image-preview-stage__arrow--previous"
-            :title="t('preview.previous')"
             :aria-label="t('preview.previous')"
             @click="previewStore.previous"
           >
@@ -265,9 +265,9 @@ onUnmounted(() => {
 
           <button
             v-if="hasMultiple"
+            v-hint-tooltip="t('preview.next')"
             type="button"
             class="image-preview-stage__arrow image-preview-stage__arrow--next"
-            :title="t('preview.next')"
             :aria-label="t('preview.next')"
             @click="previewStore.next"
           >

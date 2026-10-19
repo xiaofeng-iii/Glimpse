@@ -287,16 +287,16 @@ onUnmounted(() => {
                 <span>{{ t('filter.timeRange') }}</span>
                 <button
                   v-if="dateActive"
+                  v-hint-tooltip="t('wall.clearPeriod')"
                   type="button"
                   class="memory-filters__clear-period"
-                  :title="t('wall.clearPeriod')"
                   :aria-label="t('wall.clearPeriod')"
                   @click="clearPeriod"
                 >
                   <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </span>
-              <label class="memory-filters__range-mode" :title="t('wall.rangeModeHint')">
+              <label v-hint-tooltip="t('wall.rangeModeHint')" class="memory-filters__range-mode">
                 <input
                   v-model="rangeMode"
                   type="checkbox"
@@ -311,19 +311,18 @@ onUnmounted(() => {
               :class="{ 'memory-filters__date-block--open': calendarOpen }"
             >
               <button
+                v-hint-tooltip="dateLabel"
                 type="button"
                 class="memory-filters__date-toggle"
                 :class="{ 'memory-filters__date-toggle--active': draft.dateFrom || draft.dateTo }"
                 :aria-expanded="calendarOpen"
                 :aria-controls="calendarId"
-                :title="dateLabel"
                 @click="calendarOpen = !calendarOpen"
               >
                 <CalendarDaysIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span
                   class="memory-filters__date-text"
                   :class="{ 'memory-filters__date-text--range': dateActive }"
-                  :title="dateLabel"
                 >{{ dateRangeText }}</span>
                 <ChevronDownIcon
                   class="memory-filters__date-chevron h-4 w-4 shrink-0"
@@ -370,9 +369,9 @@ onUnmounted(() => {
                 <span>{{ t('filter.tags') }}</span>
                 <button
                   v-if="draft.tagIds.length"
+                  v-hint-tooltip="t('filter.clearTags')"
                   type="button"
                   class="memory-filters__clear-period"
-                  :title="t('filter.clearTags')"
                   :aria-label="t('filter.clearTags')"
                   @click="clearTags"
                 >
@@ -394,7 +393,7 @@ onUnmounted(() => {
                   @change="toggleTag(tag.id)"
                 />
                 <span class="memory-filters__checkbox-indicator" aria-hidden="true"></span>
-                <span class="memory-filters__tag-name" :title="tag.name">{{ tag.name }}</span>
+                <span v-hint-tooltip="tag.name" class="memory-filters__tag-name">{{ tag.name }}</span>
                 <span class="memory-filters__tag-count">{{ tag.memory_count }}</span>
               </label>
             </div>

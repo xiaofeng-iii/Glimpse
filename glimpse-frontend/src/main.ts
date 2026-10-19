@@ -4,6 +4,7 @@ import router from './router'
 import App from './App.vue'
 import './styles/main.css'
 import { initializeBackendRuntime } from './config/runtime'
+import { hintTooltip, installNativeTooltipGuard } from './directives/hint-tooltip'
 import { applyThemePreference, getStoredThemePreference } from './utils/theme'
 import { getStoredLanguagePreference, setLanguagePreference } from './utils/i18n'
 
@@ -15,6 +16,8 @@ window.addEventListener(
   { capture: true },
 )
 
+installNativeTooltipGuard()
+
 const bootstrap = async () => {
   applyThemePreference(getStoredThemePreference())
   setLanguagePreference(getStoredLanguagePreference())
@@ -24,6 +27,7 @@ const bootstrap = async () => {
 
   app.use(pinia)
   app.use(router)
+  app.directive('hint-tooltip', hintTooltip)
   app.mount('#app')
 
   void initializeBackendRuntime()

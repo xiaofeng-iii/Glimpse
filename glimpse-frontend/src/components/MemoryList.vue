@@ -135,7 +135,7 @@ const markImageError = (memoryId: string) => {
                 >
                   <span
                     v-if="memory.search_debug.semantic_distance != null"
-                    :title="t('search.distanceHint')"
+                    v-hint-tooltip="t('search.distanceHint')"
                   >
                     {{ t('search.semanticDistance') }} {{ formatDistance(memory.search_debug.semantic_distance) }}
                   </span>

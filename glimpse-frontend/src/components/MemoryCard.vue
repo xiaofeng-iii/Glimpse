@@ -180,13 +180,13 @@ onBeforeUnmount(cancelSelectIntent)
             <span
               v-for="tag in visibleTags"
               :key="tag.id"
+              v-hint-tooltip="tag.name"
               class="memory-card__tag-chip"
-              :title="tag.name"
             >{{ tag.name }}</span>
             <span
               v-if="hiddenTagCount"
+              v-hint-tooltip="cardTags.map((tag) => tag.name).join(t('filter.valueSeparator'))"
               class="memory-card__tag-chip memory-card__tag-chip--more"
-              :title="cardTags.map((tag) => tag.name).join(t('filter.valueSeparator'))"
             >+{{ hiddenTagCount }}</span>
           </div>
         </div>

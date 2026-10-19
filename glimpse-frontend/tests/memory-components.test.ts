@@ -927,7 +927,10 @@ describe('memory components', () => {
 
     const chips = wrapper.findAll('.memory-card__tag-chip')
     expect(chips.map((chip) => chip.text())).toEqual(['工作', '灵感', '+1'])
-    expect(wrapper.get('.memory-card__tag-chip--more').attributes('title'))
+    // 悬浮说明走 v-hint-tooltip 指令，元素上不再出现原生 title。
+    const moreChip = wrapper.get('.memory-card__tag-chip--more')
+    expect(moreChip.attributes('title')).toBeUndefined()
+    expect((moreChip.element as HTMLElement & { __hintTooltipValue?: unknown }).__hintTooltipValue)
       .toBe('工作、灵感、待办')
     // 时间必须仍在右侧渲染，不被标签挤走。
     expect(wrapper.get('time').exists()).toBe(true)

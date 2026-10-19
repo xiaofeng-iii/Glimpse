@@ -33,12 +33,12 @@ const choose = (mode: WallLayoutMode) => {
     <button
       v-for="option in options"
       :key="option.value"
+      v-hint-tooltip="t(option.labelKey)"
       type="button"
       class="wall-layout-switcher__option"
       :class="{ 'wall-layout-switcher__option--active': wallLayoutMode === option.value }"
       :aria-label="t(option.labelKey)"
       :aria-pressed="wallLayoutMode === option.value"
-      :title="t(option.labelKey)"
       :disabled="disabled"
       @click="choose(option.value)"
     >
