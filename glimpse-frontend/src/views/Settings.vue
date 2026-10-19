@@ -1547,6 +1547,10 @@ onUnmounted(() => {
   transition: border-color 140ms ease, background-color 140ms ease;
 }
 
+.setting-input[type='url'] {
+  font-family: var(--font-ui);
+}
+
 .setting-input[type='number'] {
   max-width: 120px;
 }
