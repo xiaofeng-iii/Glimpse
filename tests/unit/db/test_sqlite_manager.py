@@ -575,54 +575,61 @@ class TestSQLiteManagerTags:
         mgr.set_memory_tags("m-1", ["a", "b"])
         replaced = mgr.set_memory_tags("m-1", ["c"])
         assert [tag.name for tag in replaced.tags] == ["c"]
+        # 整体替换后被顶掉的 a/b 失去全部关联，随关联一并删除
+        assert [tag["name"] for tag in mgr.get_all_tags()] == ["c"]
 
         cleared = mgr.set_memory_tags("m-1", [])
         assert cleared.tags == []
+        assert mgr.get_all_tags() == []
         mgr.close()
 
-    def test_unlinked_tag_entity_survives_with_zero_count(self, mock_path_manager):
+    def test_tag_is_deleted_with_its_last_association(self, mock_path_manager):
         from db.sqlite_manager import SQLiteManager
 
         mgr = SQLiteManager(mock_path_manager)
         _insert(mgr, "m-1")
         _insert(mgr, "m-2")
 
+        # 共享标签：两条记忆都在用时，取消其中一条不影响另一条
         mgr.set_memory_tags("m-1", ["shared"])
         mgr.set_memory_tags("m-2", ["shared", "solo"])
-        mgr.set_memory_tags("m-1", [])
+        mgr.set_memory_tags("m-2", ["solo"])
 
         tags = {tag["name"]: tag for tag in mgr.get_all_tags()}
+        assert set(tags) == {"shared", "solo"}
         assert tags["shared"]["memory_count"] == 1
-        assert tags["solo"]["memory_count"] == 1
 
+        # 最后一条关联被取消后，标签实体随之删除
+        mgr.set_memory_tags("m-1", [])
         mgr.set_memory_tags("m-2", [])
-        tags = {tag["name"]: tag for tag in mgr.get_all_tags()}
-        assert tags["shared"]["memory_count"] == 0
-        assert tags["solo"]["memory_count"] == 0
+        assert mgr.get_all_tags() == []
         mgr.close()
 
-    def test_delete_memory_removes_links_but_keeps_tag_entities(
-        self, mock_path_manager
-    ):
+    def test_delete_memory_removes_links_and_orphaned_tags(self, mock_path_manager):
         from db.sqlite_manager import SQLiteManager
 
         mgr = SQLiteManager(mock_path_manager)
         _insert(mgr, "m-1")
         _insert(mgr, "m-2")
         mgr.set_memory_tags("m-1", ["shared"])
-        mgr.set_memory_tags("m-2", ["shared"])
+        mgr.set_memory_tags("m-2", ["shared", "solo"])
 
         assert mgr.delete_memory("m-1") is True
 
+        # shared 仍被 m-2 关联而保留；solo 不受影响
         links = list(
             mgr._conn.execute(
                 "SELECT memory_id FROM memory_tags WHERE memory_id = 'm-1'"
             )
         )
         assert links == []
-        assert mgr.get_memory_by_id("m-2").tags[0].name == "shared"
         tags = {tag["name"]: tag for tag in mgr.get_all_tags()}
         assert tags["shared"]["memory_count"] == 1
+        assert tags["solo"]["memory_count"] == 1
+
+        # 删除最后的关联记忆，标签一并消失
+        assert mgr.delete_memory("m-2") is True
+        assert mgr.get_all_tags() == []
         mgr.close()
 
     def test_set_tags_on_missing_memory_returns_none(self, mock_path_manager):

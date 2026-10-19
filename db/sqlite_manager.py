@@ -356,11 +356,19 @@ class SQLiteManager:
                     "INSERT INTO memory_tags (memory_id, tag_id) VALUES (?, ?)",
                     [(memory_id, tag_id) for tag_id in tag_ids],
                 )
+                self._delete_orphaned_tags(cursor)
                 self._conn.commit()
             except Exception:
                 self._conn.rollback()
                 raise
         return self.get_memory_by_id(memory_id)
+
+    @staticmethod
+    def _delete_orphaned_tags(cursor) -> None:
+        # 标签没有独立生命周期：失去全部关联（含记忆被删除）即随之删除。
+        cursor.execute(
+            "DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM memory_tags)"
+        )
 
     @staticmethod
     def _get_or_create_tag_id(cursor, name: str) -> int:
@@ -373,7 +381,8 @@ class SQLiteManager:
         return cursor.lastrowid
 
     def get_all_tags(self) -> List[TagSummaryDict]:
-        """All tags with their distinct memory counts, zero-count tags included."""
+        """All tags with their distinct memory counts; orphans are auto-deleted,
+        so every listed tag has at least one association."""
         cursor = self._conn.cursor()
         cursor.execute(
             """
@@ -693,13 +702,14 @@ class SQLiteManager:
         with self._write_lock:
             try:
                 cursor = self._conn.cursor()
-                # 失去关联的标签实体刻意保留，供未来的标签管理复用。
                 cursor.execute(
                     "DELETE FROM memory_tags WHERE memory_id = ?", (memory_id,)
                 )
                 cursor.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+                deleted = cursor.rowcount > 0
+                self._delete_orphaned_tags(cursor)
                 self._conn.commit()
-                return cursor.rowcount > 0
+                return deleted
             except Exception as e:
                 self._conn.rollback()
                 logger.error("Delete memory error: %s", e)
