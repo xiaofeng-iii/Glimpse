@@ -127,6 +127,21 @@ def mock_services():
     sqlite_mgr.delete_memory.side_effect = lambda memory_id: records.pop(
         memory_id, None
     ) is not None
+
+    def set_memory_tags(memory_id, tag_names):
+        from db.sqlite_manager import TagRecord
+        from utils.tag_names import normalize_tag_names
+
+        record = records.get(memory_id)
+        if record is None:
+            return None
+        record.tags = [
+            TagRecord(id=index + 1, name=name)
+            for index, name in enumerate(normalize_tag_names(tag_names))
+        ]
+        return copy.deepcopy(record)
+
+    sqlite_mgr.set_memory_tags.side_effect = set_memory_tags
     sqlite_mgr._records = records
 
     chroma_mgr = MagicMock()
@@ -488,6 +503,76 @@ class TestMemorySummaryUpdate:
             for call in mock_services["chroma_manager"].upsert_memory.call_args_list
         ]
         assert indexed_texts == ["old summary", "new summary"]
+
+
+class TestMemoryServiceTags:
+    def test_update_tags_replaces_and_emits_serializable_payload(self, mock_services):
+        add_record(mock_services, sync_status="SYNCED")
+        service = make_service(mock_services, with_queue=True)
+        emitted = []
+
+        with patch.object(
+            service,
+            "_emit_memory_updated",
+            side_effect=lambda memory: emitted.append(memory.to_dict()),
+        ):
+            updated = service.update_memory_tags("memory-1", [" 工作 ", "灵感", "工作"])
+
+        assert [tag.name for tag in updated.tags] == ["工作", "灵感"]
+        assert len(emitted) == 1
+        payload = emitted[0]
+        # WebSocket 广播走 json.dumps，标签对象必须可序列化。
+        json.dumps(payload)
+        assert payload["tags"] == [
+            {"id": 1, "name": "工作"},
+            {"id": 2, "name": "灵感"},
+        ]
+
+    def test_update_tags_with_empty_list_clears(self, mock_services):
+        add_record(mock_services)
+        service = make_service(mock_services)
+
+        with patch.object(service, "_emit_memory_updated"):
+            updated = service.update_memory_tags("memory-1", [])
+
+        assert updated.tags == []
+
+    def test_update_tags_missing_memory_returns_none(self, mock_services):
+        service = make_service(mock_services)
+        assert service.update_memory_tags("missing", ["工作"]) is None
+
+    def test_update_tags_rejects_invalid_names(self, mock_services):
+        add_record(mock_services)
+        service = make_service(mock_services)
+        with pytest.raises(ValueError):
+            service.update_memory_tags("memory-1", ["   "])
+        with pytest.raises(ValueError):
+            service.update_memory_tags("memory-1", [f"tag-{i}" for i in range(11)])
+
+    def test_update_tags_never_touches_sync_status_or_reindex(self, mock_services):
+        add_record(mock_services, sync_status="SYNCED")
+        service = make_service(mock_services, with_queue=True)
+
+        with patch.object(service, "_emit_memory_updated"):
+            service.update_memory_tags("memory-1", ["工作"])
+
+        record = mock_services["sqlite_manager"]._records["memory-1"]
+        assert record.sync_status == "SYNCED"
+        mock_services["task_queue"].submit.assert_not_called()
+        mock_services["embedding_client"].get_embedding.assert_not_called()
+        mock_services["chroma_manager"].upsert_memory.assert_not_called()
+        mock_services["sqlite_manager"].update_memory_summary.assert_not_called()
+        mock_services["sqlite_manager"].update_memory_user_text.assert_not_called()
+
+    def test_get_all_tags_passes_through_storage_catalog(self, mock_services):
+        mock_services["sqlite_manager"].get_all_tags.return_value = [
+            {"id": 1, "name": "工作", "memory_count": 2},
+        ]
+        service = make_service(mock_services)
+
+        assert service.get_all_tags() == [
+            {"id": 1, "name": "工作", "memory_count": 2},
+        ]
 
 
 class TestMemoryServiceVectorRepair:

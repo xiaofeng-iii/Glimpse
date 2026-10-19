@@ -7,12 +7,15 @@ export interface MemoryFilters {
   dateTo: string
   sourceChannels: string[]
   contentTypes: MemoryContentType[]
+  /** 选中的标签 ID 集合；组内为 OR，与其他筛选组之间为 AND。 */
+  tagIds: number[]
 }
 
 export interface MemoryFilterQuery {
   dateFrom?: string
   dateTo?: string
   memoryType?: MemoryContentType
+  tagIds?: number[]
 }
 
 const effectiveContentType = (contentTypes: MemoryContentType[]) => {
@@ -33,22 +36,29 @@ export const createEmptyMemoryFilters = (): MemoryFilters => ({
   dateTo: '',
   sourceChannels: [],
   contentTypes: [],
+  tagIds: [],
 })
 
 export const cloneMemoryFilters = (filters: MemoryFilters): MemoryFilters => ({
   ...filters,
   sourceChannels: [...filters.sourceChannels],
   contentTypes: [...filters.contentTypes],
+  tagIds: [...filters.tagIds],
 })
 
 export const toMemoryFilterQuery = (filters: MemoryFilters): MemoryFilterQuery => ({
   dateFrom: filters.dateFrom || undefined,
   dateTo: filters.dateTo || undefined,
   memoryType: effectiveContentType(filters.contentTypes),
+  tagIds: filters.tagIds.length ? [...filters.tagIds] : undefined,
 })
 
 export const memoryMatchesFilters = (
-  memory: { created_at: string; memory_type?: MemoryContentType },
+  memory: {
+    created_at: string
+    memory_type?: MemoryContentType
+    tags?: Array<{ id: number }>
+  },
   filters: MemoryFilters,
 ) => {
   const contentType = effectiveContentType(filters.contentTypes)
@@ -57,6 +67,12 @@ export const memoryMatchesFilters = (
   const memoryDate = memory.created_at.trim().slice(0, 10)
   if (filters.dateFrom && memoryDate < filters.dateFrom) return false
   if (filters.dateTo && memoryDate > filters.dateTo) return false
+
+  // 标签组内 OR：记忆关联任意一个选中标签即通过；未选标签则不限制。
+  if (filters.tagIds.length) {
+    const memoryTagIds = (memory.tags ?? []).map((tag) => tag.id)
+    if (!filters.tagIds.some((tagId) => memoryTagIds.includes(tagId))) return false
+  }
   return true
 }
 
@@ -64,11 +80,13 @@ export const hasActiveMemoryFilters = (filters: MemoryFilters) => Boolean(
   filters.dateFrom
   || filters.dateTo
   || filters.sourceChannels.length
-  || filters.contentTypes.length,
+  || filters.contentTypes.length
+  || filters.tagIds.length,
 )
 
 export const getActiveMemoryFilterCount = (filters: MemoryFilters) => [
   Boolean(filters.dateFrom || filters.dateTo),
   filters.sourceChannels.length > 0,
   filters.contentTypes.length > 0,
+  filters.tagIds.length > 0,
 ].filter(Boolean).length

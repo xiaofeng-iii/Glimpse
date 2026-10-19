@@ -294,11 +294,11 @@ const preventOutsideDismiss = (event: Event) => {
                 </button>
               </div>
               <button
+                v-hint-tooltip="t('addMemory.attachImage')"
                 type="button"
                 class="text-memory-dialog__attach flex aspect-square items-center justify-center rounded-lg border border-dashed text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
                 :class="dragging ? 'text-memory-dialog__attach--active' : ''"
                 :aria-label="t('addMemory.attachImage')"
-                :title="t('addMemory.attachImage')"
                 :disabled="busy"
                 @click="openFilePicker"
               >

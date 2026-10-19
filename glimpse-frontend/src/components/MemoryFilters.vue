@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch
 import { CalendarDaysIcon, ChevronDownIcon, FunnelIcon as FunnelOutlineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { languagePreference, t } from '@/utils/i18n'
 import { describeMemoryPeriod } from '@/utils/memory-grouping'
+import { useMemoriesStore } from '@/stores/memories'
 import {
   cloneMemoryFilters,
   createEmptyMemoryFilters,
@@ -52,6 +53,12 @@ const contentTypeOptions: Array<{ value: MemoryContentType; label: Parameters<ty
   { value: 'text', label: 'filter.textMemory' },
 ]
 
+const memoriesStore = useMemoriesStore()
+// 筛选面板只展示仍在使用中的标签；零关联标签留给未来的标签管理。
+const tagOptions = computed(() =>
+  memoriesStore.tags.filter((tag) => tag.memory_count > 0),
+)
+
 const active = computed(() => hasActiveMemoryFilters(props.modelValue))
 
 const close = (restoreFocus = false) => {
@@ -64,6 +71,8 @@ const show = () => {
   calendarOpen.value = false
   rangeMode.value = false
   open.value = true
+  // 标签候选按需加载：面板打开时才拉取（store 内去重）。
+  void memoriesStore.loadTags()
 }
 
 const toggle = () => {
@@ -170,6 +179,26 @@ const toggleContentType = (contentType: MemoryContentType) => {
   emitDraft()
 }
 
+// 标签多选为 OR 语义；与日期/类型等其它组之间保持 AND。
+const toggleTag = (tagId: number) => {
+  const selected = new Set(draft.value.tagIds)
+  if (selected.has(tagId)) selected.delete(tagId)
+  else selected.add(tagId)
+
+  draft.value = {
+    ...draft.value,
+    tagIds: tagOptions.value
+      .map((tag) => tag.id)
+      .filter((id) => selected.has(id)),
+  }
+  emitDraft()
+}
+
+const clearTags = () => {
+  draft.value = { ...draft.value, tagIds: [] }
+  emitDraft()
+}
+
 const apply = () => {
   emitDraft()
   close(true)
@@ -258,16 +287,16 @@ onUnmounted(() => {
                 <span>{{ t('filter.timeRange') }}</span>
                 <button
                   v-if="dateActive"
+                  v-hint-tooltip="t('wall.clearPeriod')"
                   type="button"
                   class="memory-filters__clear-period"
-                  :title="t('wall.clearPeriod')"
                   :aria-label="t('wall.clearPeriod')"
                   @click="clearPeriod"
                 >
                   <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </span>
-              <label class="memory-filters__range-mode" :title="t('wall.rangeModeHint')">
+              <label v-hint-tooltip="t('wall.rangeModeHint')" class="memory-filters__range-mode">
                 <input
                   v-model="rangeMode"
                   type="checkbox"
@@ -282,19 +311,18 @@ onUnmounted(() => {
               :class="{ 'memory-filters__date-block--open': calendarOpen }"
             >
               <button
+                v-hint-tooltip="dateLabel"
                 type="button"
                 class="memory-filters__date-toggle"
                 :class="{ 'memory-filters__date-toggle--active': draft.dateFrom || draft.dateTo }"
                 :aria-expanded="calendarOpen"
                 :aria-controls="calendarId"
-                :title="dateLabel"
                 @click="calendarOpen = !calendarOpen"
               >
                 <CalendarDaysIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span
                   class="memory-filters__date-text"
                   :class="{ 'memory-filters__date-text--range': dateActive }"
-                  :title="dateLabel"
                 >{{ dateRangeText }}</span>
                 <ChevronDownIcon
                   class="memory-filters__date-chevron h-4 w-4 shrink-0"
@@ -330,6 +358,43 @@ onUnmounted(() => {
                 />
                 <span class="memory-filters__checkbox-indicator" aria-hidden="true"></span>
                 <span>{{ t(contentType.label) }}</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <!-- 没有任何在用标签时整组不渲染，不留空壳控件。 -->
+          <fieldset v-if="tagOptions.length" class="memory-filters__group">
+            <legend class="memory-filters__group-label memory-filters__group-label--row">
+              <span class="memory-filters__group-title">
+                <span>{{ t('filter.tags') }}</span>
+                <button
+                  v-if="draft.tagIds.length"
+                  v-hint-tooltip="t('filter.clearTags')"
+                  type="button"
+                  class="memory-filters__clear-period"
+                  :aria-label="t('filter.clearTags')"
+                  @click="clearTags"
+                >
+                  <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </span>
+            </legend>
+            <div class="memory-filters__presets">
+              <label
+                v-for="tag in tagOptions"
+                :key="tag.id"
+                class="memory-filters__preset-row"
+              >
+                <input
+                  :checked="draft.tagIds.includes(tag.id)"
+                  :value="tag.id"
+                  class="memory-filters__content-type"
+                  type="checkbox"
+                  @change="toggleTag(tag.id)"
+                />
+                <span class="memory-filters__checkbox-indicator" aria-hidden="true"></span>
+                <span v-hint-tooltip="tag.name" class="memory-filters__tag-name">{{ tag.name }}</span>
+                <span class="memory-filters__tag-count">{{ tag.memory_count }}</span>
               </label>
             </div>
           </fieldset>
@@ -762,6 +827,21 @@ onUnmounted(() => {
 .memory-filters__preset-row:has(.memory-filters__content-type:focus-visible) {
   background: var(--color-primary-soft);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-focus) 26%, transparent);
+}
+
+.memory-filters__tag-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-filters__tag-count {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .memory-filters__actions {

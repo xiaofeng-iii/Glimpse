@@ -283,7 +283,7 @@ defineExpose({ focus, clear })
             >
               <XMarkIcon class="h-3 w-3" aria-hidden="true" />
             </button>
-            <kbd class="search-toolbar__detail-control border border-[var(--shell-line)] px-1 py-0 text-xs text-[var(--shell-muted)]">
+            <kbd class="search-toolbar__detail-control search-toolbar__detail-control--kbd px-1 py-0 text-xs">
               {{ shortcutLabel }}
             </kbd>
           </div>
@@ -473,7 +473,6 @@ defineExpose({ focus, clear })
           :disabled="captureDisabled"
           :shortcut-label="captureShortcutLabel"
           density="toolbar"
-          show-shortcut
           @capture="emit('capture')"
         />
         <AddMemoryButton
@@ -671,6 +670,15 @@ defineExpose({ focus, clear })
 
 .search-toolbar__detail-control {
   border-radius: var(--search-toolbar-detail-radius);
+}
+
+/* 搜索框自带灰底，键帽比全局 kbd 加深一档（灰底 hover 同档 224）才分得出来 */
+.search-toolbar__detail-control--kbd {
+  background: rgb(224, 228, 237);
+}
+
+:root[data-theme='dark'] .search-toolbar__detail-control--kbd {
+  background: var(--color-border-strong);
 }
 
 :root[data-theme='dark'] .search-toolbar__refresh:hover {

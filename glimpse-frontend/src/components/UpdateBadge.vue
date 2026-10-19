@@ -36,9 +36,9 @@ const installNow = async () => {
   >
     <template #trigger>
       <button
+        v-hint-tooltip="t('updates.badgeAvailable')"
         type="button"
         class="shell-icon-button update-badge update-badge--available"
-        :title="t('updates.badgeAvailable')"
         :aria-label="t('updates.badgeAvailable')"
       >
         <ArrowDownTrayIcon class="h-[15px] w-[15px]" aria-hidden="true" />

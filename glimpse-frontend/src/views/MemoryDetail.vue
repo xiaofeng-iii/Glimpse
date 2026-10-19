@@ -21,9 +21,14 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import MediaGallery from '@/components/MediaGallery.vue'
 import OcrText from '@/components/OcrText.vue'
 import SummaryEditor from '@/components/SummaryEditor.vue'
+import MemoryTagsEditor from '@/components/MemoryTagsEditor.vue'
 import MemoryAnalysisState from '@/components/MemoryAnalysisState.vue'
 
 type SummaryEditorExpose = {
+  canLeave: () => Promise<boolean>
+}
+
+type TagsEditorExpose = {
   canLeave: () => Promise<boolean>
 }
 
@@ -34,6 +39,7 @@ const notifications = useNotificationStore()
 const logger = createLogger('views/MemoryDetail')
 
 const summaryEditor = ref<SummaryEditorExpose | null>(null)
+const tagsEditor = ref<TagsEditorExpose | null>(null)
 const loading = ref(false)
 const loadFailed = ref(false)
 const deleteDialogOpen = ref(false)
@@ -71,7 +77,10 @@ const loadMemory = async () => {
 
 watch(memoryId, () => void loadMemory(), { immediate: true })
 
-const canLeave = () => summaryEditor.value?.canLeave() ?? Promise.resolve(true)
+const canLeave = async () => {
+  if (!(await (summaryEditor.value?.canLeave() ?? true))) return false
+  return (await tagsEditor.value?.canLeave()) ?? true
+}
 onBeforeRouteLeave(async () => canLeave())
 onBeforeRouteUpdate(async () => canLeave())
 
@@ -157,6 +166,9 @@ const confirmDelete = async () => {
             :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"
           />
           <SummaryEditor v-else ref="summaryEditor" :memory="memory" />
+
+          <!-- 标签与分析状态无关：分析进行中同样可编辑。 -->
+          <MemoryTagsEditor ref="tagsEditor" :memory="memory" />
 
           <button v-if="!analyzing && !analysisUnavailable" type="button" class="btn-secondary" @click="copySummary">
             <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />

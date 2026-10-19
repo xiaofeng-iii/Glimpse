@@ -15,7 +15,8 @@
 | 需要用户"确认/取消"的打断式询问（含删除等破坏性操作） | `ConfirmDialog.vue` | 非 destructive 分支默认带琥珀警示三角图标；常规提示不要直接套这个壳，先按 `ui-checklist.md` 第 1 条判断该用 alert 还是无图标中性变体 |
 | 信息展示型浮层（更新说明、详情速览），跟随某个触发元素弹出 | `UpdateNotesPopover.vue` | reka-ui Popover，自带标题栏+右上角关闭按钮（已统一 `XMarkIcon` 14px）+`notes-popover` 样式与进场动画；body 已隐藏滚动条、禁横滑 |
 | 大图预览 | `ImagePreviewModal.vue` | `.image-preview-dialog`；关闭按钮 = 32px 无框标准规格（见"按钮"表叉号行），翻页箭头用 `.image-preview-stage__arrow` 40px 大档 |
-| 右键/上下文菜单 | `MemoryContextMenu.vue` / `ImageContextMenu.vue` / `EditTextContextMenu.vue` | 菜单项 32px（`--control-h-md`），结构 `.x-context-menu` + `__item` + `__divider` |
+| 右键/上下文菜单 | `MemoryContextMenu.vue` / `ImageContextMenu.vue` / `EditTextContextMenu.vue` | 菜单项 28px（`--control-h-sm`，2026-10-19 由 32px 调紧凑），结构 `.x-context-menu` + `__item` + `__divider` |
+| 按钮/控件的悬浮说明（hover/focus 提示，可带快捷键键帽；文本截断的全文展示同用） | `v-hint-tooltip` 指令（`directives/hint-tooltip.ts`，main.ts 全局注册） | 值取字符串或 `{ label, shortcut? }`；零包裹节点直接挂控件上，300ms 延迟、140ms easeOutCubic 自触发元素一侧位移+放大+变不透明（出发态偏 3px / 95% / 半透明）、浅色气泡样式见 DESIGN.md 附录。**任何悬浮说明都用它，禁止写原生 `title`**——main.ts 已装原生 tooltip 铁幕（悬停即摘除 title），未配置指令就不显示 |
 
 ## 按钮
 
@@ -37,7 +38,7 @@
 |---|---|---|
 | 设置区输入框 | `.setting-input`（Settings.vue 局部） | 32px（`--control-h-md`）、文本框限宽 320px、数字框限宽 120px、聚焦只变边框色 |
 | 设置区三段式切换器 | `.theme-switcher`（Settings.vue 局部） | 32px 高、扁平线框浅底+独立平移滑块 |
-| 侧栏内嵌块（摘要/识别文本） | `SummaryEditor.vue` compact / `OcrText.vue` compact | `surface-subtle` 10px 圆角无框内衬约 12px；块头行内操作 28px；编辑态白底框浮起 |
+| 侧栏平铺块（摘要/标签/识别文本） | `SummaryEditor.vue` compact / `MemoryTagsEditor.vue` compact / `OcrText.vue` compact | 无底色直铺侧栏：标题行与正文顶到侧栏内容缘，三块左缘逐边对齐；块头行内操作 28px；编辑态白底框浮起；chip 级小控件灰底、hover 走 224 档 |
 | 搜索工具区控件 | SearchToolbar 内部 | 紧凑 32px 档 |
 
 ## 尺寸/形状/z 档位（镜像 token，以 main.css 为准）

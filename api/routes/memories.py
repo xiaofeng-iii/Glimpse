@@ -5,7 +5,7 @@ import asyncio
 import os
 import time
 from datetime import date
-from typing import List
+from typing import Annotated, List
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
@@ -20,6 +20,7 @@ from api.schemas import (
 )
 from api.dependencies import get_path_manager, get_search_service, get_memory_service
 from api.memory_filters import normalize_memory_date_range
+from api.serializers import memory_to_response
 from api.websocket import broadcast_event, broadcast_event_from_thread
 from utils.logger import get_logger
 
@@ -31,24 +32,6 @@ MAX_IMPORT_IMAGES = 10
 MAX_IMPORT_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_IMPORT_TEXT_LENGTH = 4000
 IMPORT_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
-
-
-def memory_to_response(memory) -> dict:
-    """Convert MemoryRecord to dict for API response"""
-    return {
-        "id": memory.id,
-        "created_at": memory.created_at,
-        "image_path": memory.image_path,
-        "ai_summary": memory.ai_summary,
-        "app_name": memory.app_name,
-        "text_content": memory.text_content,
-        "extra_images": memory.extra_images,
-        "user_text": getattr(memory, "user_text", None),
-        "sync_status": getattr(memory, "sync_status", "PENDING"),
-        "analysis_status": getattr(memory, "analysis_status", "COMPLETED"),
-        "memory_type": getattr(memory, "memory_type", "screenshot"),
-        "match_sources": getattr(memory, "match_sources", []),
-    }
 
 
 @router.post("", response_model=MemoryResponse, status_code=201)
@@ -251,12 +234,19 @@ async def list_memories(
     date_from: date | None = None,
     date_to: date | None = None,
     memory_type: MemoryType | None = None,
+    tag_ids: Annotated[list[int] | None, Query()] = None,
 ):
     """Get list of recent memories"""
     try:
         search_service = get_search_service()
         bounds = normalize_memory_date_range(date_from, date_to)
-        if offset or bounds.created_after or bounds.created_before or memory_type:
+        if (
+            offset
+            or bounds.created_after
+            or bounds.created_before
+            or memory_type
+            or tag_ids
+        ):
             recent_options = {
                 "limit": limit,
                 "offset": offset,
@@ -265,6 +255,8 @@ async def list_memories(
             }
             if memory_type:
                 recent_options["memory_type"] = memory_type
+            if tag_ids:
+                recent_options["tag_ids"] = tag_ids
             memories = search_service.get_recent_memories(**recent_options)
         else:
             memories = search_service.get_recent_memories(limit=limit)
@@ -274,6 +266,8 @@ async def list_memories(
         }
         if memory_type:
             count_options["memory_type"] = memory_type
+        if tag_ids:
+            count_options["tag_ids"] = tag_ids
         return MemoryListResponse(
             memories=[MemoryResponse(**memory_to_response(m)) for m in memories],
             total=search_service.get_recent_memories_count(**count_options),
@@ -303,10 +297,14 @@ async def get_memory(memory_id: str):
 async def update_memory(memory_id: str, request: MemoryUpdateRequest):
     """Update user-editable memory fields and queue semantic reindexing."""
     try:
-        if request.ai_summary is None and request.user_text is None:
+        if (
+            request.ai_summary is None
+            and request.user_text is None
+            and request.tags is None
+        ):
             raise HTTPException(
                 status_code=422,
-                detail="Provide ai_summary or user_text to update",
+                detail="Provide ai_summary, user_text or tags to update",
             )
 
         memory_service = get_memory_service()
@@ -325,6 +323,16 @@ async def update_memory(memory_id: str, request: MemoryUpdateRequest):
             memory = memory_service.update_memory_user_text(
                 memory_id,
                 request.user_text,
+            )
+            if memory is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Memory {memory_id} not found",
+                )
+        if request.tags is not None:
+            memory = memory_service.update_memory_tags(
+                memory_id,
+                request.tags,
             )
             if memory is None:
                 raise HTTPException(

@@ -12,7 +12,7 @@ from utils.logger import get_logger
 if TYPE_CHECKING:
     from core.task_queue import TaskQueue
     from db.chroma_manager import ChromaManager
-    from db.sqlite_manager import MemoryRecord, SQLiteManager
+    from db.sqlite_manager import MemoryRecord, SQLiteManager, TagSummaryDict
     from services.ai_client import AIClient
     from services.embedding_client import EmbeddingClient
     from services.ocr_engine import OCREngine
@@ -657,6 +657,27 @@ class MemoryService:
             self._emit_memory_updated(updated)
         self.schedule_memory_reindex(memory_id)
         return updated
+
+    def update_memory_tags(
+        self,
+        memory_id: str,
+        tag_names: List[str],
+    ) -> Optional["MemoryRecord"]:
+        """Replace a memory's tags without touching content, sync or the index.
+
+        Tag links live outside the memories table, so this must not take the
+        reindex lock, must not change sync_status, and must not schedule
+        embedding or vector rebuilds.
+        """
+        updated = self._sqlite_manager.set_memory_tags(memory_id, tag_names)
+        if updated is None:
+            return None
+        self._emit_memory_updated(updated)
+        return updated
+
+    def get_all_tags(self) -> List["TagSummaryDict"]:
+        """Tag catalog for the tags API; keeps route handlers off the storage layer."""
+        return self._sqlite_manager.get_all_tags()
 
     def repair_vector_index(
         self,

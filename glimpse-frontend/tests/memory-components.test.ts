@@ -11,6 +11,7 @@ import MediaGallery from '@/components/MediaGallery.vue'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 import SearchToolbar from '@/components/SearchToolbar.vue'
 import SummaryEditor from '@/components/SummaryEditor.vue'
+import MemoryTagsEditor from '@/components/MemoryTagsEditor.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import UpdateNotesPopover from '@/components/UpdateNotesPopover.vue'
 import OcrText from '@/components/OcrText.vue'
@@ -29,6 +30,8 @@ const apiMocks = vi.hoisted(() => ({
   get: vi.fn(),
   updateSummary: vi.fn(),
   updateUserText: vi.fn(),
+  updateTags: vi.fn(),
+  listTags: vi.fn(),
 }))
 
 vi.mock('@/api/client', async (importOriginal) => {
@@ -40,6 +43,11 @@ vi.mock('@/api/client', async (importOriginal) => {
       get: apiMocks.get,
       updateSummary: apiMocks.updateSummary,
       updateUserText: apiMocks.updateUserText,
+      updateTags: apiMocks.updateTags,
+    },
+    tagsApi: {
+      ...original.tagsApi,
+      list: apiMocks.listTags,
     },
   }
 })
@@ -74,6 +82,8 @@ describe('memory components', () => {
     window.localStorage.clear()
     setActivePinia(createPinia())
     setLanguagePreference('zh-CN')
+    // 筛选面板打开即拉标签目录：给个空目录默认值，避免无关测试吃到未处理拒绝。
+    apiMocks.listTags.mockResolvedValue({ tags: [] })
   })
 
   it('shows exact and semantic badges for each search match combination only', async () => {
@@ -901,11 +911,126 @@ describe('memory components', () => {
     wrapper.unmount()
     origin.remove()
   })
+
+  it('shows at most two tag chips on a card and folds the rest into +N', async () => {
+    const wrapper = mount(MemoryCard, {
+      props: {
+        memory: createMemory({
+          tags: [
+            { id: 1, name: '工作' },
+            { id: 2, name: '灵感' },
+            { id: 3, name: '待办' },
+          ],
+        }),
+      },
+    })
+
+    const chips = wrapper.findAll('.memory-card__tag-chip')
+    expect(chips.map((chip) => chip.text())).toEqual(['工作', '灵感', '+1'])
+    // 悬浮说明走 v-hint-tooltip 指令，元素上不再出现原生 title。
+    const moreChip = wrapper.get('.memory-card__tag-chip--more')
+    expect(moreChip.attributes('title')).toBeUndefined()
+    expect((moreChip.element as HTMLElement & { __hintTooltipValue?: unknown }).__hintTooltipValue)
+      .toBe('工作、灵感、待办')
+    // 时间必须仍在右侧渲染，不被标签挤走。
+    expect(wrapper.get('time').exists()).toBe(true)
+
+    await wrapper.setProps({ memory: createMemory({ tags: [] }) })
+    expect(wrapper.find('.memory-card__tag-chip').exists()).toBe(false)
+  })
+
+  it('renders the filter panel tag group only for tags in use and applies OR multi-select', async () => {
+    apiMocks.listTags.mockResolvedValue({
+      tags: [
+        { id: 1, name: '工作', memory_count: 3 },
+        { id: 2, name: '灵感', memory_count: 1 },
+        { id: 3, name: '闲置', memory_count: 0 },
+      ],
+    })
+    const wrapper = mount(MemoryFilters, {
+      props: { modelValue: createEmptyMemoryFilters() },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('.memory-filters__trigger').trigger('click')
+    await flushPromises()
+
+    // 零关联标签不进入筛选候选。
+    const rows = wrapper.findAll('.memory-filters__preset-row')
+    const tagRows = rows.filter((row) => row.text().match(/工作|灵感|闲置/))
+    expect(tagRows.map((row) => row.text())).toEqual(['工作3', '灵感1'])
+
+    const workInput = tagRows[0].get('input')
+    await workInput.trigger('change')
+    let applied = wrapper.emitted('apply')?.at(-1)?.[0]
+    expect(applied).toMatchObject({ tagIds: [1] })
+
+    const ideaRow = wrapper.findAll('.memory-filters__preset-row')
+      .find((row) => row.text().includes('灵感'))
+    await ideaRow!.get('input').trigger('change')
+    applied = wrapper.emitted('apply')?.at(-1)?.[0]
+    expect(applied).toMatchObject({ tagIds: [1, 2] })
+
+    // 图例行 ✕ 清除标签选择。
+    await wrapper.get('.memory-filters__clear-period[aria-label="清除标签筛选"]').trigger('click')
+    applied = wrapper.emitted('apply')?.at(-1)?.[0]
+    expect(applied).toMatchObject({ tagIds: [] })
+    wrapper.unmount()
+  })
+
+  it('hides the filter panel tag group when no tag is in use', async () => {
+    apiMocks.listTags.mockResolvedValue({ tags: [] })
+    const wrapper = mount(MemoryFilters, {
+      props: { modelValue: createEmptyMemoryFilters() },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('.memory-filters__trigger').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('已有标签')
+    expect(wrapper.findAll('fieldset')).toHaveLength(2)
+    wrapper.unmount()
+  })
+
+  it('lets the inspector edit tags and guards leaving with a dirty tags draft', async () => {
+    const memory = createMemory({ tags: [{ id: 1, name: '工作' }] })
+    const inspector = mount(MemoryInspector, { props: { memory } })
+
+    const tagsEditor = inspector.findComponent(MemoryTagsEditor)
+    expect(tagsEditor.exists()).toBe(true)
+    expect(tagsEditor.text()).toContain('工作')
+
+    await tagsEditor.get('.tags-editor__edit-action').trigger('click')
+    await tagsEditor.get('.tags-editor__input').setValue('灵感')
+    await tagsEditor.get('.tags-editor__input').trigger('keydown', { key: 'Enter' })
+
+    // 摘要编辑器干净但标签草稿脏：检查器仍应拦下离开。
+    const leaveRequest = (inspector.vm as unknown as { canLeave: () => Promise<boolean> }).canLeave()
+    await flushPromises()
+    const dialog = document.querySelector<HTMLElement>('[role="alertdialog"]')
+    expect(dialog).not.toBeNull()
+    const discardButton = [...dialog!.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes('放弃修改'))
+    discardButton!.click()
+    await expect(leaveRequest).resolves.toBe(true)
+  })
+
+  it('renders the shared tags editor on the detail page too', async () => {
+    apiMocks.get.mockResolvedValue(createMemory({ tags: [{ id: 1, name: '工作' }] }))
+    const wrapper = mount(MemoryDetail)
+    await flushPromises()
+
+    const tagsEditor = wrapper.findComponent(MemoryTagsEditor)
+    expect(tagsEditor.exists()).toBe(true)
+    expect(tagsEditor.text()).toContain('工作')
+  })
 })
 
 describe('窗口级关闭叉号统一规格', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    apiMocks.listTags.mockResolvedValue({ tags: [] })
   })
 
   const assertUnifiedCloseGlyph = (container: ParentNode, button: Element | null) => {

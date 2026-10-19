@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import asyncio
 
-from api.routes import memories, search, screenshot, settings, cluster, images
+from api.routes import memories, search, screenshot, settings, cluster, images, tags
 from api.desktop_actions import setup_cluster_processing
 from api.hotkeys import setup_global_hotkeys, shutdown_global_hotkeys
 from api.websocket import websocket_endpoint, setup_signal_forwarding, manager
@@ -124,6 +124,7 @@ app.include_router(screenshot.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 app.include_router(cluster.router, prefix="/api")
 app.include_router(images.router, prefix="/api")
+app.include_router(tags.router, prefix="/api")
 
 
 @app.get("/")

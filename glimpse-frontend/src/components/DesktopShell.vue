@@ -258,9 +258,9 @@ onUnmounted(() => {
         <slot name="navigation">
           <button
             v-if="isHome"
+            v-hint-tooltip="t('action.settings')"
             type="button"
             class="shell-icon-button desktop-shell__settings-button"
-            :title="t('action.settings')"
             :aria-label="t('action.settings')"
             @click="navigateSettings"
           >
@@ -311,18 +311,18 @@ onUnmounted(() => {
 
         <div v-if="isDesktop" class="desktop-shell__window-controls">
           <button
+            v-hint-tooltip="t('action.minimize')"
             type="button"
             class="window-control"
-            :title="t('action.minimize')"
             :aria-label="t('action.minimize')"
             @click="minimizeDesktopWindow"
           >
             <MinusIcon class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <button
+            v-hint-tooltip="isWindowMaximized ? t('action.restore') : t('action.maximize')"
             type="button"
             class="window-control"
-            :title="isWindowMaximized ? t('action.restore') : t('action.maximize')"
             :aria-label="isWindowMaximized ? t('action.restore') : t('action.maximize')"
             @click="handleToggleMaximize"
           >
@@ -338,9 +338,9 @@ onUnmounted(() => {
             />
           </button>
           <button
+            v-hint-tooltip="t('action.close')"
             type="button"
             class="window-control window-control--danger"
-            :title="t('action.close')"
             :aria-label="t('action.close')"
             @click="requestWindowClose"
           >

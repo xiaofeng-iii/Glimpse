@@ -5,15 +5,30 @@ SQLite Manager - 封装 SQLite CRUD，包含 FTS5 配置与写入互斥锁
 import sqlite3
 import threading
 from dataclasses import dataclass, asdict, field
-from typing import List, Optional, Dict, Any, TYPE_CHECKING
+from typing import List, Optional, Dict, Any, TypedDict, TYPE_CHECKING
 from pathlib import Path
 
 from utils.logger import get_logger
+from utils.tag_names import normalize_tag_names
 
 if TYPE_CHECKING:
     from config.path_manager import PathManager
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class TagRecord:
+    id: int
+    name: str
+
+
+class TagSummaryDict(TypedDict):
+    """One row of get_all_tags(): the tag entity plus its distinct memory count."""
+
+    id: int
+    name: str
+    memory_count: int
 
 
 @dataclass
@@ -29,6 +44,8 @@ class MemoryRecord:
     analysis_status: str = "COMPLETED"
     memory_type: str = "screenshot"
     match_sources: List[str] = field(default_factory=list)
+    # 运行时字段：由关联表单独加载，不来自 memories 行。
+    tags: List[TagRecord] = field(default_factory=list)
     # 用户手动键入的文本（与 AI 摘要分离；仅部分图片记忆携带）。
     # 必须保持在最后一个字段：旧库的按列位读取分支依赖既有顺序。
     user_text: Optional[str] = None
@@ -227,6 +244,26 @@ class SQLiteManager:
             """
         )
 
+        # 标签实体与记忆-标签关联：独立于 memories 主表，标签更新不触发主表
+        # AFTER UPDATE 触发器，也就不会引发 FTS 重写。
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE COLLATE NOCASE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS memory_tags (
+                memory_id TEXT NOT NULL,
+                tag_id INTEGER NOT NULL,
+                PRIMARY KEY (memory_id, tag_id)
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_memory_tags_tag_id
+            ON memory_tags(tag_id, memory_id)
+        """)
+
         self._conn.commit()
 
     def insert_memory(self, record: MemoryRecord) -> bool:
@@ -263,17 +300,104 @@ class SQLiteManager:
         cursor.execute("SELECT * FROM memories WHERE id = ?", (memory_id,))
         row = cursor.fetchone()
         if row:
-            return MemoryRecord.from_row(row)
+            return self._hydrate_tags([MemoryRecord.from_row(row)])[0]
         return None
+
+    def _hydrate_tags(self, records: List[MemoryRecord]) -> List[MemoryRecord]:
+        """Fill each record's tags from the association table in batched queries."""
+        if not records:
+            return records
+        tags_by_memory: Dict[str, List[TagRecord]] = {
+            record.id: [] for record in records
+        }
+        memory_ids = list(tags_by_memory.keys())
+        cursor = self._conn.cursor()
+        # SQLite caps bound parameters per statement; chunk well below 999.
+        chunk_size = 500
+        for start in range(0, len(memory_ids), chunk_size):
+            chunk = memory_ids[start : start + chunk_size]
+            placeholders = ", ".join("?" for _ in chunk)
+            cursor.execute(
+                f"""
+                SELECT mt.memory_id, t.id, t.name
+                FROM memory_tags mt
+                JOIN tags t ON t.id = mt.tag_id
+                WHERE mt.memory_id IN ({placeholders})
+                ORDER BY t.name COLLATE NOCASE, t.name
+                """,
+                chunk,
+            )
+            for memory_id, tag_id, name in cursor.fetchall():
+                tags_by_memory[memory_id].append(TagRecord(id=tag_id, name=name))
+        for record in records:
+            record.tags = tags_by_memory[record.id]
+        return records
+
+    def set_memory_tags(
+        self,
+        memory_id: str,
+        tag_names: List[str],
+    ) -> Optional[MemoryRecord]:
+        """Replace a memory's tag associations atomically; None if missing."""
+        names = normalize_tag_names(tag_names)
+        with self._write_lock:
+            try:
+                cursor = self._conn.cursor()
+                cursor.execute(
+                    "SELECT 1 FROM memories WHERE id = ?", (memory_id,)
+                )
+                if cursor.fetchone() is None:
+                    return None
+                tag_ids = [self._get_or_create_tag_id(cursor, name) for name in names]
+                cursor.execute(
+                    "DELETE FROM memory_tags WHERE memory_id = ?", (memory_id,)
+                )
+                cursor.executemany(
+                    "INSERT INTO memory_tags (memory_id, tag_id) VALUES (?, ?)",
+                    [(memory_id, tag_id) for tag_id in tag_ids],
+                )
+                self._conn.commit()
+            except Exception:
+                self._conn.rollback()
+                raise
+        return self.get_memory_by_id(memory_id)
+
+    @staticmethod
+    def _get_or_create_tag_id(cursor, name: str) -> int:
+        # NOCASE 只覆盖 ASCII 大小写；请求级的完整去重由 normalize_tag_names 完成。
+        cursor.execute("SELECT id FROM tags WHERE name = ? COLLATE NOCASE", (name,))
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        cursor.execute("INSERT INTO tags (name) VALUES (?)", (name,))
+        return cursor.lastrowid
+
+    def get_all_tags(self) -> List[TagSummaryDict]:
+        """All tags with their distinct memory counts, zero-count tags included."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            SELECT t.id, t.name, COUNT(DISTINCT mt.memory_id) AS memory_count
+            FROM tags t
+            LEFT JOIN memory_tags mt ON mt.tag_id = t.id
+            GROUP BY t.id, t.name
+            ORDER BY memory_count DESC, t.name COLLATE NOCASE, t.name
+            """
+        )
+        return [
+            {"id": row["id"], "name": row["name"], "memory_count": row["memory_count"]}
+            for row in cursor.fetchall()
+        ]
 
     @staticmethod
     def _memory_filter_clause(
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
-    ) -> tuple[str, List[str]]:
+        tag_ids: Optional[List[int]] = None,
+    ) -> tuple[str, List[Any]]:
         clauses = []
-        params = []
+        params: List[Any] = []
         if created_after:
             clauses.append("m.created_at >= ?")
             params.append(created_after)
@@ -283,6 +407,14 @@ class SQLiteManager:
         if memory_type:
             clauses.append("m.memory_type = ?")
             params.append(memory_type)
+        if tag_ids:
+            # EXISTS 而不是 JOIN：多标签记忆不会因关联多行而在结果中重复。
+            placeholders = ", ".join("?" for _ in tag_ids)
+            clauses.append(
+                "EXISTS (SELECT 1 FROM memory_tags mt "
+                f"WHERE mt.memory_id = m.id AND mt.tag_id IN ({placeholders}))"
+            )
+            params.extend(tag_ids)
         return (" AND ".join(clauses), params)
 
     def get_all_memories(
@@ -292,12 +424,14 @@ class SQLiteManager:
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
+        tag_ids: Optional[List[int]] = None,
     ) -> List[MemoryRecord]:
         cursor = self._conn.cursor()
         filter_clause, filter_params = self._memory_filter_clause(
             created_after,
             created_before,
             memory_type,
+            tag_ids,
         )
         where_sql = f"WHERE {filter_clause}" if filter_clause else ""
         cursor.execute(
@@ -306,19 +440,21 @@ class SQLiteManager:
             (*filter_params, limit, offset),
         )
         rows = cursor.fetchall()
-        return [MemoryRecord.from_row(row) for row in rows]
+        return self._hydrate_tags([MemoryRecord.from_row(row) for row in rows])
 
     def get_memory_ids(
         self,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
+        tag_ids: Optional[List[int]] = None,
     ) -> List[str]:
         cursor = self._conn.cursor()
         filter_clause, filter_params = self._memory_filter_clause(
             created_after,
             created_before,
             memory_type,
+            tag_ids,
         )
         where_sql = f"WHERE {filter_clause}" if filter_clause else ""
         cursor.execute(
@@ -334,12 +470,14 @@ class SQLiteManager:
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
+        tag_ids: Optional[List[int]] = None,
     ) -> List[MemoryRecord]:
         cursor = self._conn.cursor()
         filter_clause, filter_params = self._memory_filter_clause(
             created_after,
             created_before,
             memory_type,
+            tag_ids,
         )
         filter_sql = f" AND {filter_clause}" if filter_clause else ""
         try:
@@ -355,7 +493,7 @@ class SQLiteManager:
             )
             rows = cursor.fetchall()
             if rows:
-                return [MemoryRecord.from_row(row) for row in rows]
+                return self._hydrate_tags([MemoryRecord.from_row(row) for row in rows])
         except Exception:
             pass
 
@@ -369,7 +507,7 @@ class SQLiteManager:
             (f"%{query}%", f"%{query}%", f"%{query}%", *filter_params, limit),
         )
         rows = cursor.fetchall()
-        return [MemoryRecord.from_row(row) for row in rows]
+        return self._hydrate_tags([MemoryRecord.from_row(row) for row in rows])
 
     def update_memory_summary(
         self,
@@ -555,10 +693,15 @@ class SQLiteManager:
         with self._write_lock:
             try:
                 cursor = self._conn.cursor()
+                # 失去关联的标签实体刻意保留，供未来的标签管理复用。
+                cursor.execute(
+                    "DELETE FROM memory_tags WHERE memory_id = ?", (memory_id,)
+                )
                 cursor.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
                 self._conn.commit()
                 return cursor.rowcount > 0
             except Exception as e:
+                self._conn.rollback()
                 logger.error("Delete memory error: %s", e)
                 return False
 
@@ -567,12 +710,14 @@ class SQLiteManager:
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         memory_type: Optional[str] = None,
+        tag_ids: Optional[List[int]] = None,
     ) -> int:
         cursor = self._conn.cursor()
         filter_clause, filter_params = self._memory_filter_clause(
             created_after,
             created_before,
             memory_type,
+            tag_ids,
         )
         where_sql = f"WHERE {filter_clause}" if filter_clause else ""
         cursor.execute(

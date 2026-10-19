@@ -6,13 +6,11 @@ withDefaults(defineProps<{
   capturing?: boolean
   disabled?: boolean
   shortcutLabel?: string
-  showShortcut?: boolean
   density?: 'standard' | 'toolbar'
 }>(), {
   capturing: false,
   disabled: false,
   shortcutLabel: 'Ctrl+Shift+G',
-  showShortcut: false,
   density: 'standard',
 })
 
@@ -23,6 +21,7 @@ const emit = defineEmits<{
 
 <template>
   <button
+    v-hint-tooltip="{ label: t('action.capture'), shortcut: shortcutLabel }"
     type="button"
     class="capture-button inline-flex min-w-[5.875rem] items-center gap-2 px-4 text-white transition duration-[160ms] ease-[ease]"
     :class="density === 'toolbar' ? 'h-8 capture-button--slim' : 'h-10'"
@@ -34,9 +33,6 @@ const emit = defineEmits<{
     <ArrowPathIcon v-if="capturing" class="h-5 w-5 flex-none animate-spin" aria-hidden="true" />
     <CameraIcon v-else class="h-5 w-5 flex-none" aria-hidden="true" />
     <span>{{ t('action.capture') }}</span>
-    <kbd v-if="showShortcut" class="capture-shortcut rounded-md bg-white/18 text-xs">
-      {{ shortcutLabel }}
-    </kbd>
   </button>
 </template>
 
@@ -48,17 +44,5 @@ const emit = defineEmits<{
   padding-inline: 0.625rem;
   font-size: 0.875rem;
   font-weight: 400;
-}
-
-/* 全局 kbd 规则（.capture-button kbd）优先级高于工具类，芯片内衬需在此覆盖 */
-.capture-shortcut {
-  padding: 0 0.25rem;
-  line-height: 14px;
-}
-
-@media (max-width: 1120px) {
-  .capture-shortcut {
-    display: none;
-  }
 }
 </style>

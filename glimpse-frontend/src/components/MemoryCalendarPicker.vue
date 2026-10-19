@@ -300,20 +300,20 @@ onUnmounted(() => {
         <span v-if="monthPickerOpen" class="memory-calendar__year" aria-live="polite">{{ yearLabel }}</span>
         <button
           v-else
+          v-hint-tooltip="t('wall.browseWholeMonth')"
           type="button"
           class="memory-calendar__month"
-          :title="t('wall.browseWholeMonth')"
           @click="chooseWholeMonth"
         >
           {{ monthTitle }}
         </button>
         <div class="memory-calendar__nav-right">
           <button
+            v-hint-tooltip="t('wall.pickMonth')"
             type="button"
             class="memory-calendar__nav-btn memory-calendar__pick-btn"
             :class="{ 'memory-calendar__nav-btn--active': monthPickerOpen }"
             :aria-expanded="monthPickerOpen"
-            :title="t('wall.pickMonth')"
             @click="toggleMonthPicker"
           >
             <Squares2X2Icon class="h-4 w-4" aria-hidden="true" />

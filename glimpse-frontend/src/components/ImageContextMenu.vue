@@ -233,7 +233,7 @@ const runCopyAllImages = async () => {
 .image-context-menu__item {
   display: flex;
   width: 100%;
-  min-height: var(--control-h-md);
+  min-height: var(--control-h-sm);
   align-items: center;
   gap: 0.5rem;
   padding: 0 0.625rem;

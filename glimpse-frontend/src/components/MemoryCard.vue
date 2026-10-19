@@ -40,6 +40,10 @@ const analyzing = computed(() => analysisStatus.value === 'PROCESSING')
 const analysisUnavailable = computed(() => analysisStatus.value === 'FAILED')
 // 图片记忆的分析/失败态统一叠加在元数据行；正文始终内容优先，有用户文字时不占位。
 const showStatus = computed(() => !textMemory.value && (analyzing.value || analysisUnavailable.value))
+// 卡片标签最多展示 2 个，其余折叠为 +N；单行排列、超长省略，完整名走 title。
+const cardTags = computed(() => props.memory.tags ?? [])
+const visibleTags = computed(() => cardTags.value.slice(0, 2))
+const hiddenTagCount = computed(() => Math.max(0, cardTags.value.length - visibleTags.value.length))
 
 // 单击选中延迟确认：双击进入详情时取消侧栏弹出，避免“先弹预览再跳页”的闪动。
 const SELECT_INTENT_DELAY_MS = 250
@@ -172,6 +176,19 @@ onBeforeUnmount(cancelSelectIntent)
               {{ t(kind === 'exact' ? 'match.exact' : 'match.semantic') }}
             </span>
           </template>
+          <div v-if="visibleTags.length" class="memory-card__tags">
+            <span
+              v-for="tag in visibleTags"
+              :key="tag.id"
+              v-hint-tooltip="tag.name"
+              class="memory-card__tag-chip"
+            >{{ tag.name }}</span>
+            <span
+              v-if="hiddenTagCount"
+              v-hint-tooltip="cardTags.map((tag) => tag.name).join(t('filter.valueSeparator'))"
+              class="memory-card__tag-chip memory-card__tag-chip--more"
+            >+{{ hiddenTagCount }}</span>
+          </div>
         </div>
         <time class="flex-none text-xs text-[var(--shell-muted)]" :datetime="memory.created_at">
           {{ formatCardTime(memory.created_at) }}
@@ -232,6 +249,36 @@ onBeforeUnmount(cancelSelectIntent)
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* 标签组单行展示：挤不下时逐个截断，时间列在右侧不受影响。 */
+.memory-card__tags {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.25rem;
+  overflow: hidden;
+}
+
+.memory-card__tag-chip {
+  min-width: 0;
+  max-width: 6.5rem;
+  flex: 0 1 auto;
+  overflow: hidden;
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--shell-muted);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-card__tag-chip--more {
+  flex: none;
 }
 
 .memory-card:focus-visible {

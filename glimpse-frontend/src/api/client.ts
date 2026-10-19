@@ -26,6 +26,19 @@ export interface SearchDebugInfo {
   rrf_score?: number | null
 }
 
+/** 记忆上挂的标签对象；memory_count 只在标签目录接口里出现。 */
+export interface MemoryTag {
+  id: number
+  name: string
+  memory_count?: number
+}
+
+export interface TagSummary {
+  id: number
+  name: string
+  memory_count: number
+}
+
 export interface SearchOptions {
   limit?: number
   semanticThreshold?: number
@@ -35,6 +48,7 @@ export interface SearchOptions {
   dateFrom?: string
   dateTo?: string
   memoryType?: 'screenshot' | 'text'
+  tagIds?: number[]
   /** 仅开发模式：人为延迟搜索返回（毫秒），用于观察加载态；不会发给后端。 */
   devDelayMs?: number
   /** 仅开发模式：模拟搜索请求失败；不会发给后端。 */
@@ -47,6 +61,7 @@ export interface MemoryListOptions {
   dateFrom?: string
   dateTo?: string
   memoryType?: 'screenshot' | 'text'
+  tagIds?: number[]
 }
 
 export interface Memory {
@@ -64,13 +79,14 @@ export interface Memory {
   memory_type?: 'screenshot' | 'text'
   match_sources: string[]
   search_debug?: SearchDebugInfo | null
+  tags?: MemoryTag[]
 }
 
 export interface Settings {
   hotkeys: Record<string, string>
   screenshot: Record<string, any>
   ai: Record<string, any>
-  ocr: Record<string, string>
+  ocr: Record<string, any>
   ui: Record<string, any> & {
     update_channel?: 'stable' | 'preview'
     update_mirror_mode?: 'auto' | 'direct' | 'mirror'
@@ -157,7 +173,10 @@ export const memoriesApi = {
         date_from: normalizedOptions.dateFrom,
         date_to: normalizedOptions.dateTo,
         memory_type: normalizedOptions.memoryType,
+        tag_ids: normalizedOptions.tagIds,
       },
+      // 后端按重复参数解析：tag_ids=1&tag_ids=2，禁止 axios 默认的 tag_ids[]=1。
+      paramsSerializer: { indexes: null },
     })
     return response.data
   },
@@ -181,6 +200,20 @@ export const memoriesApi = {
     const response = await api.patch(`/memories/${id}`, { user_text: userText })
     return response.data
   },
+
+  /** 整体替换标签：传 [] 即清空该记忆的全部标签。 */
+  updateTags: async (id: string, tags: string[]): Promise<Memory> => {
+    const response = await api.patch(`/memories/${id}`, { tags })
+    return response.data
+  },
+}
+
+// Tags API
+export const tagsApi = {
+  list: async (): Promise<{ tags: TagSummary[] }> => {
+    const response = await api.get('/tags')
+    return response.data
+  },
 }
 
 // Search API
@@ -202,7 +235,10 @@ export const searchApi = {
         date_from: options.dateFrom,
         date_to: options.dateTo,
         memory_type: options.memoryType,
+        tag_ids: options.tagIds,
       },
+      // 同 memoriesApi.list：tag_ids 必须是重复参数格式。
+      paramsSerializer: { indexes: null },
     })
     return response.data
   },
