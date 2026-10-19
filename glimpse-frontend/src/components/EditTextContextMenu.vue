@@ -255,7 +255,7 @@ onBeforeUnmount(unbindListeners)
 .edit-text-menu__item {
   display: flex;
   width: 100%;
-  min-height: var(--control-h-md);
+  min-height: var(--control-h-sm);
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
