@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
-  ArrowPathIcon,
-  PencilSquareIcon,
+  PlusIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
@@ -10,7 +9,6 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
 import { t } from '@/utils/i18n'
-import ConfirmDialog from './ConfirmDialog.vue'
 
 const TAG_NAME_MAX_LENGTH = 24
 const TAGS_PER_MEMORY_LIMIT = 10
@@ -29,17 +27,15 @@ const emit = defineEmits<{
 const memoriesStore = useMemoriesStore()
 const notifications = useNotificationStore()
 const unsavedChanges = useUnsavedChangesStore()
-const editing = ref(false)
-const draftTags = ref<string[]>([])
+
+// 展示与提交都以 localNames 为准：操作先落到本地，再经串行保存链整体替换到服务端。
+const localNames = ref<string[]>([])
 const inputValue = ref('')
-const saving = ref(false)
-const errorMessage = ref('')
+// 行尾添加入口：收起时是「＋」小方块，激活后就地展开行内输入框。
+const inputActive = ref(false)
 const inputHint = ref('')
-const discardDialogOpen = ref(false)
 const inputElement = ref<HTMLInputElement | null>(null)
 const composing = ref(false)
-let discardResolver: ((confirmed: boolean) => void) | null = null
-let pendingDiscardPromise: Promise<boolean> | null = null
 let unregisterGuard: (() => boolean) | null = null
 
 const currentTagNames = computed(() =>
@@ -48,26 +44,9 @@ const currentTagNames = computed(() =>
 
 const normalizeTagName = (value: string) => value.trim().replace(/\s+/g, ' ')
 
-const sortedNames = (names: string[]) =>
-  [...names].map((name) => name.toLowerCase()).sort()
-
-const dirty = computed(() => {
-  const draft = sortedNames(draftTags.value)
-  const current = sortedNames(currentTagNames.value)
-  return (
-    draft.length !== current.length
-    || draft.some((name, index) => name !== current[index])
-  )
-})
-
-// 输入框里躺着未回车确认的内容也算“可保存”：保存时会先收下它。
-const canSave = computed(() =>
-  (dirty.value || Boolean(normalizeTagName(inputValue.value))) && !saving.value,
-)
-
 // 已有标签建议：复用标签库现存标签，过滤掉已选，按输入片段收敛。
 const suggestions = computed(() => {
-  const selected = new Set(draftTags.value.map((name) => name.toLowerCase()))
+  const selected = new Set(localNames.value.map((name) => name.toLowerCase()))
   const needle = normalizeTagName(inputValue.value).toLowerCase()
   return memoriesStore.tags
     .filter((tag) => !selected.has(tag.name.toLowerCase()))
@@ -77,44 +56,64 @@ const suggestions = computed(() => {
 watch(
   () => props.memory.id,
   () => {
-    editing.value = false
-    draftTags.value = currentTagNames.value
+    localNames.value = currentTagNames.value
+    inputActive.value = false
     inputValue.value = ''
-    errorMessage.value = ''
     inputHint.value = ''
   },
+  { immediate: true },
 )
 
-// 外部（如其它客户端）改了标签且本地无草稿时，跟随最新值。
+// 外部（如其它客户端）更新标签且本地无在途保存时跟随最新值。
 watch(
   currentTagNames,
   (names) => {
-    if (!editing.value || !dirty.value) {
-      draftTags.value = [...names]
-    }
+    if (pendingSaves === 0) localNames.value = [...names]
   },
 )
 
-const startEditing = async () => {
-  draftTags.value = [...currentTagNames.value]
-  inputValue.value = ''
-  errorMessage.value = ''
+const activateInput = async () => {
+  inputActive.value = true
   inputHint.value = ''
-  editing.value = true
   void memoriesStore.loadTags()
   await nextTick()
   inputElement.value?.focus({ preventScroll: true })
 }
 
-const cancelEditing = () => {
-  draftTags.value = [...currentTagNames.value]
+const collapseInput = () => {
+  inputActive.value = false
   inputValue.value = ''
-  errorMessage.value = ''
   inputHint.value = ''
-  editing.value = false
-  if (inputElement.value && document.activeElement === inputElement.value) {
-    inputElement.value.blur()
-  }
+}
+
+// 串行保存链：每次操作入队时快照（目标记忆 + 完整名单），逐个执行，
+// 连续快速操作不会互相覆盖，响应只采纳最新一次的规范化结果。
+let saveChain: Promise<void> = Promise.resolve()
+let pendingSaves = 0
+let saveSeq = 0
+
+const persist = () => {
+  const memoryId = props.memory.id
+  const names = [...localNames.value]
+  const seq = ++saveSeq
+  pendingSaves += 1
+  saveChain = saveChain.then(async () => {
+    try {
+      const memory = await memoriesStore.updateTags(memoryId, names)
+      if (seq === saveSeq && memory) {
+        localNames.value = (memory.tags ?? []).map((tag) => tag.name)
+        emit('saved', memory)
+      }
+    } catch {
+      notifications.show(t('tags.saveFailed'), 'error', 3000)
+      if (props.memory.id === memoryId) {
+        // 回退到服务端已知状态；在途的后续操作会携带最新本地名单重写。
+        localNames.value = [...currentTagNames.value]
+      }
+    } finally {
+      pendingSaves -= 1
+    }
+  })
 }
 
 const addTag = (raw: string) => {
@@ -125,64 +124,42 @@ const addTag = (raw: string) => {
     inputHint.value = t('tags.tooLong')
     return false
   }
-  if (draftTags.value.some((tag) => tag.toLowerCase() === name.toLowerCase())) {
+  if (localNames.value.some((tag) => tag.toLowerCase() === name.toLowerCase())) {
     inputHint.value = t('tags.duplicate')
     return false
   }
-  if (draftTags.value.length >= TAGS_PER_MEMORY_LIMIT) {
+  if (localNames.value.length >= TAGS_PER_MEMORY_LIMIT) {
     inputHint.value = t('tags.tooMany')
     return false
   }
-  draftTags.value = [...draftTags.value, name]
+  localNames.value = [...localNames.value, name]
   inputValue.value = ''
-  errorMessage.value = ''
+  persist()
   return true
 }
 
 const removeTag = (name: string) => {
-  draftTags.value = draftTags.value.filter((tag) => tag !== name)
+  localNames.value = localNames.value.filter((tag) => tag !== name)
   inputHint.value = ''
+  persist()
 }
 
-const commitPendingInput = () => {
-  // 保存前把输入框里尚未回车确认的内容一并收下；非法输入则拦下保存。
+// 点击空白（失焦）：有未确认输入则自动提交，空输入则收起；非法输入保留待改。
+const handleInputBlur = () => {
+  if (!inputActive.value) return
   const pending = normalizeTagName(inputValue.value)
-  if (!pending) return true
-  return addTag(pending)
-}
-
-const save = async () => {
-  if (saving.value) return
-  if (!commitPendingInput()) return
-  if (!dirty.value) {
-    cancelEditing()
+  if (!pending) {
+    collapseInput()
     return
   }
-
-  saving.value = true
-  errorMessage.value = ''
-  try {
-    const memory = await memoriesStore.updateTags(props.memory.id, draftTags.value)
-    // 以服务端规范化后的标签为准（去重/大小写合并可能与草稿不同）。
-    draftTags.value = (memory?.tags ?? []).map((tag) => tag.name)
-    inputValue.value = ''
-    editing.value = false
-    if (inputElement.value && document.activeElement === inputElement.value) {
-      inputElement.value.blur()
-    }
-    if (memory) emit('saved', memory)
-  } catch {
-    errorMessage.value = t('tags.saveFailed')
-    notifications.show(t('tags.saveFailed'), 'error', 3000)
-  } finally {
-    saving.value = false
-  }
+  if (addTag(pending)) collapseInput()
 }
 
 const handleInputKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Escape') {
+    // Esc = 明确放弃：丢弃未确认输入并收起，不提交。
     event.preventDefault()
-    cancelEditing()
+    collapseInput()
     return
   }
   // 中文输入法组词期间的 Enter/Backspace 是在编辑拼音串，不触发标签操作。
@@ -190,36 +167,24 @@ const handleInputKeydown = (event: KeyboardEvent) => {
 
   if (event.key === 'Enter') {
     event.preventDefault()
-    if (event.ctrlKey || event.metaKey) {
-      void save()
-      return
-    }
     addTag(inputValue.value)
     return
   }
 
-  // 输入为空时的 Backspace 删除最后一个草稿标签。
-  if (event.key === 'Backspace' && !inputValue.value && draftTags.value.length) {
-    removeTag(draftTags.value[draftTags.value.length - 1])
+  // 输入为空时的 Backspace 删除最后一个标签。
+  if (event.key === 'Backspace' && !inputValue.value && localNames.value.length) {
+    removeTag(localNames.value[localNames.value.length - 1])
   }
 }
 
-const resolveDiscard = (confirmed: boolean) => {
-  discardDialogOpen.value = false
-  if (confirmed) cancelEditing()
-  discardResolver?.(confirmed)
-  discardResolver = null
-  pendingDiscardPromise = null
-}
-
+// 离开前把未确认输入按失焦同款语义收尾（有效即提交），不存在被丢弃的草稿。
 const canLeave = async () => {
-  if (!editing.value || !dirty.value) return true
-  if (pendingDiscardPromise) return pendingDiscardPromise
-  discardDialogOpen.value = true
-  pendingDiscardPromise = new Promise<boolean>((resolve) => {
-    discardResolver = resolve
-  })
-  return pendingDiscardPromise
+  if (inputActive.value) {
+    const pending = normalizeTagName(inputValue.value)
+    if (pending) addTag(pending)
+    collapseInput()
+  }
+  return true
 }
 
 onMounted(() => {
@@ -228,12 +193,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unregisterGuard?.()
-  discardResolver?.(false)
 })
 
 defineExpose({
   canLeave,
-  isDirty: dirty,
 })
 </script>
 
@@ -241,125 +204,81 @@ defineExpose({
   <section class="tags-editor" :class="{ 'tags-editor--compact': compact }" :aria-label="t('tags.title')">
     <div class="tags-editor__header mb-2.5 flex min-h-8 items-center justify-between gap-3">
       <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ t('tags.title') }}</h3>
+    </div>
+
+    <!-- 直接操作模型：chips 带 × 即点即删，行尾「＋」/输入框即点即加，无显式保存 -->
+    <div class="tags-editor__chips" data-testid="tags-chips">
+      <span
+        v-for="name in localNames"
+        :key="name"
+        class="tags-editor__chip"
+      >
+        <span class="tags-editor__chip-text">{{ name }}</span>
+        <button
+          type="button"
+          class="tags-editor__chip-remove"
+          :aria-label="`${t('tags.removeTag')} ${name}`"
+          @mousedown.prevent
+          @click="removeTag(name)"
+        >
+          <XMarkIcon class="h-3 w-3" aria-hidden="true" />
+        </button>
+      </span>
+      <input
+        v-if="inputActive"
+        ref="inputElement"
+        v-model="inputValue"
+        type="text"
+        class="tags-editor__input"
+        :aria-label="t('tags.placeholder')"
+        :maxlength="TAG_NAME_MAX_LENGTH * 2"
+        @keydown="handleInputKeydown"
+        @blur="handleInputBlur"
+        @compositionstart="composing = true"
+        @compositionend="composing = false"
+      />
       <button
-        v-if="!editing"
+        v-else
+        v-hint-tooltip="t('tags.add')"
         type="button"
-        class="tags-editor__edit-action inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] px-3 text-sm font-normal text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
-        @click="startEditing"
+        class="tags-editor__add"
+        :aria-label="t('tags.add')"
+        @click="activateInput"
       >
-        <PencilSquareIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
-        {{ t('tags.edit') }}
+        <PlusIcon class="h-3.5 w-3.5" aria-hidden="true" />
       </button>
-      <div v-else class="tags-editor__edit-actions flex flex-none items-center gap-2">
-        <button
-          type="button"
-          class="tags-editor__edit-action btn-secondary !h-8 !min-h-8 px-2.5 text-sm"
-          :disabled="saving"
-          @click="cancelEditing"
-        >
-          {{ t('action.cancel') }}
-        </button>
-        <button
-          type="button"
-          class="tags-editor__edit-action btn-primary !h-8 !min-h-8 gap-1.5 px-3 text-sm"
-          :disabled="!canSave"
-          @click="save"
-        >
-          <ArrowPathIcon v-if="saving" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
-          {{ saving ? t('tags.saving') : t('tags.save') }}
-        </button>
-      </div>
     </div>
 
-    <div v-if="!editing" class="tags-editor__readonly" data-testid="tags-readonly">
-      <div v-if="currentTagNames.length" class="tags-editor__chips">
-        <span
-          v-for="name in currentTagNames"
-          :key="name"
-          class="tags-editor__chip"
-        >{{ name }}</span>
-      </div>
-      <p v-else class="tags-editor__empty text-sm">{{ t('tags.empty') }}</p>
-    </div>
+    <p
+      v-if="inputHint"
+      class="tags-editor__feedback mt-1.5 text-xs text-red-600"
+    >
+      {{ inputHint }}
+    </p>
 
-    <div v-else class="tags-editor__editing">
-      <div class="tags-editor__input-row">
-        <div v-if="draftTags.length" class="tags-editor__chips">
-          <span
-            v-for="name in draftTags"
-            :key="name"
-            class="tags-editor__chip tags-editor__chip--editable"
-          >
-            <span class="tags-editor__chip-text">{{ name }}</span>
-            <button
-              type="button"
-              class="tags-editor__chip-remove"
-              :aria-label="`${t('tags.removeTag')} ${name}`"
-              :disabled="saving"
-              @click="removeTag(name)"
-            >
-              <XMarkIcon class="h-3 w-3" aria-hidden="true" />
-            </button>
-          </span>
-        </div>
-        <input
-          ref="inputElement"
-          v-model="inputValue"
-          type="text"
-          class="tags-editor__input"
-          :placeholder="t('tags.placeholder')"
-          :aria-label="t('tags.placeholder')"
-          :disabled="saving"
-          :maxlength="TAG_NAME_MAX_LENGTH * 2"
-          @keydown="handleInputKeydown"
-          @compositionstart="composing = true"
-          @compositionend="composing = false"
-        />
-      </div>
-
-      <p
-        v-if="inputHint || errorMessage"
-        class="tags-editor__feedback mt-1.5 text-xs text-red-600"
-      >
-        {{ inputHint || errorMessage }}
+    <div v-if="inputActive && suggestions.length" class="tags-editor__suggestions mt-2">
+      <p class="tags-editor__suggestions-label text-xs text-[var(--shell-muted)]">
+        {{ t('tags.suggestions') }}
       </p>
-
-      <div v-if="suggestions.length" class="tags-editor__suggestions mt-2">
-        <p class="tags-editor__suggestions-label text-xs text-[var(--shell-muted)]">
-          {{ t('tags.suggestions') }}
-        </p>
-        <div class="tags-editor__suggestions-list">
-          <button
-            v-for="tag in suggestions"
-            :key="tag.id"
-            type="button"
-            class="tags-editor__suggestion"
-            :disabled="saving"
-            @click="addTag(tag.name)"
-          >
-            {{ tag.name }}
-          </button>
-        </div>
+      <div class="tags-editor__suggestions-list">
+        <button
+          v-for="tag in suggestions"
+          :key="tag.id"
+          type="button"
+          class="tags-editor__suggestion"
+          @mousedown.prevent
+          @click="addTag(tag.name)"
+        >
+          {{ tag.name }}
+        </button>
       </div>
-      <p
-        v-else-if="normalizeTagName(inputValue)"
-        class="tags-editor__suggestions-label mt-2 text-xs text-[var(--shell-muted)]"
-      >
-        {{ t('tags.noMatch') }}
-      </p>
     </div>
-
-    <ConfirmDialog
-      id="discard-tags"
-      :open="discardDialogOpen"
-      :title="t('tags.discardTitle')"
-      :description="t('tags.discardDescription')"
-      :confirm-label="t('tags.discard')"
-      :cancel-label="t('tags.keepEditing')"
-      destructive
-      @confirm="resolveDiscard(true)"
-      @cancel="resolveDiscard(false)"
-    />
+    <p
+      v-else-if="inputActive && normalizeTagName(inputValue)"
+      class="tags-editor__suggestions-label mt-2 text-xs text-[var(--shell-muted)]"
+    >
+      {{ t('tags.noMatch') }}
+    </p>
   </section>
 </template>
 
@@ -417,34 +336,58 @@ defineExpose({
   background: var(--color-surface-hover);
 }
 
-.tags-editor__empty {
-  margin: 0;
-  color: var(--shell-muted);
-}
-
-.tags-editor__input-row {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
+/* 行内输入：与 chips 同排同高（24px）；基线宽 4 个中文字符，
+   随内容弹性增长（field-sizing），上限不超出所在行 */
 .tags-editor__input {
-  width: 100%;
-  height: var(--control-h-md);
-  min-height: var(--control-h-md);
-  padding: 0 0.75rem;
+  min-width: calc(4em + 1rem + 2px);
+  max-width: 100%;
+  height: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0 0.5rem;
   border: 1px solid var(--shell-line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--shell-ink);
-  font-size: 0.875rem;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
   outline: none;
+  field-sizing: content;
   transition: border-color 160ms ease;
 }
 
 .tags-editor__input:focus {
   border-color: var(--color-focus);
+}
+
+/* 行尾添加入口：与 chip 同高同饰的圆角小方块，收起态即添加功能的锚点 */
+.tags-editor__add {
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--shell-muted);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.tags-editor__add:hover {
+  background: rgb(224, 228, 237);
+  color: var(--shell-ink);
+}
+
+:root[data-theme='dark'] .tags-editor__add:hover {
+  background: var(--color-surface-hover);
+}
+
+.tags-editor__add:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .tags-editor__suggestions-list {
@@ -489,15 +432,8 @@ defineExpose({
   margin-bottom: 0;
 }
 
-/* 侧栏紧凑形态：与摘要/识别文本块同构平铺，标题与 chips 顶到侧栏内容缘；
-   块头行内操作降 28px 档。 */
+/* 侧栏紧凑形态：与摘要/识别文本块同构平铺，标题与 chips 顶到侧栏内容缘。 */
 .tags-editor--compact .tags-editor__header {
-  margin-bottom: 0.375rem;
-}
-
-.tags-editor--compact .tags-editor__edit-action {
-  height: 1.75rem;
-  min-height: 1.75rem;
-  padding-inline: 0.625rem;
+  margin-bottom: 0.25rem;
 }
 </style>
