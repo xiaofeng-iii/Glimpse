@@ -293,7 +293,7 @@ onUnmounted(() => {
                   :aria-label="t('wall.clearPeriod')"
                   @click="clearPeriod"
                 >
-                  <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                  <XMarkIcon class="h-3 w-3" aria-hidden="true" />
                 </button>
               </span>
               <label v-hint-tooltip="t('wall.rangeModeHint')" class="memory-filters__range-mode">
@@ -375,7 +375,7 @@ onUnmounted(() => {
                   :aria-label="t('filter.clearTags')"
                   @click="clearTags"
                 >
-                  <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                  <XMarkIcon class="h-3 w-3" aria-hidden="true" />
                 </button>
               </span>
             </legend>
@@ -623,19 +623,20 @@ onUnmounted(() => {
   gap: 0.25rem;
 }
 
+/* 行内控件一律控制在标题行高（1.25rem）以内：出现/消失不改变行高 */
 .memory-filters__range-mode {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
   margin: 0;
-  padding: 0.125rem 0.375rem;
+  padding: 0 0.375rem;
   border-radius: var(--radius-sm);
   color: var(--color-text);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 400;
-  line-height: var(--line-height-14);
+  line-height: var(--line-height-12);
   transition: background-color 160ms ease;
 }
 
@@ -650,8 +651,8 @@ onUnmounted(() => {
 
 .memory-filters__clear-period {
   display: inline-flex;
-  width: calc(var(--line-height-14) + 0.25rem);
-  height: calc(var(--line-height-14) + 0.25rem);
+  width: 1.25rem;
+  height: 1.25rem;
   min-height: 0;
   align-items: center;
   justify-content: center;
@@ -808,6 +809,19 @@ onUnmounted(() => {
   border: 1px solid var(--color-border-strong);
   border-radius: 0.1875rem;
   background: transparent;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+/* 对勾常驻、仅做透明度淡入淡出，与底色填充同一节奏 */
+.memory-filters__checkbox-indicator::after {
+  content: '';
+  width: 0.4375rem;
+  height: 0.25rem;
+  border-bottom: 2px solid var(--color-on-primary);
+  border-left: 2px solid var(--color-on-primary);
+  opacity: 0;
+  transform: translateY(-0.0625rem) rotate(-45deg);
+  transition: opacity 160ms ease;
 }
 
 .memory-filters__content-type:checked + .memory-filters__checkbox-indicator {
@@ -816,12 +830,7 @@ onUnmounted(() => {
 }
 
 .memory-filters__content-type:checked + .memory-filters__checkbox-indicator::after {
-  content: '';
-  width: 0.4375rem;
-  height: 0.25rem;
-  border-bottom: 2px solid var(--color-on-primary);
-  border-left: 2px solid var(--color-on-primary);
-  transform: translateY(-0.0625rem) rotate(-45deg);
+  opacity: 1;
 }
 
 .memory-filters__preset-row:has(.memory-filters__content-type:focus-visible) {
@@ -901,6 +910,8 @@ onUnmounted(() => {
   .memory-filters__trigger-label,
   .memory-filters__preset-row,
   .memory-filters__calendar-reveal,
+  .memory-filters__checkbox-indicator,
+  .memory-filters__checkbox-indicator::after,
   .filter-popover-enter-active,
   .filter-popover-leave-active {
     transition: none;
