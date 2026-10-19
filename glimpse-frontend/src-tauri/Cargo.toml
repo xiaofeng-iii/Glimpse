@@ -1,6 +1,6 @@
 [package]
 name = "glimpse"
-version = "0.4.7"
+version = "0.5.0-beta.1"
 description = "AI-powered desktop memory assistant"
 authors = ["Glimpse Team"]
 edition = "2021"
