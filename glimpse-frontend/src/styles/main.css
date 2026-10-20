@@ -23,7 +23,7 @@
   --line-height-24: 32px;
   --line-height-30: 38px;
   --line-height-38: 46px;
-  --color-canvas: #e4e8f1;
+  --color-canvas: #e9edf4;
   --color-header: var(--color-canvas);
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
@@ -90,8 +90,8 @@
   --shell-control-hover: var(--color-surface-hover);
   --shell-primary-start: var(--color-primary);
   --shell-primary-end: var(--color-primary);
-  --shell-primary-shadow: rgba(82, 135, 234, 0.18);
-  --shell-primary-shadow-hover: rgba(82, 135, 234, 0.26);
+  --shell-primary-shadow: rgba(65, 112, 205, 0.24);
+  --shell-primary-shadow-hover: rgba(65, 112, 205, 0.32);
   --shell-scrollbar-thumb: rgba(95, 109, 134, 0.32);
   --shell-scrollbar-thumb-hover: rgba(95, 109, 134, 0.5);
 }
@@ -252,6 +252,8 @@ button {
 }
 
 .desktop-shell__titlebar {
+  --titlebar-control-hover: rgb(224, 228, 237);
+
   position: relative;
   z-index: 30;
   display: flex;
@@ -408,7 +410,7 @@ button {
 .shell-navigation-button:hover {
   color: var(--color-text);
   border-color: transparent;
-  background: var(--color-surface-hover);
+  background: var(--titlebar-control-hover, var(--color-surface-hover));
 }
 
 .shell-icon-button.desktop-shell__settings-button,
@@ -419,14 +421,12 @@ button {
 }
 
 .desktop-shell__leading .shell-icon-button:hover {
-  background: var(--color-surface-hover);
+  background: var(--titlebar-control-hover);
   border-color: transparent;
 }
 
-:root[data-theme='dark'] .desktop-shell__leading .shell-icon-button:hover,
-:root[data-theme='dark'] .shell-navigation-button:hover {
-  background: color-mix(in srgb, var(--color-text) 7%, transparent);
-  border-color: transparent;
+:root[data-theme='dark'] .desktop-shell__titlebar {
+  --titlebar-control-hover: var(--color-surface-hover);
 }
 
 .desktop-shell__window-controls {
@@ -456,7 +456,7 @@ button {
 
 .window-control:hover {
   color: var(--color-text);
-  background: var(--color-surface-hover);
+  background: var(--titlebar-control-hover, var(--color-surface-hover));
 }
 
 .window-control--danger:hover {
@@ -518,14 +518,18 @@ button {
   font-size: 0.875rem;
   font-weight: 400;
   line-height: var(--line-height-14);
-  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+  transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
   background: var(--color-primary);
-  box-shadow: 0 2px 8px var(--shell-primary-shadow);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 8px var(--shell-primary-shadow);
 }
 
 .capture-button {
   background: var(--color-accent);
-  box-shadow: 0 2px 8px rgba(217, 96, 28, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 2px 8px rgba(217, 96, 28, 0.2);
 }
 
 .capture-button,
@@ -535,7 +539,9 @@ button {
 
 .btn-primary:not(:disabled):hover,
 .capture-button:not(:disabled):hover {
-  box-shadow: 0 4px 12px var(--shell-primary-shadow-hover);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 4px 12px var(--shell-primary-shadow-hover);
 }
 
 .btn-primary:not(:disabled):hover {
@@ -544,7 +550,9 @@ button {
 
 .capture-button:not(:disabled):hover {
   background: var(--color-accent-hover);
-  box-shadow: 0 4px 12px rgba(217, 96, 28, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 4px 12px rgba(194, 84, 20, 0.28);
 }
 
 .btn-primary:disabled {

@@ -330,7 +330,6 @@ onUnmounted(() => {
 
         <div v-if="isDesktop" class="desktop-shell__window-controls">
           <button
-            v-hint-tooltip="t('action.minimize')"
             type="button"
             class="window-control"
             :aria-label="t('action.minimize')"
@@ -339,7 +338,6 @@ onUnmounted(() => {
             <MinusIcon class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <button
-            v-hint-tooltip="isWindowMaximized ? t('action.restore') : t('action.maximize')"
             type="button"
             class="window-control"
             :aria-label="isWindowMaximized ? t('action.restore') : t('action.maximize')"
@@ -357,7 +355,6 @@ onUnmounted(() => {
             />
           </button>
           <button
-            v-hint-tooltip="t('action.close')"
             type="button"
             class="window-control window-control--danger"
             :aria-label="t('action.close')"

@@ -4,7 +4,7 @@ name: "Glimpse"
 description: "A compact desktop memory workspace built for fast capture, scanning, and recall."
 purpose: 设计判断的权威框架。正文（原则与交互逻辑）为准；本 YAML 头部与附录中的具体数值是镜像 main.css 当前状态的派生参考，会随实现漂移，遇到冲突时以正文原则与 main.css 为准。
 colors:
-  canvas: "#e4e8f1"
+  canvas: "#e9edf4"
   header: "var(--color-canvas)"
   surface: "#ffffff"
   surface-raised: "#ffffff"
@@ -137,7 +137,7 @@ Glimpse 是一只整理得很好的桌面索引盒：打开后先看到记忆，
 
 | 状态 | 表达 |
 |---|---|
-| 悬停 | 中性面升一档，**以所在底色为基准**：白底/透明控件 → `surface-hover`（#edf0f5）；`surface-subtle` 灰底（#f4f6f9）上的控件 → 再深一档 rgb(224,228,237)。hover 变红/蓝/琥珀等语义色的不参与灰阶 |
+| 悬停 | 中性面升一档，**以所在底色为基准**：白色表面上的控件 → `surface-hover`（#edf0f5）；`surface-subtle` 灰底（#f4f6f9）及画布上的控件（如软件头设置、返回和中性窗口按钮）→ 再深一档 rgb(224,228,237)，深色模式用 `surface-hover`。hover 变红/蓝/琥珀等语义色的不参与灰阶 |
 | 选中/当前 | `primary-soft` 浅蓝底 + 深主色文字——全站唯一例外的彩色静息态 |
 | 键盘焦点 | **短时填写**（搜索、设置行）：主色描边（`--color-focus`），回答"我在哪个框"。**长时编辑**（大面积、需停留思考的编辑器）：不叠加焦点圈——进入编辑的表面切换（白底框浮起）就是状态表达，高对比描边会在整个停留期与文字争夺注意力。退出编辑必须移焦 |
 | 编辑中 | 白底框在 subtle 块内浮起 |
@@ -265,7 +265,7 @@ Glimpse 是一只整理得很好的桌面索引盒：打开后先看到记忆，
 
 ### 颜色（亮色 / 暗色）
 
-画布 `#e4e8f1` / `#0c101b`；表面 `#ffffff` / `#181e2c`；浮起表面 `#ffffff` / `#202737`；内嵌面 `#f4f6f9` / `#151a27`；悬停面 `#edf0f5` / `#283043`；深悬停面（灰底上的 hover，未令牌化）`#e0e4ed` / 暗色沿用 `#283043`；主色 `#5287ea` / `#8494ff`（聚焦与主色同值）；截图橙 `#d9601c` / `#e07b3d`。标题栏并入画布色。完整令牌见 main.css `:root` 与 `[data-theme='dark']`。
+画布 `#e9edf4` / `#0c101b`；表面 `#ffffff` / `#181e2c`；浮起表面 `#ffffff` / `#202737`；内嵌面 `#f4f6f9` / `#151a27`；悬停面 `#edf0f5` / `#283043`；深悬停面（灰底上的 hover，未令牌化）`#e0e4ed` / 暗色沿用 `#283043`；主色 `#5287ea` / `#8494ff`（聚焦与主色同值）；截图橙 `#d9601c` / `#e07b3d`。标题栏并入画布色。完整令牌见 main.css `:root` 与 `[data-theme='dark']`。
 
 ### 排版
 
@@ -275,7 +275,7 @@ Glimpse 是一只整理得很好的桌面索引盒：打开后先看到记忆，
 
 ### 控件规格（当前已验证值，实测自运行界面）
 
-- 常规按钮 32px 高（`--control-h-md`=2rem）、8px 圆角、常规字重：`.btn-primary` 主色实底带品牌投影；`.btn-secondary` 静息 `surface-subtle`、悬停 `surface-hover`、无描边；`.btn-ghost-danger` 透明、悬停才显危险色。弹窗内低频动作叠 `.btn-sm` 降为 28px。
+- 常规按钮 32px 高（`--control-h-md`=2rem）、8px 圆角、常规字重：`.btn-primary` 与 `.capture-button` 实底带顶部细高光与品牌投影；`.btn-secondary` 静息 `surface-subtle`、悬停 `surface-hover`、无描边；`.btn-ghost-danger` 透明、悬停才显危险色。弹窗内低频动作叠 `.btn-sm` 降为 28px。
 - 块头行内操作（编辑摘要、复制文本等）28px 苗条档、14px 字号、无描边、悬停显浅底。
 - 窗口级关闭按钮：统一 32px 无框 + `XMarkIcon` 14px（`h-3.5 w-3.5`）；唯一例外是软件头窗口关闭按钮（15px）。禁止自绘叉形 SVG。
 - 主界面搜索工具区：控件 32px 档；模式分段器外框 8px 圆角、内缩 2px、内层按钮 6px（同心公式）；滑块 easeOutCubic `cubic-bezier(0.33, 1, 0.68, 1)`，时长 = 基础 100ms + 每格 100ms。浮条磨砂尾巴向下延伸约 2rem 淡出。

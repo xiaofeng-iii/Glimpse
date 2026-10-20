@@ -504,8 +504,8 @@ defineExpose({ focus, clear })
   );
   --search-toolbar-detail-radius: var(--search-toolbar-control-radius);
   --search-toolbar-surface-shadow:
-    0 1px 2px rgba(26, 38, 64, 0.05),
-    0 6px 16px rgba(26, 38, 64, 0.08);
+    0 1px 2px rgba(43, 70, 120, 0.06),
+    0 10px 26px rgba(43, 70, 120, 0.11);
   /* 浮条下方模糊尾巴的长度：模糊在下缘之外继续向下渐变这么远 */
   --search-toolbar-blur-tail: 2rem;
 /* 分段器滑动缓动：easeOutCubic——起步平缓、逐帧位移均匀递减，收尾柔和。
@@ -597,7 +597,9 @@ defineExpose({ focus, clear })
   border-radius: var(--search-toolbar-segment-radius);
   background: var(--color-primary);
   /* 对称光晕：向下偏移的投影在分数缩放下会吃掉滑块底部间隙的视觉，导致四边读数不一致 */
-  box-shadow: 0 0 2px rgba(0, 0, 0, .1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 2px rgba(0, 0, 0, .1);
   will-change: transform;
   transition: transform var(--segment-slide-duration, 300ms) var(--segment-slide-easing);
 }
@@ -699,6 +701,12 @@ defineExpose({ focus, clear })
 
 :root[data-theme='dark'] .search-toolbar {
   --search-toolbar-surface-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-theme='dark'] .search-toolbar__source-thumb {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 2px rgba(0, 0, 0, .3);
 }
 
 
