@@ -184,7 +184,7 @@ onBeforeUnmount(unbindListeners)
         @click="runUndo"
       >
         <span>{{ t('action.undo') }}</span>
-        <kbd class="edit-text-menu__shortcut">Ctrl+Z</kbd>
+        <span class="edit-text-menu__shortcut">Ctrl+Z</span>
       </button>
       <button
         type="button"
@@ -194,7 +194,7 @@ onBeforeUnmount(unbindListeners)
         @click="runCut"
       >
         <span>{{ t('action.cut') }}</span>
-        <kbd class="edit-text-menu__shortcut">Ctrl+X</kbd>
+        <span class="edit-text-menu__shortcut">Ctrl+X</span>
       </button>
       <button
         type="button"
@@ -204,7 +204,7 @@ onBeforeUnmount(unbindListeners)
         @click="runCopy"
       >
         <span>{{ t('action.copy') }}</span>
-        <kbd class="edit-text-menu__shortcut">Ctrl+C</kbd>
+        <span class="edit-text-menu__shortcut">Ctrl+C</span>
       </button>
       <button
         type="button"
@@ -214,7 +214,7 @@ onBeforeUnmount(unbindListeners)
         @click="runPaste"
       >
         <span>{{ t('action.paste') }}</span>
-        <kbd class="edit-text-menu__shortcut">Ctrl+V</kbd>
+        <span class="edit-text-menu__shortcut">Ctrl+V</span>
       </button>
       <button
         type="button"
@@ -224,7 +224,7 @@ onBeforeUnmount(unbindListeners)
         @click="runSelectAll"
       >
         <span>{{ t('action.selectAll') }}</span>
-        <kbd class="edit-text-menu__shortcut">Ctrl+A</kbd>
+        <span class="edit-text-menu__shortcut">Ctrl+A</span>
       </button>
     </div>
   </Teleport>
