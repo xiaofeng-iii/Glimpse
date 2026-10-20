@@ -676,11 +676,11 @@ defineExpose({ focus, clear })
 
 /* 搜索框自带灰底，键帽比全局 kbd 加深一档（灰底 hover 同档 224）才分得出来 */
 .search-toolbar__detail-control--kbd {
-  background: rgb(224, 228, 237);
+  background: var(--color-surface-deep);
 }
 
 :root[data-theme='dark'] .search-toolbar__detail-control--kbd {
-  background: var(--color-border-strong);
+  background: var(--color-surface-deep);
 }
 
 :root[data-theme='dark'] .search-toolbar__refresh:hover {

@@ -25,10 +25,13 @@
   --line-height-38: 46px;
   --color-canvas: #e9edf4;
   --color-header: var(--color-canvas);
-  --color-surface: #ffffff;
-  --color-surface-raised: #ffffff;
-  --color-surface-subtle: #f4f6f9;
-  --color-surface-hover: #edf0f5;
+  --color-surface: #f7f9fd;
+  --color-surface-raised: #fafbfe;
+  --color-surface-subtle: #eef2f8;
+  --color-surface-hover: #e1e7f1;
+  --color-surface-control: #dae0ed;
+  --color-surface-deep: #d2dae9;
+  --color-surface-deep-hover: color-mix(in srgb, var(--color-surface-deep) 78%, var(--color-border-strong));
   --color-text: #1a2334;
   --color-text-secondary: #49566c;
   --color-text-muted: #66738a;
@@ -72,7 +75,7 @@
   --shell-muted: var(--color-text-secondary);
   --shell-line: var(--color-border);
   --shell-card: var(--color-surface);
-  --memory-card-bg: color-mix(in srgb, #fff 2%, color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)));
+  --memory-card-bg: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface-raised));
   --shell-highlight: var(--color-primary);
   --shell-highlight-strong: var(--color-primary-hover);
   --shell-accent: var(--color-primary);
@@ -97,17 +100,20 @@
 }
 
 :root[data-theme='dark'] {
-  --color-canvas: #0c101b;
+  --color-canvas: #121b2d;
   --color-header: var(--color-canvas);
-  --color-surface: #181e2c;
-  --color-surface-raised: #202737;
-  --color-surface-subtle: #151a27;
-  --color-surface-hover: #283043;
+  --color-surface: #1c2740;
+  --color-surface-raised: #25314d;
+  --color-surface-subtle: #182236;
+  --color-surface-hover: #2c3a56;
+  --color-surface-control: var(--color-surface-hover);
+  --color-surface-deep: #374666;
+  --color-surface-deep-hover: color-mix(in srgb, var(--color-surface-deep) 75%, var(--color-border-strong));
   --color-text: #f2f5fb;
   --color-text-secondary: #b6c0d2;
   --color-text-muted: #8995aa;
-  --color-border: #2e374a;
-  --color-border-strong: #424d63;
+  --color-border: #34425f;
+  --color-border-strong: #506087;
   --color-primary: #8494ff;
   --color-primary-hover: #9aa8ff;
   --color-primary-soft: #252e5a;
@@ -128,7 +134,7 @@
   /* 暗色下 1px 描边比亮色同款更跳：分隔线与控件框柔化为 60% 不透明度。 */
   --shell-line: color-mix(in srgb, var(--color-border) 60%, transparent);
   --shell-card: var(--color-surface);
-  --memory-card-bg: color-mix(in srgb, #fff 2%, color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)));
+  --memory-card-bg: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
   --shell-highlight: var(--color-primary);
   --shell-highlight-strong: var(--color-primary-hover);
   --shell-accent: var(--color-primary);
@@ -297,7 +303,7 @@ button {
 }
 
 .desktop-shell__titlebar {
-  --titlebar-control-hover: rgb(224, 228, 237);
+  --titlebar-control-hover: var(--color-surface-deep);
 
   position: relative;
   z-index: 30;
@@ -471,7 +477,7 @@ button {
 }
 
 :root[data-theme='dark'] .desktop-shell__titlebar {
-  --titlebar-control-hover: var(--color-surface-hover);
+  --titlebar-control-hover: var(--color-surface-deep);
 }
 
 .desktop-shell__window-controls {
@@ -647,8 +653,18 @@ button {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: rgb(224, 228, 237);
+  background: var(--color-surface-deep);
   color: var(--color-text);
+}
+
+/* 画布底上的次级动作：静息取悬停面与最深档之间的控件档，悬停再压到最深档；
+   表面仍用默认两档，深色沿用 .btn-secondary 的既有取值。 */
+.btn-secondary--on-canvas {
+  background: var(--color-surface-control);
+}
+
+.btn-secondary--on-canvas:hover:not(:disabled) {
+  background: var(--color-surface-deep-hover);
 }
 
 .btn-secondary:disabled {
@@ -960,7 +976,7 @@ kbd {
 }
 
 :root[data-theme='dark'] .btn-secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-surface-hover) 75%, var(--color-border-strong));
+  background: var(--color-surface-deep);
   color: var(--color-text);
 }
 

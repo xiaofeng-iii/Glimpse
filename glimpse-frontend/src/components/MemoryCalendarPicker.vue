@@ -489,7 +489,7 @@ onUnmounted(() => {
 }
 
 .memory-calendar__month-cell:hover:not(:disabled) {
-  background: rgb(224, 228, 237);
+  background: var(--color-surface-deep);
 }
 
 .memory-calendar__month-cell:focus-visible {
@@ -525,7 +525,7 @@ onUnmounted(() => {
 
 .memory-calendar__nav-btn:hover:not(:disabled) {
   color: var(--color-text);
-  background: rgb(224, 228, 237);
+  background: var(--color-surface-deep);
 }
 
 .memory-calendar__nav-btn:focus-visible {
@@ -624,13 +624,13 @@ onUnmounted(() => {
 }
 
 .memory-calendar__day:hover:not(:disabled) {
-  background: rgb(224, 228, 237);
+  background: var(--color-surface-deep);
 }
 
 :root[data-theme='dark'] .memory-calendar__month-cell:hover:not(:disabled),
 :root[data-theme='dark'] .memory-calendar__day:hover:not(:disabled),
 :root[data-theme='dark'] .memory-calendar__nav-btn:hover:not(:disabled) {
-  background: var(--color-surface-hover);
+  background: var(--color-surface-deep);
 }
 
 .memory-calendar__day--endpoint:hover:not(:disabled),

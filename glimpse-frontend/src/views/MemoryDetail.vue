@@ -121,7 +121,7 @@ const confirmDelete = async () => {
       <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h1 class="text-xl font-semibold tracking-[-0.01em] text-[var(--shell-ink)]">{{ t('memory.detail') }}</h1>
-          <time v-if="memory" class="text-sm text-[var(--shell-muted)]" :datetime="memory.created_at">
+          <time v-if="memory" class="text-xs text-[var(--shell-muted)]" :datetime="memory.created_at">
             {{ formatDate(memory.created_at) }}
           </time>
         </div>
@@ -169,17 +169,24 @@ const confirmDelete = async () => {
             v-if="analyzing || analysisUnavailable"
             :status="analysisUnavailable ? 'FAILED' : 'PROCESSING'"
           />
-          <SummaryEditor v-else ref="summaryEditor" :memory="memory" />
+          <SummaryEditor v-else ref="summaryEditor" :memory="memory">
+            <template #header-actions="{ editing }">
+              <button
+                v-if="!editing"
+                type="button"
+                class="btn-secondary btn-secondary--on-canvas"
+                @click="copySummary"
+              >
+                <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+                {{ t(textMemory || hasNote ? 'action.copyContent' : 'action.copySummary') }}
+              </button>
+            </template>
+          </SummaryEditor>
 
           <!-- 标签与分析状态无关：分析进行中同样可编辑。 -->
           <MemoryTagsEditor ref="tagsEditor" :memory="memory" />
 
-          <button v-if="!analyzing && !analysisUnavailable" type="button" class="btn-secondary" @click="copySummary">
-            <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />
-            {{ t(textMemory || hasNote ? 'action.copyContent' : 'action.copySummary') }}
-          </button>
-
-          <div v-if="!textMemory && !analyzing" class="border-t border-[var(--shell-line)] pt-5">
+          <div v-if="!textMemory && !analyzing" class="detail-section-divider">
             <OcrText
               :text="memory.text_content"
               :memory-id="memory.id"
@@ -187,9 +194,6 @@ const confirmDelete = async () => {
             />
           </div>
 
-          <p class="text-xs text-[var(--shell-muted)]">
-            {{ t('memory.createdAt', { date: formatDate(memory.created_at) }) }}
-          </p>
         </section>
       </div>
     </div>
@@ -219,6 +223,12 @@ const confirmDelete = async () => {
 .detail-layout--text {
   grid-template-columns: minmax(0, 760px);
   justify-content: center;
+}
+
+/* 与侧栏头栏同款内缩低对比细线：只做分区，不在画布上留硬分割。 */
+.detail-section-divider {
+  border-top: 1px solid color-mix(in srgb, var(--shell-line) 55%, transparent);
+  padding-top: 1.25rem;
 }
 
 @media (max-width: 960px) {

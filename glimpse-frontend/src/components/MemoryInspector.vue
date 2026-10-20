@@ -92,7 +92,7 @@ defineExpose({ canLeave })
 </script>
 
 <template>
-  <aside class="flex h-full min-h-0 w-full flex-col bg-[var(--color-surface)]">
+  <aside class="flex h-full min-h-0 w-full flex-col bg-[var(--shell-window-bg)]">
     <header class="flex items-center gap-3 px-3 pb-2 pt-3">
       <div class="flex min-w-0 flex-1 items-baseline gap-x-2.5">
         <h2 class="flex-none text-base font-semibold text-[var(--shell-ink)]">{{ t('memory.detail') }}</h2>
@@ -139,11 +139,11 @@ defineExpose({ canLeave })
         class="memory-inspector__summary-actions grid gap-2.5"
         :class="displayText ? 'grid-cols-2' : 'grid-cols-1'"
       >
-        <button v-if="displayText" type="button" class="btn-secondary justify-center" @click="copySummary">
+        <button v-if="displayText" type="button" class="btn-secondary btn-secondary--on-canvas justify-center" @click="copySummary">
           <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t(textMemory || hasUserNote(props.memory) ? 'action.copyContent' : 'action.copySummary') }}
         </button>
-        <button type="button" class="btn-secondary justify-center" @click="emit('open', memory.id)">
+        <button type="button" class="btn-secondary btn-secondary--on-canvas justify-center" @click="emit('open', memory.id)">
           <ArrowTopRightOnSquareIcon class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t('action.viewDetail') }}
         </button>

@@ -724,11 +724,11 @@ onUnmounted(() => {
 }
 
 .memory-filters__date-toggle:hover {
-  background: rgb(224, 228, 237);
+  background: var(--color-surface-deep);
 }
 
 :root[data-theme='dark'] .memory-filters__date-toggle:hover {
-  background: var(--color-surface-hover);
+  background: var(--color-surface-deep);
 }
 
 .memory-filters__date-toggle:focus-visible {

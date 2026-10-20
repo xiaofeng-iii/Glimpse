@@ -72,7 +72,6 @@ const compactHeightLimit = () => {
 }
 
 const resizeCompactEditor = () => {
-  if (!props.compact) return
   const editor = compactEditor.value
   if (!editor) return
 
@@ -251,38 +250,40 @@ defineExpose({
   <section class="summary-editor" :class="{ 'summary-editor--compact': compact }" :aria-label="contentLabel">
     <div class="summary-editor__header mb-2.5 flex min-h-8 items-center justify-between gap-3">
       <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ contentLabel }}</h3>
-      <button
-        v-if="!editing"
-        type="button"
-        class="summary-editor__edit-action inline-flex h-7 min-h-7 items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 text-sm font-normal text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)] hover:text-[var(--shell-ink)]"
-        @click="startEditing"
-      >
-        <PencilSquareIcon class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
-        {{ editorText('edit') }}
-      </button>
-      <div v-else class="summary-editor__edit-actions flex flex-none items-center gap-2">
+      <div class="summary-editor__header-actions flex flex-none items-center gap-2">
+        <slot name="header-actions" :editing="editing" />
         <button
+          v-if="!editing"
           type="button"
-          class="summary-editor__edit-action btn-secondary !h-7 !min-h-7 px-2.5 text-sm"
-          :disabled="saving"
-          @click="cancelEditing"
+          class="summary-editor__edit-action btn-secondary btn-secondary--on-canvas text-sm"
+          @click="startEditing"
         >
-          {{ t('action.cancel') }}
+          <PencilSquareIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+          {{ editorText('edit') }}
         </button>
-        <button
-          type="button"
-          class="summary-editor__edit-action btn-primary !h-7 !min-h-7 gap-1.5 px-2.5 text-sm"
-          :disabled="!canSave"
-          @click="save"
-        >
-          <ArrowPathIcon v-if="saving" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
-          {{ saving ? editorText('saving') : editorText('save') }}
-        </button>
+        <div v-else class="summary-editor__edit-actions flex flex-none items-center gap-2">
+          <button
+            type="button"
+            class="summary-editor__edit-action btn-secondary btn-secondary--on-canvas text-sm"
+            :disabled="saving"
+            @click="cancelEditing"
+          >
+            {{ t('action.cancel') }}
+          </button>
+          <button
+            type="button"
+            class="summary-editor__edit-action btn-primary gap-1.5 px-2.5 text-sm"
+            :disabled="!canSave"
+            @click="save"
+          >
+            <ArrowPathIcon v-if="saving" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
+            {{ saving ? editorText('saving') : editorText('save') }}
+          </button>
+        </div>
       </div>
     </div>
 
     <div
-      v-if="compact"
       ref="compactFrame"
       class="summary-editor__compact-frame relative isolate min-h-20 overflow-hidden rounded-lg border transition-[border-color,background-color,box-shadow]"
       :class="editing
@@ -314,33 +315,6 @@ defineExpose({
         id="summary-editor-feedback"
         class="pointer-events-none absolute inset-x-3 bottom-2 z-20 flex items-center justify-between gap-3 text-xs"
       >
-        <p class="min-w-0 truncate text-red-600">
-          {{ validationMessage || errorMessage }}
-        </p>
-        <span class="flex-none tabular-nums" :class="draft.length > 4000 ? 'text-red-600' : 'text-[var(--shell-muted)]'">
-          {{ draft.length }} / 4000
-        </span>
-      </div>
-    </div>
-
-    <div v-else class="relative" :class="editing ? 'min-h-32' : ''">
-      <textarea
-        v-if="editing"
-        v-model="draft"
-        class="min-h-32 w-full resize-none rounded-lg border bg-[var(--shell-control-bg)] px-3.5 py-2.5 text-sm text-[var(--shell-ink)] outline-none transition"
-        :class="validationMessage ? 'border-red-400' : 'border-[var(--shell-line)]'"
-        :aria-invalid="Boolean(validationMessage)"
-        aria-describedby="summary-editor-feedback summary-editor-shortcut"
-        maxlength="4001"
-        autofocus
-        :aria-label="contentLabel"
-        @keydown="handleEditorKeydown"
-      />
-      <p v-else class="whitespace-pre-wrap text-sm text-[var(--shell-ink)] [overflow-wrap:anywhere]">
-        {{ fieldText }}
-      </p>
-
-      <div v-if="editing" id="summary-editor-feedback" class="mt-2 flex items-center justify-between gap-3 text-xs">
         <p class="min-w-0 truncate text-red-600">
           {{ validationMessage || errorMessage }}
         </p>
@@ -402,13 +376,8 @@ defineExpose({
     gap: 0.5rem;
   }
 
-  .summary-editor__header > .summary-editor__edit-action {
+  .summary-editor__header-actions {
     justify-self: end;
-  }
-
-  .summary-editor__edit-actions {
-    width: 100%;
-    justify-content: flex-end;
   }
 }
 
@@ -418,20 +387,19 @@ defineExpose({
   margin-bottom: 0.25rem;
 }
 
-.summary-editor--compact .summary-editor__edit-action {
-  height: 1.75rem;
-  min-height: 1.75rem;
-  padding-inline: 0.625rem;
-}
-
-.summary-editor--compact .summary-editor__compact-control {
+.summary-editor__compact-control {
   padding-inline: 0;
 }
 
-/* 编辑框向外扩（负边距 + 框内衬），而不是把文字向内推进框里：
-   进入/退出编辑时文字位置零移动，消除平铺形态下的跳动 */
-.summary-editor--compact .summary-editor__compact-frame--active {
+/* 侧栏编辑框向外扩一半正文留白，而不是把文字向内推进框里：
+   文字位置零移动，框与侧栏边缘各保留 6px 呼吸距离；详情页沿用原留白。 */
+.summary-editor__compact-frame--active {
   margin-inline: -0.75rem;
   padding-inline: 0.75rem;
+}
+
+.summary-editor--compact .summary-editor__compact-frame--active {
+  margin-inline: -0.375rem;
+  padding-inline: 0.375rem;
 }
 </style>

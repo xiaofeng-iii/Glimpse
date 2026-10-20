@@ -673,9 +673,9 @@ describe('memory components', () => {
     origin.remove()
   })
 
-  it('keeps one compact summary text node and identical text geometry classes across edit state', async () => {
+  it.each([false, true])('keeps one summary text node and stable geometry with compact=%s', async (compact) => {
     const wrapper = mount(SummaryEditor, {
-      props: { memory: createMemory(), compact: true },
+      props: { memory: createMemory(), compact },
     })
     const originalControl = wrapper.get('textarea').element as HTMLTextAreaElement
     const originalClassName = originalControl.className
@@ -708,7 +708,10 @@ describe('memory components', () => {
     })
 
     const editButton = wrapper.get('.summary-editor__edit-action')
-    expect(editButton.classes()).toEqual(expect.arrayContaining(['h-7', 'min-h-7', 'font-normal']))
+    expect(editButton.classes()).toEqual(expect.arrayContaining([
+      'btn-secondary',
+      'btn-secondary--on-canvas',
+    ]))
 
     await editButton.trigger('click')
     await flushPromises()
@@ -716,9 +719,9 @@ describe('memory components', () => {
     const frame = wrapper.get('.summary-editor__compact-frame')
     expect(frame.attributes('style')).toContain('height: 220px')
     expect(document.activeElement).toBe(originalControl)
-    for (const button of wrapper.findAll('.summary-editor__edit-action')) {
-      expect(button.classes()).toEqual(expect.arrayContaining(['!h-7', '!min-h-7']))
-    }
+    const [cancelButton, saveButton] = wrapper.findAll('.summary-editor__edit-action')
+    expect(cancelButton.classes()).toContain('btn-secondary')
+    expect(saveButton.classes()).toContain('btn-primary')
 
     measuredHeight = 600
     await wrapper.get('textarea').setValue('A much longer summary that needs more room')
@@ -769,12 +772,12 @@ describe('memory components', () => {
     await flushPromises()
 
     expect(apiMocks.updateSummary).toHaveBeenCalledWith('memory-1', 'Revised summary')
-    expect(wrapper.find('textarea').exists()).toBe(false)
+    expect(wrapper.get('textarea').element.readOnly).toBe(true)
 
     await wrapper.get('.summary-editor__edit-action').trigger('click')
     await wrapper.get('textarea').setValue('Discard me')
     await wrapper.get('textarea').trigger('keydown', { key: 'Escape' })
-    expect(wrapper.find('textarea').exists()).toBe(false)
+    expect(wrapper.get('textarea').element.readOnly).toBe(true)
     expect(wrapper.text()).not.toContain('Discard me')
   })
 
@@ -790,7 +793,7 @@ describe('memory components', () => {
 
     expect(wrapper.text()).toContain('记忆内容')
     expect(wrapper.text()).toContain('编辑内容')
-    expect(wrapper.text()).toContain('我的原始说明')
+    expect(wrapper.get('textarea').element.value).toBe('我的原始说明')
     expect(wrapper.text()).not.toContain('A payment screen')
 
     await wrapper.get('.summary-editor__edit-action').trigger('click')
@@ -800,7 +803,7 @@ describe('memory components', () => {
 
     expect(apiMocks.updateUserText).toHaveBeenCalledWith('memory-1', 'Revised note')
     expect(apiMocks.updateSummary).not.toHaveBeenCalled()
-    expect(wrapper.find('textarea').exists()).toBe(false)
+    expect(wrapper.get('textarea').element.readOnly).toBe(true)
   })
 
   it('renders the user note on wall cards in place of the AI summary', () => {
@@ -883,7 +886,7 @@ describe('memory components', () => {
       .find((button) => button.textContent?.includes('放弃修改'))
     discardButton!.click()
     await expect(discardChanges).resolves.toBe(true)
-    expect(wrapper.find('textarea').exists()).toBe(false)
+    expect(wrapper.get('textarea').element.readOnly).toBe(true)
   })
 
   it('keeps a failed summary draft and reports the failure inline and as a toast', async () => {
@@ -1033,6 +1036,31 @@ describe('memory components', () => {
     const leaveRequest = (inspector.vm as unknown as { canLeave: () => Promise<boolean> }).canLeave()
     await expect(leaveRequest).resolves.toBe(true)
     expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+  })
+
+  it('puts copy left of edit in the summary header and styles header actions as filled buttons', async () => {
+    apiMocks.get.mockResolvedValue(createMemory())
+    const wrapper = mount(MemoryDetail)
+    await flushPromises()
+
+    const headerActions = wrapper.get('.summary-editor__header-actions')
+    const headerButtons = headerActions.findAll('button')
+    expect(headerButtons.map((button) => button.text())).toEqual(['复制摘要', '编辑摘要'])
+    for (const button of headerButtons) {
+      expect(button.classes()).toEqual(expect.arrayContaining(['btn-secondary', 'btn-secondary--on-canvas']))
+    }
+
+    const ocr = wrapper.getComponent(OcrText)
+    expect(ocr.find('.ocr-text__actions--filled').exists()).toBe(true)
+    expect(ocr.classes()).not.toContain('border')
+    expect(ocr.classes()).not.toContain('rounded-lg')
+    expect(wrapper.findAll('time')).toHaveLength(1)
+
+    // 进入编辑后复制让位给取消/保存，不复制已保存的旧文本。
+    await headerButtons[1].trigger('click')
+    await flushPromises()
+    expect(headerActions.findAll('button').map((button) => button.text())).toEqual(['取消', '保存修改'])
+    wrapper.unmount()
   })
 
   it('renders the shared tags editor on the detail page too', async () => {

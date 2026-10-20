@@ -729,7 +729,8 @@ onUnmounted(() => {
   scrollbar-color: var(--shell-scrollbar-thumb) transparent;
 }
 
-/* 详情侧栏是浮在墙侧的内容块：白底、圆角与卡片阴影成块；边缘不加描边。 */
+/* 详情侧栏与详情页同饰：底色同为画布，常驻时不浮起；
+   只有窄窗浮层形态才用圆角与加深加宽的投影建立高度。 */
 .inspector-panel {
   width: 364px;
   flex: 0 0 364px;
@@ -737,8 +738,7 @@ onUnmounted(() => {
   overflow: hidden;
   margin: 0.5rem 0.5rem 0.5rem 0.125rem;
   border-radius: var(--radius-xl);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
+  background: var(--shell-window-bg);
 }
 
 /* 装饰面板与记忆墙背景一体：无底色、无圆角、无阴影，仅借用槽位宽度。 */
@@ -758,10 +758,18 @@ onUnmounted(() => {
 }
 
 @media (max-width: 1319px) {
+  /* 浮层形态与画布同色，靠更深更宽的投影与墙内容分开 */
   .inspector-panel {
     position: absolute;
     inset: 0 0 0 auto;
     width: min(420px, 100%);
+    box-shadow:
+      0 1px 2px rgba(24, 34, 56, 0.1),
+      0 20px 56px rgba(24, 34, 56, 0.24);
+  }
+
+  :root[data-theme='dark'] .inspector-panel {
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.58);
   }
 }
 

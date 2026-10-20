@@ -15,7 +15,7 @@
 | 需要用户"确认/取消"的打断式询问（含删除等破坏性操作） | `ConfirmDialog.vue` | 非 destructive 分支默认带琥珀警示三角图标；常规提示不要直接套这个壳，先按 `ui-checklist.md` 第 1 条判断该用 alert 还是无图标中性变体 |
 | 信息展示型浮层（更新说明、详情速览），跟随某个触发元素弹出 | `UpdateNotesPopover.vue` | reka-ui Popover，自带标题栏+右上角关闭按钮（已统一 `XMarkIcon` 14px）+`notes-popover` 样式与进场动画；body 已隐藏滚动条、禁横滑 |
 | 大图预览 | `ImagePreviewModal.vue` | `.image-preview-dialog`；关闭按钮 = 32px 无框标准规格（见"按钮"表叉号行），翻页箭头用 `.image-preview-stage__arrow` 40px 大档 |
-| 右键/上下文菜单 | `MemoryContextMenu.vue` / `ImageContextMenu.vue` / `EditTextContextMenu.vue` | 菜单项 28px（`--control-h-sm`，2026-10-19 由 32px 调紧凑），结构 `.x-context-menu` + `__item` + `__divider` |
+| 右键/上下文菜单 | `MemoryContextMenu.vue` / `ImageContextMenu.vue` / `EditTextContextMenu.vue` / `TagContextMenu.vue` | 菜单项 28px（`--control-h-sm`，2026-10-19 由 32px 调紧凑），结构 `.x-context-menu` + `__item` + `__divider`；标签 chip 无常驻叉号，右键打开单项删除菜单 |
 | 按钮/控件的悬浮说明（hover/focus 提示，可带快捷键键帽；文本截断的全文展示同用） | `v-hint-tooltip` 指令（`directives/hint-tooltip.ts`，main.ts 全局注册） | 值取字符串或 `{ label, shortcut? }`；零包裹节点直接挂控件上，300ms 延迟、140ms easeOutCubic 自触发元素一侧位移+放大+变不透明（出发态偏 3px / 95% / 半透明）、浅色气泡样式见 DESIGN.md 附录。**任何悬浮说明都用它，禁止写原生 `title`**——main.ts 已装原生 tooltip 铁幕（悬停即摘除 title），未配置指令就不显示 |
 
 ## 按钮
@@ -23,7 +23,7 @@
 | 场景 | 类名 | 高度档 | 字重/备注 |
 |---|---|---|---|
 | 主路径动作（搜索、召回确认） | `.btn-primary` | 32px md | 字重 400、实底带顶部细高光与品牌投影——**只给主路径**，低频/次级动作别拿这个分量 |
-| 次级动作 | `.btn-secondary` | 32px md | 字重 400、静息 `surface-subtle` 无描边、悬停 `surface-hover`——静息态与内嵌块同色，别再手动调底 |
+| 次级动作 | `.btn-secondary` | 32px md | 字重 400、静息 `surface-subtle` 无描边、悬停 `surface-hover`——静息态与内嵌块同色，别再手动调底；画布底上叠 `.btn-secondary--on-canvas`（静息 `surface-control` 档、悬停 `surface-deep-hover`）。详情页与侧栏的摘要/识别文本块头操作（复制内容、编辑内容、复制文本）同样用它，复制排在编辑左侧 |
 | 低频破坏性操作（设置区"恢复默认"等） | `.btn-ghost-danger` | 32px md | 字重 400、无投影、hover 才显危险色——这是克制基调的现成榜样 |
 | 弹窗/浮层里的动作按钮（确认/取消、查看详情/立即更新等低频操作） | 在基础按钮类上叠 `.btn-sm`（如 `.btn-primary.btn-sm`、`.btn-secondary.btn-sm`） | **28px sm** | 字重 400、13px、无投影。弹窗操作不是主路径，别用默认 32px 的分量 |
 | 确认破坏性操作（弹窗内） | `.btn-danger`（弹窗内叠 `.btn-sm`） | 32px md（弹窗内 28px） | 实心危险色 |
@@ -39,7 +39,7 @@
 | 设置区输入框 | `.setting-input`（main.css 全局） | 32px（`--control-h-md`）、文本框限宽 320px、数字框限宽 120px、聚焦只变边框色 |
 | 密钥/密码输入框 | `SecretInput.vue` | `.setting-input` 规格 + 尾部 24px 显隐眼睛；显隐为组件内部状态，各实例独立不联动；WebView2 原生眼睛由全局 `::-ms-reveal` 关闭 |
 | 设置区三段式切换器 | `.theme-switcher`（Settings.vue 局部） | 32px 高、扁平线框浅底+独立平移滑块 |
-| 侧栏平铺块（摘要/标签/识别文本） | `SummaryEditor.vue` compact / `MemoryTagsEditor.vue` compact / `OcrText.vue` compact | 无底色直铺侧栏：标题行与正文顶到侧栏内容缘，三块左缘逐边对齐；块头行内操作 28px；编辑态白底框浮起；chip 级小控件灰底、hover 走 224 档 |
+| 侧栏平铺块（摘要/标签/识别文本） | `SummaryEditor.vue` compact / `MemoryTagsEditor.vue` compact / `OcrText.vue` compact | 整体底色同画布（与详情页一致，常驻不浮起）：标题行与正文顶到侧栏内容缘，三块左缘逐边对齐；块头操作同详情页 32px 实底按钮；编辑态近白框浮起；chip 级小控件静息 `surface-control`、hover `surface-deep` |
 | 搜索工具区控件 | SearchToolbar 内部 | 紧凑 32px 档 |
 
 ## 尺寸/形状/z 档位（镜像 token，以 main.css 为准）

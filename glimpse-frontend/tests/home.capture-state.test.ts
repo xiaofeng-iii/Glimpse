@@ -263,7 +263,7 @@ describe('Home capture state wiring', () => {
     expect(wrapper.findComponent({ name: 'MemoryWall' }).attributes('max-columns')).toBe('3')
 
     // ≥1320 docked 形态：点外与 Esc 都不关闭
-    vi.stubGlobal('innerWidth', 1340)
+    vi.stubGlobal('innerWidth', 1320)
     window.dispatchEvent(new Event('resize'))
     await flushPromises()
     expect(wrapper.findComponent({ name: 'MemoryWall' }).attributes('max-columns')).toBeUndefined()

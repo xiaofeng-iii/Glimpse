@@ -132,7 +132,7 @@ onBeforeUnmount(cancelSelectIntent)
       </p>
     </div>
 
-    <div v-else class="memory-card__media relative flex items-center justify-center overflow-hidden bg-slate-100/70">
+    <div v-else class="memory-card__media relative flex items-center justify-center overflow-hidden bg-[var(--color-surface-subtle)]">
       <img
         v-if="imageUrl && !imageFailed"
         :src="imageUrl"
