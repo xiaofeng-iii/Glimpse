@@ -230,6 +230,51 @@ textarea:focus {
   box-shadow: 0 1px 2px rgba(26, 38, 64, 0.04);
 }
 
+/* WebView2/Chromium 会给有内容的密码框叠加自带的「显示密码」眼睛，
+   与应用自绘的显隐按钮重影，全局关掉。 */
+input[type='password']::-ms-reveal {
+  display: none;
+}
+
+/* 设置区输入框/只读框：32px 档、文本框限宽 320px、数字框限宽 120px、聚焦只变边框色。
+   SecretInput 组件复用同一规格。 */
+.setting-input,
+.setting-readonly {
+  width: 100%;
+  max-width: 320px;
+  height: var(--control-h-md);
+  min-height: var(--control-h-md);
+  border: 1px solid var(--shell-line);
+  border-radius: var(--radius-md);
+  background: var(--shell-control-bg);
+  padding: 0 .65rem;
+  font-size: .875rem;
+  color: var(--shell-ink);
+  outline: none;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.setting-input[type='url'] {
+  font-family: var(--font-ui);
+}
+
+.setting-input[type='number'] {
+  max-width: 120px;
+}
+
+.setting-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: none;
+  background: var(--shell-control-bg);
+}
+
+.setting-readonly {
+  display: flex;
+  align-items: center;
+  color: var(--shell-muted);
+  cursor: default;
+}
+
 button {
   min-height: 0;
 }
