@@ -62,9 +62,10 @@ const deletingMemory = ref(false)
 const showSearchDebug = ref(false)
 const clusterModeEnabled = ref(false)
 const screenshotShortcutLabel = ref('Ctrl+Shift+G')
-// 1180 同时是排版分界与侧栏交互分界：CSS 在 1179px 以下把侧栏面板变成右侧浮层，
-// 点外/Esc 关闭只在浮层形态生效（见 handleDocumentPointerDown 与 handleKeydown）。
-const wideLayout = ref(window.innerWidth >= 1180)
+// 1320 同时是排版分界与侧栏交互分界：侧栏占位后墙面仍保底三列 290px 卡片；
+// CSS 在 1319px 以下把侧栏面板变成右侧浮层，点外/Esc 关闭只在浮层形态生效。
+const WIDE_LAYOUT_BREAKPOINT = 1320
+const wideLayout = ref(window.innerWidth >= WIDE_LAYOUT_BREAKPOINT)
 const isDesktop = isDesktopShell()
 // 浮条下方控件行的吸顶与紧凑态：布局/筛选控件已从墙头部上移到这里，
 // 三级吸顶（浮条 → 控件行 → 墙头标题）的 top 由脚本按实测高度级联写入。
@@ -377,7 +378,7 @@ const confirmContextDelete = async () => {
 }
 
 const handleResize = () => {
-  wideLayout.value = window.innerWidth >= 1180
+  wideLayout.value = window.innerWidth >= WIDE_LAYOUT_BREAKPOINT
 }
 
 // 记忆墙滚动条仅在滚动进行时浮现，停止片刻即隐回（详见 .home-memory-pane 样式注释）。
@@ -394,7 +395,7 @@ const markPaneScrollbarActive = () => {
   }, SCROLLBAR_IDLE_MS)
 }
 
-// 浮层形态（<1180px，与把面板变成右侧浮层的媒体查询同界）下，点击面板以外
+// 浮层形态（<1320px，与把面板变成右侧浮层的媒体查询同界）下，点击面板以外
 //（记忆卡片除外）即关闭；docked 形态是排版内的内容块，点外不关闭。<820px 面板
 // 全屏覆盖窗口，不存在面板外区域，实际只有 X 按钮与 Esc 能关。拖动标题栏是窗口
 // 操作，任何形态都不视为关闭意图。走 handleCloseInspector 以保留未保存草稿确认。
@@ -592,7 +593,7 @@ onUnmounted(() => {
         </div>
       </Transition>
       <!-- 装饰板不参与 Transition：普通条件渲染瞬时挂载/卸载，永远在流内占位，
-           不存在离场中间态。只在 wideLayout（≥1180px，与侧栏 docked 边界一致）
+           不存在离场中间态。只在 wideLayout（≥1320px，与侧栏 docked 边界一致）
            下渲染——更窄时媒体查询会把 .inspector-panel 变成右侧浮层，装饰板
            在该区间会悬浮在墙上，且预留槽位后墙面不足三列。 -->
       <div
@@ -730,11 +731,11 @@ onUnmounted(() => {
 
 /* 详情侧栏是浮在墙侧的内容块：白底、圆角与卡片阴影成块；边缘不加描边。 */
 .inspector-panel {
-  width: 380px;
-  flex: 0 0 380px;
+  width: 364px;
+  flex: 0 0 364px;
   min-height: 0;
   overflow: hidden;
-  margin: 0.5rem 0.75rem 0.75rem 0.25rem;
+  margin: 0.5rem 0.5rem 0.5rem 0.125rem;
   border-radius: var(--radius-xl);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
@@ -756,7 +757,7 @@ onUnmounted(() => {
   bottom: 0;
 }
 
-@media (max-width: 1179px) {
+@media (max-width: 1319px) {
   .inspector-panel {
     position: absolute;
     inset: 0 0 0 auto;

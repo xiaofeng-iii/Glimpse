@@ -93,7 +93,7 @@ defineExpose({ canLeave })
 
 <template>
   <aside class="flex h-full min-h-0 w-full flex-col bg-[var(--color-surface)]">
-    <header class="flex items-center gap-3 px-5 pb-3 pt-3.5">
+    <header class="flex items-center gap-3 px-3 pb-2 pt-3">
       <div class="flex min-w-0 flex-1 items-baseline gap-x-2.5">
         <h2 class="flex-none text-base font-semibold text-[var(--shell-ink)]">{{ t('memory.detail') }}</h2>
         <time class="min-w-0 truncate text-xs text-[var(--shell-muted)]" :datetime="memory.created_at">
@@ -112,7 +112,7 @@ defineExpose({ canLeave })
 
     <div class="memory-inspector__divider" aria-hidden="true"></div>
 
-    <div class="memory-inspector__body min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-clip px-5 py-4">
+    <div class="memory-inspector__body min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-clip px-3 py-4">
       <MediaGallery v-if="!textMemory" :memory="memory" compact />
 
       <div
@@ -192,7 +192,7 @@ defineExpose({ canLeave })
 .memory-inspector__divider {
   flex: none;
   height: 1px;
-  margin-inline: 1.25rem;
+  margin-inline: 0.75rem;
   background: color-mix(in srgb, var(--shell-line) 55%, transparent);
 }
 

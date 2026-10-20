@@ -115,7 +115,7 @@ describe('Home capture state wiring', () => {
   })
 
   it('closes the floating inspector on outside pointerdown and Escape but not on card or titlebar clicks', async () => {
-    // <1180 浮层形态。真实浏览器中 <820 面板全屏覆盖、不存在面板外区域，
+    // <1320 浮层形态。真实浏览器中 <820 面板全屏覆盖、不存在面板外区域，
     // 点外关闭在该区间只是逻辑路径；本用例验证的是处理器本身的判定逻辑。
     vi.stubGlobal('innerWidth', 800)
     const router = createRouter({
@@ -197,7 +197,7 @@ describe('Home capture state wiring', () => {
     vi.unstubAllGlobals()
   })
 
-  it('closes the floating inspector below 1180px but keeps the docked inspector open on outside clicks', async () => {
+  it('closes the floating inspector below 1320px but keeps the docked inspector open on outside clicks', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', name: 'home', component: Home }],
@@ -248,7 +248,7 @@ describe('Home capture state wiring', () => {
       await flushPromises()
     }
 
-    // jsdom 默认 1024px（<1180 浮层形态）：点外与 Esc 都关闭
+    // jsdom 默认 1024px（<1320 浮层形态）：点外与 Esc 都关闭
     await select()
     await pointerDownOnBody()
     expect(memoriesStore.selectedId).toBeNull()
@@ -258,12 +258,12 @@ describe('Home capture state wiring', () => {
     await flushPromises()
     expect(memoriesStore.selectedId).toBeNull()
 
-    // 浮层形态关闭后：1024px（窄于 docked 边界 1180）不渲染装饰板，墙列数封顶三列
+    // 浮层形态关闭后：1024px（窄于 docked 边界 1320）不渲染装饰板，墙列数封顶三列
     expect(document.querySelector('.inspector-panel--decor')).toBeNull()
     expect(wrapper.findComponent({ name: 'MemoryWall' }).attributes('max-columns')).toBe('3')
 
-    // ≥1180 docked 形态：点外与 Esc 都不关闭
-    vi.stubGlobal('innerWidth', 1280)
+    // ≥1320 docked 形态：点外与 Esc 都不关闭
+    vi.stubGlobal('innerWidth', 1340)
     window.dispatchEvent(new Event('resize'))
     await flushPromises()
     expect(wrapper.findComponent({ name: 'MemoryWall' }).attributes('max-columns')).toBeUndefined()
