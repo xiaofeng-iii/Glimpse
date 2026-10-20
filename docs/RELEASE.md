@@ -56,6 +56,33 @@ Tauri CLI 同 minor 校验。依赖缺失或版本错位不应到发布时才首
 可达、后续开发不进 tag 也不丢失。v0.4.2 曾因「动态导入未声明」与「npm 包
 版本高于 crate」连续两次构建失败，即以该流程修复并沉淀出本节规则。
 
+## 安装器的进程等待与后端目录清理
+
+`glimpse-frontend/src-tauri/installer-hooks.nsh` 的 PREINSTALL 钩子负责更新时
+替换后端运行时（`binaries\GlimpseRuntime`，GB 级 PyInstaller 目录）。
+v0.5.0-beta.2 曾因「固定等待 1 秒后盲删、复制半途而废」造成后端 `_internal`
+下 DLL 全缺、应用每次启动都失败（该版本已撤回）。现行机制：
+
+1. 杀掉 Glimpse / GlimpseRuntime 及历史后端进程；
+2. 轮询等待 `GlimpseRuntime.exe` 真正退出（`taskkill` 返回非 0 即进程已消失，
+   500ms 一次、上限 15 秒），退出后再等 500ms 兜底句柄释放；
+3. `RMDir /r` 清空后端目录后校验 `binaries\GlimpseRuntime` 确实清空（重试 5 次、
+   每次隔 1 秒）；
+4. 仍有残留（第三方句柄占用，常见于杀毒扫描刚加载过的 torch DLL）则 `Abort`
+   中止安装并提示重试，绝不带着残缺目录继续覆盖出新旧混杂的后端。
+
+改动钩子后用 Tauri 自带的编译器做语法验证：
+
+```powershell
+& "$env:LOCALAPPDATA\tauri\NSIS\makensis.exe" <一个 !include 该 .nsh 并 insertmacro 的最小 .nsi>
+```
+
+**留档待办（后续实现）**：启动时后端完整性校验——spawn 前检查
+`binaries\GlimpseRuntime\GlimpseRuntime.exe` 与 `_internal\python310.dll` 的存在性，
+缺失时把后端状态标为「安装损坏，请重新安装」并在界面给出重装引导，替代当前的
+静默后端离线。远期方案：后端改为压缩包资源 + 版本化运行时目录，首次启动原子
+解压、切换成功后再删旧目录，让 NSIS 不再逐文件替换活文件。
+
 ## 版本号事实源
 
 应用版本只在 `glimpse-frontend/src-tauri/Cargo.toml` 的
