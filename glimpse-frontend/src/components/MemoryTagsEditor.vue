@@ -2,13 +2,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   PlusIcon,
-  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
 import { t } from '@/utils/i18n'
+import TagContextMenu from './TagContextMenu.vue'
 
 const TAG_NAME_MAX_LENGTH = 24
 const TAGS_PER_MEMORY_LIMIT = 10
@@ -36,6 +36,7 @@ const inputActive = ref(false)
 const inputHint = ref('')
 const inputElement = ref<HTMLInputElement | null>(null)
 const composing = ref(false)
+const tagMenu = ref<{ name: string; x: number; y: number } | null>(null)
 let unregisterGuard: (() => boolean) | null = null
 
 const currentTagNames = computed(() =>
@@ -144,6 +145,14 @@ const removeTag = (name: string) => {
   persist()
 }
 
+const openTagMenu = (name: string, event: MouseEvent) => {
+  tagMenu.value = { name, x: event.clientX, y: event.clientY }
+}
+
+const closeTagMenu = () => {
+  tagMenu.value = null
+}
+
 // 点击空白（失焦）：有未确认输入则自动提交，空输入则收起；非法输入保留待改。
 const handleInputBlur = () => {
   if (!inputActive.value) return
@@ -206,23 +215,15 @@ defineExpose({
       <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ t('tags.title') }}</h3>
     </div>
 
-    <!-- 直接操作模型：chips 带 × 即点即删，行尾「＋」/输入框即点即加，无显式保存 -->
+    <!-- 直接操作模型：右键 chip 打开删除菜单，行尾「＋」/输入框即点即加，无显式保存 -->
     <div class="tags-editor__chips" data-testid="tags-chips">
       <span
         v-for="name in localNames"
         :key="name"
         class="tags-editor__chip"
+        @contextmenu.prevent="openTagMenu(name, $event)"
       >
         <span class="tags-editor__chip-text">{{ name }}</span>
-        <button
-          type="button"
-          class="tags-editor__chip-remove"
-          :aria-label="`${t('tags.removeTag')} ${name}`"
-          @mousedown.prevent
-          @click="removeTag(name)"
-        >
-          <XMarkIcon class="h-3 w-3" aria-hidden="true" />
-        </button>
       </span>
       <input
         v-if="inputActive"
@@ -279,6 +280,14 @@ defineExpose({
     >
       {{ t('tags.noMatch') }}
     </p>
+
+    <TagContextMenu
+      :tag-name="tagMenu?.name ?? null"
+      :x="tagMenu?.x ?? 0"
+      :y="tagMenu?.y ?? 0"
+      @delete="removeTag"
+      @close="closeTagMenu"
+    />
   </section>
 </template>
 
@@ -297,7 +306,7 @@ defineExpose({
   gap: 0.25rem;
   padding: 0.125rem 0.5rem;
   border-radius: var(--radius-sm);
-  background: var(--color-surface-subtle);
+  background: var(--color-surface-control);
   color: var(--shell-ink);
   font-size: 0.75rem;
   line-height: 1.25rem;
@@ -308,32 +317,6 @@ defineExpose({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.tags-editor__chip-remove {
-  display: inline-flex;
-  width: 1rem;
-  height: 1rem;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--shell-muted);
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease;
-}
-
-/* chip 本体是 surface-subtle 灰底：hover 走灰底档（224），暗色用 token 覆盖 */
-.tags-editor__chip-remove:hover {
-  color: var(--shell-ink);
-  background: rgb(224, 228, 237);
-}
-
-:root[data-theme='dark'] .tags-editor__chip-remove:hover {
-  background: var(--color-surface-hover);
 }
 
 /* 行内输入：与 chips 同排同高（24px）；基线宽 4 个中文字符，
@@ -370,19 +353,19 @@ defineExpose({
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
-  background: var(--color-surface-subtle);
+  background: var(--color-surface-control);
   color: var(--shell-muted);
   cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease;
 }
 
 .tags-editor__add:hover {
-  background: rgb(224, 228, 237);
+  background: var(--color-surface-deep);
   color: var(--shell-ink);
 }
 
 :root[data-theme='dark'] .tags-editor__add:hover {
-  background: var(--color-surface-hover);
+  background: var(--color-surface-deep);
 }
 
 .tags-editor__add:focus-visible {
@@ -407,7 +390,7 @@ defineExpose({
   padding: 0.125rem 0.5rem;
   border: 0;
   border-radius: var(--radius-sm);
-  background: var(--color-surface-subtle);
+  background: var(--color-surface-control);
   color: var(--shell-muted);
   cursor: pointer;
   font-size: 0.75rem;
@@ -418,14 +401,14 @@ defineExpose({
   white-space: nowrap;
 }
 
-/* 建议按钮同 chip：灰底控件 hover 走 224 档 */
+/* 建议按钮同 chip：静息控件档，hover 压到最深档 */
 .tags-editor__suggestion:hover {
-  background: rgb(224, 228, 237);
+  background: var(--color-surface-deep);
   color: var(--shell-ink);
 }
 
 :root[data-theme='dark'] .tags-editor__suggestion:hover {
-  background: var(--color-surface-hover);
+  background: var(--color-surface-deep);
 }
 
 .tags-editor__feedback {

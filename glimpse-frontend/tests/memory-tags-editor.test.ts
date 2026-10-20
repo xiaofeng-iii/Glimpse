@@ -71,14 +71,14 @@ describe('MemoryTagsEditor', () => {
     }))
   })
 
-  it('renders chips with remove buttons and the tail add square', () => {
+  it('renders chips without persistent remove controls and the tail add square', () => {
     const wrapper = mountEditor(createMemory({
       tags: [{ id: 1, name: '工作' }, { id: 2, name: '灵感' }],
     }))
 
     const chips = wrapper.findAll('.tags-editor__chip')
     expect(chips.map((chip) => chip.text())).toEqual(['工作', '灵感'])
-    expect(wrapper.findAll('.tags-editor__chip-remove')).toHaveLength(2)
+    expect(wrapper.findAll('.tags-editor__chip-remove')).toHaveLength(0)
     expect(wrapper.get('.tags-editor__add').attributes('aria-label')).toBe('添加标签')
     expect(apiMocks.updateTags).not.toHaveBeenCalled()
   })
@@ -217,15 +217,25 @@ describe('MemoryTagsEditor', () => {
     expect(wrapper.find('.tags-editor__input').exists()).toBe(true)
   })
 
-  it('removes a tag immediately and can clear all tags', async () => {
-    const wrapper = mountEditor(createMemory({ tags: [{ id: 1, name: '工作' }] }))
+  it('opens a right-click delete action and removes the tag immediately', async () => {
+    const wrapper = mount(MemoryTagsEditor, {
+      attachTo: document.body,
+      props: { memory: createMemory({ tags: [{ id: 1, name: '工作' }] }) },
+    })
 
-    await wrapper.get('.tags-editor__chip-remove').trigger('click')
+    await wrapper.get('.tags-editor__chip').trigger('contextmenu', { clientX: 40, clientY: 40 })
+    await nextTick()
+
+    const deleteItem = document.querySelector<HTMLElement>('[role="menuitem"]')
+    expect(deleteItem?.textContent).toContain('删除标签')
+    deleteItem?.click()
+    await flushPromises()
 
     expect(apiMocks.updateTags).toHaveBeenCalledWith('memory-1', [])
-    await flushPromises()
     expect(wrapper.find('.tags-editor__chip').exists()).toBe(false)
     expect(wrapper.find('.tags-editor__add').exists()).toBe(true)
+    expect(document.querySelector('.tag-context-menu')).toBeNull()
+    wrapper.unmount()
   })
 
   it('reverts to the server state and toasts when a save fails', async () => {
