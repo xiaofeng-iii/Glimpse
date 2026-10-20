@@ -105,12 +105,12 @@ onBeforeUnmount(cancelSelectIntent)
 
 <template>
   <article
-    class="memory-card group flex cursor-pointer flex-col overflow-hidden rounded-lg border bg-[var(--shell-card)] transition duration-[160ms] ease-[ease]"
+    class="memory-card group flex cursor-pointer flex-col overflow-hidden rounded-lg border bg-[var(--memory-card-bg)] transition duration-[160ms] ease-[ease]"
     :class="[
       textMemory ? 'memory-card--text' : '',
       selected
-        ? 'border-[var(--color-primary)] shadow-[0_4px_14px_rgba(59,86,201,.10)] ring-1 ring-[var(--color-primary)]'
-        : 'border-[var(--shell-line)] hover:border-[var(--color-border-strong)] hover:shadow-md',
+        ? 'border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]'
+        : 'border-[var(--shell-line)] hover:border-[var(--color-border-strong)]',
     ]"
     role="button"
     tabindex="0"
@@ -137,7 +137,7 @@ onBeforeUnmount(cancelSelectIntent)
         v-if="imageUrl && !imageFailed"
         :src="imageUrl"
         :alt="displayText || t('memory.imageAnalyzing')"
-        class="h-full w-full object-contain transition duration-[160ms] ease-[ease] group-hover:scale-[1.01]"
+        class="h-full w-auto max-w-none flex-none transition duration-[160ms] ease-[ease] group-hover:scale-[1.01]"
         loading="lazy"
         @error="imageFailed = true"
       />
@@ -149,14 +149,14 @@ onBeforeUnmount(cancelSelectIntent)
 
     <div
       class="flex flex-col"
-      :class="textMemory ? 'memory-card__text-footer' : 'flex-1 p-2'"
+      :class="textMemory ? 'memory-card__text-footer' : 'memory-card__image-body flex-1 px-2 pt-1.5 pb-1'"
     >
-      <p v-if="!textMemory" class="line-clamp-4 min-h-20 text-sm text-[var(--shell-ink)]">
+      <p v-if="!textMemory" class="line-clamp-4 text-sm text-[var(--shell-ink)]">
         {{ displayText || (showStatus ? '' : t('memory.noContent')) }}
       </p>
       <div
-        class="memory-card__metadata-row mt-auto flex min-h-6 items-center gap-2"
-        :class="{ 'pt-[5px]': !textMemory }"
+        class="memory-card__metadata-row mt-auto flex min-h-5 items-center gap-2"
+        :class="{ 'pt-0.5': !textMemory }"
       >
         <div class="memory-card__tag-area">
           <MemoryAnalysisState
@@ -182,12 +182,16 @@ onBeforeUnmount(cancelSelectIntent)
               :key="tag.id"
               v-hint-tooltip="tag.name"
               class="memory-card__tag-chip"
-            >{{ tag.name }}</span>
+            >
+              <span class="memory-card__tag-chip__label">{{ tag.name }}</span>
+            </span>
             <span
               v-if="hiddenTagCount"
               v-hint-tooltip="cardTags.map((tag) => tag.name).join(t('filter.valueSeparator'))"
               class="memory-card__tag-chip memory-card__tag-chip--more"
-            >+{{ hiddenTagCount }}</span>
+            >
+              <span class="memory-card__tag-chip__label">+{{ hiddenTagCount }}</span>
+            </span>
           </div>
         </div>
         <time class="flex-none text-xs text-[var(--shell-muted)]" :datetime="memory.created_at">
@@ -212,20 +216,49 @@ onBeforeUnmount(cancelSelectIntent)
 
 <style scoped>
 .memory-card {
-  inline-size: var(--memory-card-width, 239px);
-  block-size: 270px;
+  --memory-card-shadow-hover:
+    0 1px 2px rgba(43, 70, 120, 0.08),
+    0 12px 28px rgba(43, 70, 120, 0.13);
+  --memory-card-shadow-selected:
+    0 2px 5px rgba(59, 86, 201, 0.1),
+    0 12px 26px rgba(59, 86, 201, 0.13);
+
+  inline-size: var(--memory-card-width, 290px);
+  block-size: 280px;
+  box-shadow: var(--shadow-card);
+}
+
+.memory-card:hover {
+  box-shadow: var(--memory-card-shadow-hover);
+}
+
+.memory-card[aria-pressed='true'] {
+  box-shadow: var(--memory-card-shadow-selected);
+}
+
+:global(:root[data-theme='dark'] .memory-card) {
+  --memory-card-shadow-hover: 0 14px 34px rgba(0, 0, 0, 0.3);
+  --memory-card-shadow-selected: 0 14px 34px rgba(0, 0, 0, 0.34);
 }
 
 .memory-card__media {
   flex: 0 0 148px;
+  margin: var(--memory-card-layer-inset);
+  border-radius: calc(var(--radius-lg) - 1px - var(--memory-card-layer-inset));
 }
 
 .memory-card__text-body {
   flex: 1 1 0;
   min-height: 0;
+  margin: var(--memory-card-layer-inset);
+  overflow: hidden;
+  border-radius: calc(var(--radius-lg) - 1px - var(--memory-card-layer-inset));
   /* 文字卡主题色块：比画布更深、更蓝一档，避免整卡与画布背景混成一片 */
   background: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
-  border-bottom: 1px solid var(--shell-line);
+}
+
+:global(:root:not([data-theme='dark']) .memory-card__text-body) {
+  background: color-mix(in srgb, var(--color-primary) 28%, var(--color-surface));
 }
 
 .memory-card__text-content {
@@ -238,8 +271,8 @@ onBeforeUnmount(cancelSelectIntent)
 
 .memory-card__text-footer {
   flex: 0 0 3.5rem;
-  padding: 8px;
-  background: var(--shell-card);
+  padding: 4px 8px;
+  background: var(--memory-card-bg);
 }
 
 .memory-card__tag-area {
@@ -263,16 +296,26 @@ onBeforeUnmount(cancelSelectIntent)
 }
 
 .memory-card__tag-chip {
-  min-width: 0;
-  max-width: 6.5rem;
+  display: inline-flex;
+  min-width: calc(1.125rem + 1em);
   flex: 0 1 auto;
+  align-items: center;
+  justify-content: center;
+  height: 1.125rem;
   overflow: hidden;
-  padding: 0.125rem 0.375rem;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-subtle);
-  color: var(--shell-muted);
+  padding: 0 calc(1.125rem / 2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 24%, var(--color-surface));
+  color: var(--color-primary-hover);
   font-size: 0.75rem;
-  line-height: 1.125rem;
+}
+
+.memory-card__tag-chip__label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: inherit;
+  line-height: 1rem;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

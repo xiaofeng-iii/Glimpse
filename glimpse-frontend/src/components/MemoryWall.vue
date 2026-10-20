@@ -115,8 +115,8 @@ const reportScrollState = () => {
 
 // 墙内容块整体居中：按容器可用宽度求出实际列数（受 maxColumns 封顶），把
 // 内容块宽度写入 --wall-content-width，供样式把分组标题、网格与骨架屏一起居中。
-const CARD_WIDTH_PX = 239
-const CARD_GAP_PX = 12
+const CARD_WIDTH_PX = 290
+const CARD_GAP_PX = 10
 let paneResizeObserver: ResizeObserver | null = null
 
 const updateContentWidth = () => {
@@ -241,7 +241,7 @@ const groups = computed<MemoryGroup[]>(() => {
       <div
         v-else
         :key="resultsRenderKey"
-        class="memory-wall__results space-y-5"
+        class="memory-wall__results space-y-4"
         :class="{ 'memory-wall__results--stale': loading }"
       >
         <section v-for="group in groups" :key="group.key">
@@ -272,7 +272,7 @@ const groups = computed<MemoryGroup[]>(() => {
 <style scoped>
 .memory-wall {
   --memory-wall-inline-inset: 1rem;
-  --memory-card-width: 239px;
+  --memory-card-width: 290px;
 
   position: relative;
   display: flex;
@@ -344,22 +344,26 @@ const groups = computed<MemoryGroup[]>(() => {
   grid-template-columns: repeat(auto-fill, var(--memory-card-width));
   align-items: start;
   justify-content: start;
-  gap: 0.75rem;
+  column-gap: 10px;
+  row-gap: 0.75rem;
 }
 
 /* 搜索加载骨架屏：占位卡片尺寸与 MemoryCard 对齐，shimmer 扫过提示加载中。 */
 .memory-card-skeleton {
   display: flex;
-  inline-size: var(--memory-card-width, 239px);
-  block-size: 270px;
+  inline-size: var(--memory-card-width, 290px);
+  block-size: 280px;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--shell-line);
   border-radius: var(--radius-lg);
+  background: var(--memory-card-bg);
 }
 
 .memory-card-skeleton__media {
   flex: 0 0 148px;
+  margin: var(--memory-card-layer-inset);
+  border-radius: calc(var(--radius-lg) - 1px - var(--memory-card-layer-inset));
 }
 
 .memory-card-skeleton__body {

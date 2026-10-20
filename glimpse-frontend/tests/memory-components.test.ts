@@ -271,6 +271,22 @@ describe('memory components', () => {
     expect(block.text()).toContain('等待AI摘要和OCR识别')
   })
 
+  it('fills the preview height without shrinking wide images to the card width', () => {
+    const wrapper = mount(MemoryCard, { props: { memory: createMemory() } })
+    const image = wrapper.get('.memory-card__media img')
+
+    expect(image.classes()).toEqual(expect.arrayContaining(['h-full', 'w-auto', 'max-w-none', 'flex-none']))
+    expect(image.classes()).not.toContain('object-contain')
+    expect(wrapper.get('.memory-card__image-body p').classes()).toContain('line-clamp-4')
+    expect(wrapper.get('.memory-card__image-body p').classes()).not.toContain('min-h-20')
+    expect(wrapper.get('.memory-card__image-body').classes()).toEqual(
+      expect.arrayContaining(['px-2', 'pt-1.5', 'pb-1']),
+    )
+    expect(wrapper.get('.memory-card__metadata-row').classes()).toEqual(
+      expect.arrayContaining(['min-h-5', 'pt-0.5']),
+    )
+  })
+
   it('labels a card image that fails to load with the shared preview message', async () => {
     const card = mount(MemoryCard, { props: { memory: createMemory() } })
     await card.get('.memory-card__media img').trigger('error')
@@ -334,6 +350,7 @@ describe('memory components', () => {
     expect(wrapper.get('.memory-card__text-content').classes()).toContain('memory-card__text-content')
     expect(wrapper.get('.memory-card__tag-area').text()).toBe('')
     expect(wrapper.get('.memory-card__text-footer time').text()).toBeTruthy()
+    expect(wrapper.get('.memory-card__metadata-row').classes()).toContain('min-h-5')
     expect(wrapper.find('img').exists()).toBe(false)
     expect(wrapper.find('svg').exists()).toBe(false)
   })
