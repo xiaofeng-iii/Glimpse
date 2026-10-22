@@ -36,6 +36,7 @@ vi.mock('@/platform/desktop', () => ({
   getDesktopWindowMaximized: vi.fn().mockResolvedValue(false),
   hideDesktopWindow: vi.fn(),
   isDesktopShell: () => false,
+  listenForBackendCorruption: vi.fn().mockResolvedValue(() => {}),
   listenForDesktopCloseRequests: vi.fn(),
   minimizeDesktopWindow: vi.fn(),
   toggleDesktopMaximize: vi.fn(),
@@ -99,6 +100,35 @@ describe('DesktopShell service status', () => {
     await flushPromises()
     expect(status().text()).toBe('服务异常')
     expect(status().classes()).toContain('service-status--offline')
+  })
+
+  it('keeps reporting a corrupted installation across failing health checks', async () => {
+    mocks.checkHealth.mockRejectedValue(connectionFailure())
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', name: 'home', component: { template: '<div />' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    const pinia = createPinia()
+    const wrapper = mount(DesktopShell, {
+      slots: { default: '<div />' },
+      global: {
+        plugins: [pinia, router],
+        stubs: { CloseActionDialog: true },
+      },
+    })
+    await flushPromises()
+
+    const backendStatus = useBackendStatusStore(pinia)
+    backendStatus.markCorrupted()
+    await backendStatus.check()
+    await flushPromises()
+
+    const status = wrapper.get('[role="status"]')
+    expect(status.text()).toBe('安装损坏，请重装')
+    expect(status.classes()).toContain('service-status--offline')
   })
 
   it('reports AI service disabled when backend is ready but AI is unavailable', async () => {

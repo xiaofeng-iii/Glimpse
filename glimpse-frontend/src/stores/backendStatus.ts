@@ -5,7 +5,7 @@ import { healthApi } from '@/api/client'
 
 export const BACKEND_STARTUP_GRACE_PERIOD_MS = 30_000
 
-export type BackendState = 'starting' | 'ready' | 'offline'
+export type BackendState = 'starting' | 'ready' | 'offline' | 'corrupted'
 
 export const useBackendStatusStore = defineStore('backend-status', () => {
   const state = ref<BackendState>('starting')
@@ -21,12 +21,20 @@ export const useBackendStatusStore = defineStore('backend-status', () => {
   const isReady = computed(() => state.value === 'ready')
   const isStarting = computed(() => state.value === 'starting')
   const isOffline = computed(() => state.value === 'offline')
+  // 壳层启动时校验发现后端文件缺失（更新中断）后的固定状态：
+  // 轮询失败不再降级成普通离线，重装后健康检查成功才恢复 ready。
+  const isCorrupted = computed(() => state.value === 'corrupted')
+
+  const markCorrupted = () => {
+    state.value = 'corrupted'
+  }
   // 后端正常但 AI 未配置/模型不通时，状态条改报「AI 服务未启用」
   const aiUnavailable = computed(
     () => state.value === 'ready' && (aiConfigured.value === false || aiReachable.value === false),
   )
 
   const applyCheckFailure = (error: unknown) => {
+    if (state.value === 'corrupted') return
     const coldStartConnectionFailure = state.value === 'starting'
       && !hasEverBeenReady
       && Date.now() < startupDeadlineAt
@@ -73,6 +81,8 @@ export const useBackendStatusStore = defineStore('backend-status', () => {
     isReady,
     isStarting,
     isOffline,
+    isCorrupted,
+    markCorrupted,
     aiUnavailable,
     isChecking,
     lastCheckedAt,

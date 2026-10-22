@@ -77,11 +77,13 @@ v0.5.0-beta.2 曾因「固定等待 1 秒后盲删、复制半途而废」造成
 & "$env:LOCALAPPDATA\tauri\NSIS\makensis.exe" <一个 !include 该 .nsh 并 insertmacro 的最小 .nsi>
 ```
 
-**留档待办（后续实现）**：启动时后端完整性校验——spawn 前检查
-`binaries\GlimpseRuntime\GlimpseRuntime.exe` 与 `_internal\python310.dll` 的存在性，
-缺失时把后端状态标为「安装损坏，请重新安装」并在界面给出重装引导，替代当前的
-静默后端离线。远期方案：后端改为压缩包资源 + 版本化运行时目录，首次启动原子
-解压、切换成功后再删旧目录，让 NSIS 不再逐文件替换活文件。
+**启动时完整性校验（已实现）**：壳层启动后端前检查
+`binaries\GlimpseRuntime\GlimpseRuntime.exe` 与 `_internal` 下的 `python3*.dll`
+（按前缀匹配，Python 升版本不误报）；缺失时跳过启动并广播
+`glimpse://backend-corrupted`，前端状态条固定显示「安装损坏，请重装」——轮询
+失败不再降级为普通离线，重装后健康检查成功即恢复。远期待办：后端改为压缩包
+资源 + 版本化运行时目录，首次启动原子解压、切换成功后再删旧目录，让 NSIS
+不再逐文件替换活文件。
 
 ## 版本号事实源
 

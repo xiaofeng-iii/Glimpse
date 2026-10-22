@@ -146,6 +146,24 @@ export const focusDesktopWindow = async () => {
   await currentWindow.setFocus()
 }
 
+export const listenForBackendCorruption = async (
+  handler: () => void,
+) => {
+  if (!isDesktopShell()) {
+    return () => {}
+  }
+
+  try {
+    const module = await import('@tauri-apps/api/event')
+    return await module.listen('glimpse://backend-corrupted', () => {
+      handler()
+    })
+  } catch (error) {
+    console.error('Failed to listen for backend corruption notices:', error)
+    return () => {}
+  }
+}
+
 export const listenForDesktopCloseRequests = async (
   handler: () => void,
 ) => {

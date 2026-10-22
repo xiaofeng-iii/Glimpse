@@ -327,12 +327,48 @@ fn bundled_backend_dir(app: &AppHandle) -> Option<PathBuf> {
     Some(resource_dir.join("binaries").join(BACKEND_BUNDLE_NAME))
 }
 
+/// 安装完整性校验：更新中断会留下残缺后端（v0.5.0-beta.2 事故，
+/// 见 docs/RELEASE.md）。缺失 exe 或 `_internal` 下的 python3x.dll 时
+/// 返回缺失项描述，由调用方广播「安装损坏」并跳过启动。
+#[cfg(not(debug_assertions))]
+fn backend_bundle_missing_file(app: &AppHandle) -> Option<String> {
+    let sidecar_dir = bundled_backend_dir(app)?;
+    let sidecar_exe = sidecar_dir.join(BACKEND_PROCESS_NAME);
+    if !sidecar_exe.is_file() {
+        return Some(sidecar_exe.display().to_string());
+    }
+    let internal_dir = sidecar_dir.join("_internal");
+    let has_python_dll = std::fs::read_dir(&internal_dir)
+        .map(|entries| {
+            entries.filter_map(Result::ok).any(|entry| {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                name.starts_with("python3") && name.ends_with(".dll")
+            })
+        })
+        .unwrap_or(false);
+    if !has_python_dll {
+        return Some(internal_dir.display().to_string());
+    }
+    None
+}
+
 fn spawn_backend_if_needed(app: &AppHandle, runtime: &BackendRuntime) -> Option<Child> {
     if backend_autostart_disabled() {
         return None;
     }
 
     cleanup_stale_backend_processes(app);
+
+    #[cfg(not(debug_assertions))]
+    if let Some(missing) = backend_bundle_missing_file(app) {
+        eprintln!(
+            "Bundled backend is incomplete (missing {}); please reinstall Glimpse.",
+            missing
+        );
+        let _ = app.emit("glimpse://backend-corrupted", ());
+        return None;
+    }
 
     #[cfg(debug_assertions)]
     if backend_port_is_open(&runtime.origin) {

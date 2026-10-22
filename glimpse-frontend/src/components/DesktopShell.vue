@@ -23,6 +23,7 @@ import {
   getDesktopWindowMaximized,
   hideDesktopWindow,
   isDesktopShell,
+  listenForBackendCorruption,
   listenForDesktopCloseRequests,
   minimizeDesktopWindow,
   toggleDesktopMaximize,
@@ -54,6 +55,7 @@ const logger = createLogger('components/DesktopShell')
 const isDesktop = isDesktopShell()
 const isHome = computed(() => route.name === 'home')
 const serviceLabel = computed(() => {
+  if (backendStatus.isCorrupted) return t('status.corrupted')
   if (backendStatus.isOffline) return t('status.offline')
   if (backendStatus.isStarting) return t('status.starting')
   if (backendStatus.aiUnavailable) return t('status.aiDisabled')
@@ -63,7 +65,8 @@ const showOcrRepair = computed(() =>
   ocrRepair.running
   && route.name !== 'settings'
   && !backendStatus.isOffline
-  && !backendStatus.isStarting,
+  && !backendStatus.isStarting
+  && !backendStatus.isCorrupted,
 )
 const statusLabel = computed(() =>
   showOcrRepair.value
@@ -75,6 +78,7 @@ const isWindowMaximized = ref(false)
 const closeAction = ref<CloseAction>('ask')
 const closeDialogOpen = ref(false)
 let removeDesktopCloseListener: (() => void) | null = null
+let removeBackendCorruptionListener: (() => void) | null = null
 let removeNavigationGuard: (() => void) | null = null
 let healthPollTimer: ReturnType<typeof window.setInterval> | null = null
 
@@ -211,6 +215,9 @@ onMounted(async () => {
     removeDesktopCloseListener = await listenForDesktopCloseRequests(() => {
       void requestWindowClose()
     })
+    removeBackendCorruptionListener = await listenForBackendCorruption(() => {
+      backendStatus.markCorrupted()
+    })
     window.addEventListener('resize', syncDesktopWindowState)
   }
 
@@ -232,6 +239,8 @@ onUnmounted(() => {
   removeNavigationGuard = null
   removeDesktopCloseListener?.()
   removeDesktopCloseListener = null
+  removeBackendCorruptionListener?.()
+  removeBackendCorruptionListener = null
   window.removeEventListener('resize', syncDesktopWindowState)
 
   if (healthPollTimer) {
@@ -300,7 +309,7 @@ onUnmounted(() => {
             'service-status--ready': !showOcrRepair && backendStatus.isReady && !backendStatus.aiUnavailable,
             'service-status--ai-off': backendStatus.aiUnavailable,
             'service-status--starting': showOcrRepair || backendStatus.isStarting,
-            'service-status--offline': backendStatus.isOffline,
+            'service-status--offline': backendStatus.isOffline || backendStatus.isCorrupted,
           }"
           role="status"
           :aria-live="showOcrRepair ? 'off' : 'polite'"
