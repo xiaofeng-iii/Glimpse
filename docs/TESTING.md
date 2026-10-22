@@ -108,6 +108,8 @@ npm test
 | Vue 组件或 stores | 受影响组件测试（如有）+ 最小渲染/显示检查；仅在逻辑或构建链路受影响时补 `npm run build` |
 | Tauri/Rust 或 sidecar | 受影响链路的最小前端构建或冒烟检查；仅在发布配置受影响时运行 `build_release.bat` |
 | 设置或快捷键 | settings、hotkey、keyboard 单测 |
+| 前端诊断日志（logger/diagnostics/更新说明事件） | `tests/logger.test.ts`、`tests/update-notes.loader.test.ts`、`tests/updates.store.test.ts` |
+| Tauri 诊断宿主（`src-tauri/src/diagnostics.rs`） | `cargo test`（diagnostics 模块；本地需按 ci.yml 设 `TAURI_CONFIG='{"bundle":{"resources":[]}}'` 并建空 `dist/`） |
 
 ## 4. 外部服务
 

@@ -5,6 +5,7 @@ import { isDesktopShell } from '@/platform/desktop'
 import { createLogger } from '@/utils/logger'
 import {
   createNotesLoader,
+  NotesLoaderError,
   parseNotes,
   type Notes,
 } from '@/utils/updateNotes'
@@ -14,6 +15,17 @@ const logger = createLogger('stores/updates')
 // 开发假通道的标识，与 @/dev/fakeUpdateChannel 配套；生产构建里所有引用都会被 DEV 常量折叠掉。
 export const DEV_UPDATE_CHANNEL = 'dev-test'
 export const DEV_UPDATE_CHANNEL_STORAGE_KEY = 'glimpse.devUpdateChannel'
+
+function newOperationId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function describeNotesError(error: unknown): { kind: string; detail?: string; status?: number } {
+  if (error instanceof NotesLoaderError) {
+    return { kind: error.kind, detail: error.detail, status: error.status }
+  }
+  return { kind: 'unknown' }
+}
 
 function isMainlandChina(): boolean {
   try {
@@ -76,8 +88,11 @@ export const useUpdatesStore = defineStore('updates', () => {
   const currentNotesError = ref<'' | 'settings.notesMissing' | 'settings.notesNetwork'>('')
   const currentNotesLoading = ref(false)
 
-  const loadNotes = createNotesLoader()
+  const loadNotes = createNotesLoader((event) => {
+    logger.child({ event: 'updates.notes.loader' }).debug(`notes index ${event.phase}`)
+  })
   let currentNotesRequested = false
+  let currentNotesVersion = ''
   let pendingCheck: Promise<AvailableUpdate | null> | null = null
 
   const showAvailableBadge = computed(() => Boolean(availableUpdate.value))
@@ -112,6 +127,8 @@ export const useUpdatesStore = defineStore('updates', () => {
     checkFailed.value = false
     installFailed.value = false
     const requestedChannel = channel.value
+    const operationId = newOperationId()
+    const op = logger.child({ operationId, event: 'updates.check' })
     pendingCheck = (async () => {
       try {
         let target: AvailableUpdate | null
@@ -125,8 +142,17 @@ export const useUpdatesStore = defineStore('updates', () => {
           })
         }
         // 通道在检测期间被切换时，旧响应只代表旧通道，不得写回共享状态。
-        if (channel.value !== requestedChannel) return null
+        if (channel.value !== requestedChannel) {
+          op.child({ outcome: 'dropped_stale' }).debug('channel changed during check, dropping result')
+          return null
+        }
         availableUpdate.value = target
+        op
+          .child({
+            outcome: target ? 'available' : 'up_to_date',
+            data: { target: target?.version ?? null, channel: requestedChannel },
+          })
+          .info(target ? `update available: ${target.version}` : 'up to date')
         if (target) {
           // 更新弹窗直接渲染 updater manifest 带回的目标版正文：与版本检测
           // 同一次响应，不存在第二数据源的陈旧/缺录问题（原 index 聚合路径
@@ -136,7 +162,7 @@ export const useUpdatesStore = defineStore('updates', () => {
         return target
       } catch (error) {
         // 启动静默检测失败不打扰用户；手动检查由设置页按 checkFailed 提示。
-        logger.error('Failed to check for updates: %s', error)
+        op.child({ outcome: 'failed' }).error('Failed to check for updates: %s', error)
         checkFailed.value = true
         return null
       } finally {
@@ -153,6 +179,7 @@ export const useUpdatesStore = defineStore('updates', () => {
     cancelling.value = false
     downloadProgress.value = null
 
+    const op = logger.child({ event: 'updates.install' })
     let unlistenProgress: (() => void) | null = null
     try {
       if (import.meta.env.DEV && channel.value === DEV_UPDATE_CHANNEL) {
@@ -176,13 +203,15 @@ export const useUpdatesStore = defineStore('updates', () => {
           preferMirror: resolvePreferMirror(mirrorMode),
         })
         if (result === 'cancelled') {
+          op.child({ outcome: 'cancelled' }).info('update download cancelled')
           installFailed.value = false
           return true
         }
       }
+      op.child({ outcome: 'success' }).info('update install finished')
       return true
     } catch (error) {
-      logger.error('Failed to install update: %s', error)
+      op.child({ outcome: 'failed' }).error('Failed to install update: %s', error)
       availableUpdate.value = null
       installFailed.value = true
       return false
@@ -202,28 +231,40 @@ export const useUpdatesStore = defineStore('updates', () => {
       await invoke('cancel_update_download')
     } catch (error) {
       cancelling.value = false
-      logger.error('Failed to cancel update download: %s', error)
+      logger.child({ event: 'updates.install', outcome: 'cancel_failed' }).error('Failed to cancel update download: %s', error)
     }
   }
 
   const loadCurrentNotes = async () => {
-    if (currentNotesRequested) return
+    const version = currentVersion.value
+    if (currentNotesRequested && currentNotesVersion === version) return
     currentNotesRequested = true
+    currentNotesVersion = version
     currentNotesLoading.value = true
+    const op = logger.child({ event: 'updates.current_notes', operationId: newOperationId() })
     try {
       const entries = await loadNotes()
-      const entry = entries.find((release) => release.version === currentVersion.value)
+      // 等待期间当前版本变了：旧结果作废并放开门闩，下一次调用按新版本加载。
+      if (currentVersion.value !== version) {
+        currentNotesRequested = false
+        op.child({ outcome: 'superseded' }).debug('current version changed during load, discarding result')
+        return
+      }
+      const entry = entries.find((release) => release.version === version)
       if (entry) {
         currentNotes.value = parseNotes(entry.notes)
         // 上一次失败残留的错误在正文里优先渲染，成功后必须清掉。
         currentNotesError.value = ''
+        op.child({ outcome: 'ready' }).info('current notes loaded')
       } else {
         currentNotesError.value = 'settings.notesMissing'
+        op.child({ outcome: 'missing', data: { version } }).warn('current version missing from notes index')
       }
-    } catch {
+    } catch (error) {
       // 放开门闩，让下次打开浮窗/重进设置页时还能再试；成功路径保持会话级缓存不变。
       currentNotesRequested = false
       currentNotesError.value = 'settings.notesNetwork'
+      op.child({ outcome: 'failed', data: describeNotesError(error) }).warn('failed to load notes index: %s', error)
     } finally {
       currentNotesLoading.value = false
     }

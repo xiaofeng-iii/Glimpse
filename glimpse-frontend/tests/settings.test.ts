@@ -78,6 +78,7 @@ const deferred = () => {
 describe('Settings', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    window.localStorage.clear()
     apiMocks.resetSettings.mockResolvedValue({})
     apiMocks.getSettings.mockResolvedValue({
       hotkeys: { screenshot: '<ctrl>+<shift>+g' },
@@ -362,6 +363,29 @@ describe('Settings', () => {
     await wrapper.get('[data-testid=save-ai]').trigger('click')
     await flushPromises()
     expect(wrapper.get('[data-testid=save-ai]').attributes('disabled')).toBeDefined()
+  })
+
+  it('manages the diagnostics debug window without writing settings or desktop-only actions', async () => {
+    const wrapper = await mountSettings()
+    await selectSection(wrapper, '维护')
+
+    expect(wrapper.text()).toContain('诊断日志')
+    // 浏览器环境：依赖桌面宿主的目录/导出按钮不出现。
+    const buttonTexts = () => wrapper.findAll('button').map((button) => button.text())
+    expect(buttonTexts()).not.toContain('打开日志文件夹')
+    expect(buttonTexts()).not.toContain('导出诊断包')
+
+    const start = wrapper.findAll('button').find((button) => button.text() === '开启 30 分钟详细日志')!
+    await start.trigger('click')
+    expect(window.localStorage.getItem('glimpse.debugUntil')).toBeTruthy()
+    expect(wrapper.text()).toContain('分钟后自动关闭')
+    // 诊断开关是会话级状态，不得触发设置自动保存。
+    expect(apiMocks.updateSettings).not.toHaveBeenCalled()
+
+    const stop = wrapper.findAll('button').find((button) => button.text() === '提前关闭详细日志')!
+    await stop.trigger('click')
+    expect(window.localStorage.getItem('glimpse.debugUntil')).toBeNull()
+    expect(wrapper.text()).toContain('详细日志默认关闭')
   })
 
 })

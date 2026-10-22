@@ -9,11 +9,15 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
 
-const mountBadge = async (installing: boolean) => {
-  setActivePinia(createPinia())
-  const updates = useUpdatesStore()
+const mountBadge = async (installing: boolean) => mountBadgeWith((updates) => {
   updates.availableUpdate = { version: '1.0.0', notes: '' }
   updates.installing = installing
+})
+
+const mountBadgeWith = async (prepare: (updates: ReturnType<typeof useUpdatesStore>) => void) => {
+  setActivePinia(createPinia())
+  const updates = useUpdatesStore()
+  prepare(updates)
   const wrapper = mount(UpdateBadge, { attachTo: document.body })
   await flushPromises()
   const trigger = wrapper.find('.update-badge--available')
@@ -48,6 +52,23 @@ describe('UpdateBadge 下载中按钮状态', () => {
       { text: '查看详情', disabled: false },
       { text: '立即更新', disabled: false },
     ])
+    wrapper.unmount()
+  })
+
+  it('降级时：原始 Markdown 按三分类渲染，不暴露标记符号', async () => {
+    const wrapper = await mountBadgeWith((updates) => {
+      updates.availableUpdate = {
+        version: '1.0.0',
+        notes: '**新特性**\n- 降级单版功能\n\n**修复**\n\n**Full Changelog**: x',
+      }
+      updates.updateNotesPartial = true
+    })
+
+    const bodyText = document.body.textContent ?? ''
+    expect(bodyText).toContain('部分版本说明获取失败')
+    expect(bodyText).toContain('降级单版功能')
+    expect(bodyText).not.toContain('**新特性**')
+    expect(bodyText).not.toContain('Full Changelog')
     wrapper.unmount()
   })
 })

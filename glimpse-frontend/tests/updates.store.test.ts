@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useUpdatesStore } from '@/stores/updates'
 import { useSettingsStore } from '@/stores/settings'
+import { setDiagnosticsSink, type DiagnosticsSinkEvent } from '@/utils/logger'
 
 const apiMocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -247,5 +248,83 @@ describe('updates store', () => {
     // 成功后恢复会话级缓存：第三次调用不再请求。
     await store.loadCurrentNotes()
     expect(apiMocks.fetchIndex).toHaveBeenCalledTimes(2)
+  })
+
+  describe('diagnostics events', () => {
+    let events: DiagnosticsSinkEvent[]
+
+    beforeEach(() => {
+      events = []
+      setDiagnosticsSink((event) => events.push(event))
+    })
+
+    afterEach(() => {
+      setDiagnosticsSink(null)
+    })
+
+    it('records missing_target when the target version is absent from the index', async () => {
+      const store = useUpdatesStore()
+      store.recordCurrentVersion('0.3.2')
+      apiMocks.invoke.mockResolvedValue({ version: '9.9.9', notes: null })
+
+      await store.checkForUpdate()
+      await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
+
+      expect(store.updateNotesPartial).toBe(true)
+      const partial = events.find((event) => event.event === 'updates.notes' && event.outcome === 'partial')
+      expect(partial?.data?.reason).toBe('missing_target')
+    })
+
+    it('records unsupported_current when the running version cannot be parsed', async () => {
+      const store = useUpdatesStore()
+      store.recordCurrentVersion('0.3.2-weird')
+      apiMocks.invoke.mockResolvedValue({ version: '0.3.3', notes: null })
+
+      await store.checkForUpdate()
+      await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
+
+      expect(store.updateNotesPartial).toBe(true)
+      const partial = events.find((event) => event.event === 'updates.notes' && event.outcome === 'partial')
+      expect(partial?.data?.reason).toBe('unsupported_current')
+    })
+
+    it('records the failure kind when the notes index cannot be fetched', async () => {
+      const store = useUpdatesStore()
+      store.recordCurrentVersion('0.3.2')
+      apiMocks.invoke.mockResolvedValue({ version: '0.3.3', notes: null })
+      apiMocks.fetchIndex.mockRejectedValue(new TypeError('offline'))
+
+      await store.checkForUpdate()
+      await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
+
+      const failed = events.find((event) => event.event === 'updates.notes' && event.outcome === 'fetch_failed')
+      expect(failed?.data?.kind).toBe('network')
+      expect(store.updateNotesPartial).toBe(true)
+    })
+
+    it('distinguishes a missing current version from a network failure', async () => {
+      const store = useUpdatesStore()
+      store.recordCurrentVersion('0.3.9')
+
+      await store.loadCurrentNotes()
+      expect(store.currentNotesError).toBe('settings.notesMissing')
+      expect(events.some((event) => event.event === 'updates.current_notes' && event.outcome === 'missing')).toBe(true)
+      expect(events.some((event) => event.event === 'updates.current_notes' && event.outcome === 'failed')).toBe(false)
+    })
+
+    it('reloads current notes when the recorded version changes', async () => {
+      const store = useUpdatesStore()
+      store.recordCurrentVersion('0.3.2')
+
+      await store.loadCurrentNotes()
+      expect(store.currentNotes?.sections.features).toContain('0.3.2 已有功能')
+
+      store.recordCurrentVersion('0.3.3')
+      await store.loadCurrentNotes()
+      // 索引成功后是会话级缓存：不再发请求，但按新版本重新解析。
+      expect(apiMocks.fetchIndex).toHaveBeenCalledTimes(1)
+      expect(store.currentNotes?.sections.features).toContain('0.3.3 新能力')
+      expect(store.currentNotesError).toBe('')
+    })
   })
 })

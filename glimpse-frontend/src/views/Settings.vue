@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { AlertCircleFreeIcons, Camera01FreeIcons, CloudFreeIcons, ComputerTerminal01FreeIcons, CpuChargeFreeIcons, Database01FreeIcons, Download04FreeIcons, LockFreeIcons, PaintBoardFreeIcons, Refresh01FreeIcons, SparklesFreeIcons, Tick02FreeIcons } from '@hugeicons/core-free-icons'
+import { AlertCircleFreeIcons, Camera01FreeIcons, CloudFreeIcons, ComputerTerminal01FreeIcons, CpuChargeFreeIcons, Database01FreeIcons, Download04FreeIcons, File01FreeIcons, LockFreeIcons, PaintBoardFreeIcons, Refresh01FreeIcons, SparklesFreeIcons, Tick02FreeIcons } from '@hugeicons/core-free-icons'
 import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import {
   indexApi,
@@ -24,7 +24,9 @@ import {
   t,
   type LanguagePreference,
 } from '@/utils/i18n'
-import { createLogger } from '@/utils/logger'
+import { createLogger, getDebugLoggingRemainingMs, isDebugLoggingActive, startDebugLogging, stopDebugLogging } from '@/utils/logger'
+import { diagnosticsSessionId } from '@/utils/diagnostics'
+import { exportDiagnostics, openLogsDirectory } from '@/platform/diagnosticsBridge'
 import { isDesktopShell } from '@/platform/desktop'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppSelect from '@/components/AppSelect.vue'
@@ -34,6 +36,7 @@ import UpdateNotesPopover from '@/components/UpdateNotesPopover.vue'
 
 const logger = createLogger('views/Settings')
 const route = useRoute()
+const isDesktop = isDesktopShell()
 const settingsStore = useSettingsStore()
 const hotkeyRegistration = useHotkeyRegistrationStore()
 const notifications = useNotificationStore()
@@ -197,6 +200,57 @@ let discardResolver: ((confirmed: boolean) => void) | null = null
 let pendingDiscardPromise: Promise<boolean> | null = null
 let unregisterGuard: (() => boolean) | null = null
 let maintenanceTimer: ReturnType<typeof window.setTimeout> | null = null
+
+// 诊断日志：详细日志窗口是会话级状态（localStorage 到期时间戳），设置页只做
+// 展示与开关；打开目录/导出诊断包都由桌面宿主完成，不依赖后端存活。
+const diagnosticsDebugActive = ref(false)
+const diagnosticsRemainingMs = ref(0)
+const openingLogs = ref(false)
+const exportingDiagnostics = ref(false)
+let diagnosticsTimer: ReturnType<typeof window.setInterval> | null = null
+
+const refreshDiagnosticsState = () => {
+  diagnosticsDebugActive.value = isDebugLoggingActive()
+  diagnosticsRemainingMs.value = getDebugLoggingRemainingMs()
+  if (!diagnosticsDebugActive.value && diagnosticsTimer !== null) {
+    window.clearInterval(diagnosticsTimer)
+    diagnosticsTimer = null
+  } else if (diagnosticsDebugActive.value && diagnosticsTimer === null) {
+    diagnosticsTimer = window.setInterval(refreshDiagnosticsState, 15_000)
+  }
+}
+
+const toggleDiagnosticsDebug = () => {
+  if (isDebugLoggingActive()) stopDebugLogging()
+  else startDebugLogging()
+  refreshDiagnosticsState()
+}
+
+const diagnosticsStatusText = computed(() => diagnosticsDebugActive.value
+  ? t('settings.diagnosticsDebugUntil', { minutes: Math.max(1, Math.ceil(diagnosticsRemainingMs.value / 60_000)) })
+  : t('settings.diagnosticsIdle'))
+
+const handleOpenLogs = async () => {
+  if (openingLogs.value) return
+  openingLogs.value = true
+  try {
+    if (!(await openLogsDirectory())) notifications.show(t('settings.diagnosticsOpenFailed'), 'error', 2800)
+  } finally {
+    openingLogs.value = false
+  }
+}
+
+const handleExportDiagnostics = async () => {
+  if (exportingDiagnostics.value) return
+  exportingDiagnostics.value = true
+  try {
+    const exportedPath = await exportDiagnostics(diagnosticsSessionId)
+    if (exportedPath) notifications.show(t('settings.diagnosticsExportDone'), 'success', 2800)
+    else notifications.show(t('settings.diagnosticsExportFailed'), 'error', 2800)
+  } finally {
+    exportingDiagnostics.value = false
+  }
+}
 
 const currentSection = computed(() => sections.find((section) => section.id === activeSection.value) ?? sections[0])
 const maintenanceRunning = computed(() => Boolean(indexStatus.value?.running || ocrRepair.running))
@@ -752,12 +806,14 @@ onMounted(async () => {
   adoptStoreUpdate()
   scheduleMaintenancePoll()
   void ocrRepair.ensurePolling()
+  refreshDiagnosticsState()
 })
 
 onUnmounted(() => {
   disposed = true
   updateGeneration++
   if (maintenanceTimer) window.clearTimeout(maintenanceTimer)
+  if (diagnosticsTimer !== null) window.clearInterval(diagnosticsTimer)
   unregisterGuard?.()
   discardResolver?.(false)
 })
@@ -1235,6 +1291,28 @@ onUnmounted(() => {
                   >
                     {{ ocrRepair.running ? t('settings.repairingOcr') : t('settings.ocrRepair') }}
                   </button>
+                </div>
+              </div>
+
+              <div class="maintenance-card">
+                <div class="flex items-start gap-3.5">
+                  <HugeiconsIcon :icon="File01FreeIcons" class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
+                  <div class="min-w-0 flex-1">
+                    <h3 class="setting-label">{{ t('settings.diagnostics') }}</h3>
+                    <p class="setting-help">{{ t('settings.diagnosticsHint') }}</p>
+                    <p class="mt-3 text-xs text-[var(--shell-muted)]">{{ diagnosticsStatusText }}</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <button type="button" class="btn-secondary" @click="toggleDiagnosticsDebug">
+                        {{ diagnosticsDebugActive ? t('settings.diagnosticsDebugStop') : t('settings.diagnosticsDebugStart') }}
+                      </button>
+                      <button v-if="isDesktop" type="button" class="btn-secondary" :disabled="openingLogs" @click="handleOpenLogs">
+                        {{ t('settings.diagnosticsOpenLogs') }}
+                      </button>
+                      <button v-if="isDesktop" type="button" class="btn-secondary" :disabled="exportingDiagnostics" @click="handleExportDiagnostics">
+                        {{ t('settings.diagnosticsExport') }}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </template>

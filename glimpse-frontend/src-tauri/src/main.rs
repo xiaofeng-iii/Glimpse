@@ -66,6 +66,8 @@ const LEGACY_BACKENDS: [(&str, &str); 2] = [
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const APP_ICON_PNG: &[u8] = include_bytes!("../../../assets/icons/glimpse_256.png");
 
+mod diagnostics;
+
 struct AppState {
     backend_child: Mutex<Option<Child>>,
     backend_runtime: Mutex<BackendRuntime>,
@@ -240,7 +242,7 @@ fn backend_runtime_root(app: &AppHandle) -> Option<PathBuf> {
     }
 }
 
-fn backend_data_root(app: &AppHandle) -> Option<PathBuf> {
+pub(crate) fn backend_data_root(app: &AppHandle) -> Option<PathBuf> {
     if let Some(root) = non_empty_env_path(DATA_ROOT_ENV) {
         return Some(root);
     }
@@ -1181,6 +1183,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState::default())
+        .manage(diagnostics::DiagnosticsState::default())
         .invoke_handler(tauri::generate_handler![
             check_for_update,
             install_checked_update,
@@ -1194,7 +1197,10 @@ fn main() {
             toggle_maximize_window,
             is_window_maximized,
             copy_image_files_to_clipboard,
-            copy_image_file_to_clipboard
+            copy_image_file_to_clipboard,
+            diagnostics::append_diagnostic_logs,
+            diagnostics::open_logs_directory,
+            diagnostics::export_diagnostics
         ])
         .setup(|app| {
             let runtime = backend_runtime_for_launch();

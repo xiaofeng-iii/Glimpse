@@ -214,6 +214,15 @@ SQLite 是事实来源，保存 UUID、时间、图片路径、AI 摘要、来�
 - 集群模式、自动提交、数量与超时
 - 主题、语言和窗口关闭行为
 
+诊断日志：前端结构化事件经 Tauri 宿主写入 `logs/glimpse-frontend.jsonl`
+（单条上限 16KB，2MiB × 3 备份滚动），不依赖 Python 后端存活；与后端
+`logs/glimpse.log`、sidecar 原始输出 `logs/glimpse-sidecar.out.log` 并存。
+事件在写入前脱敏（密钥、签名参数、本机用户路径），只存本地、不自动上传。
+设置页「维护 → 诊断日志」可临时开启 30 分钟详细日志、打开日志文件夹、导出
+zip 诊断包（固定文件集合 + manifest，缺失项如实标注）。更新说明链路
+（检测、索引获取、聚合降级）是首个接入点，事件带 sessionId/operationId
+与失败分类（timeout/network/http/json/schema/聚合 reason）。
+
 ## 7. 当前边界
 
 - `MemoryService` 在 AI 摘要前尝试本地 OCR；OCR 失败不会阻止保存。历史记录
