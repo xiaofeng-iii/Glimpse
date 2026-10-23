@@ -1,6 +1,7 @@
 """Memory lifecycle orchestration."""
 
 import json
+import os
 import time
 import uuid
 from threading import Lock, Semaphore
@@ -733,6 +734,7 @@ class MemoryService:
         skipped = 0
         failed = 0
         offset = 0
+        sqlite_ids: Set[str] = set()
         while processed < total:
             memories = self._sqlite_manager.get_all_memories(
                 limit=batch_size,
@@ -743,6 +745,7 @@ class MemoryService:
 
             for memory in memories:
                 processed += 1
+                sqlite_ids.add(memory.id)
                 is_current = (
                     not force_rebuild
                     and memory.id in existing_ids
@@ -759,6 +762,13 @@ class MemoryService:
                     failed += 1
             offset += len(memories)
 
+        # 反向清理：SQLite 行已删但向量残留（删除时向量清理失败的兜底）。
+        # force_rebuild 整体重建过集合，不存在孤儿。
+        orphans_removed = 0 if force_rebuild else self._sweep_orphan_vectors_locked(
+            chroma_ids=existing_ids,
+            sqlite_ids=sqlite_ids,
+        )
+
         result = {
             "status": "completed",
             "processed": processed,
@@ -766,14 +776,79 @@ class MemoryService:
             "skipped": skipped,
             "failed": failed,
             "rebuilt": force_rebuild,
+            "orphans_removed": orphans_removed,
         }
         logger.info(
-            "Vector index repair completed: %s indexed, %s skipped, %s failed",
+            "Vector index repair completed: %s indexed, %s skipped, %s failed, "
+            "%s orphans removed",
             indexed,
             skipped,
             failed,
+            orphans_removed,
         )
         return result
+
+    def _sweep_orphan_vectors_locked(
+        self,
+        chroma_ids: Optional[Set[str]] = None,
+        sqlite_ids: Optional[Set[str]] = None,
+    ) -> int:
+        """Delete vectors whose SQLite row no longer exists. Caller must hold
+        the maintenance lock (or pass both id sets collected by the caller)."""
+        if chroma_ids is None:
+            chroma_ids = set()
+            offset = 0
+            while True:
+                ids = self._chroma_manager.get_all_memory_ids(limit=500, offset=offset)
+                if not ids:
+                    break
+                chroma_ids.update(ids)
+                offset += len(ids)
+                if len(ids) < 500:
+                    break
+        if not chroma_ids:
+            return 0
+        if sqlite_ids is None:
+            sqlite_ids = set()
+            offset = 0
+            while True:
+                memories = self._sqlite_manager.get_all_memories(limit=500, offset=offset)
+                if not memories:
+                    break
+                sqlite_ids.update(memory.id for memory in memories)
+                offset += len(memories)
+                if len(memories) < 500:
+                    break
+
+        removed = 0
+        for memory_id in chroma_ids - sqlite_ids:
+            try:
+                if self._chroma_manager.delete_memory(memory_id):
+                    removed += 1
+            except Exception as exc:
+                logger.warning("Orphan vector cleanup failed for %s: %s", memory_id, exc)
+        if removed:
+            logger.info("Removed %s orphan vectors", removed)
+        return removed
+
+    def _sweep_orphan_vectors(self) -> int:
+        with self._maintenance_lock:
+            return self._sweep_orphan_vectors_locked()
+
+    def _schedule_orphan_vector_sweep(self) -> None:
+        """In-session fallback when vector cleanup fails at delete time."""
+        if not self._task_queue:
+            self._sweep_orphan_vectors()
+            return
+        try:
+            task = self._task_queue.submit(
+                f"orphan_vector_sweep_{uuid.uuid4().hex[:8]}",
+                self._sweep_orphan_vectors,
+            )
+            if task is None:
+                logger.warning("Orphan vector sweep task was rejected")
+        except Exception as exc:
+            logger.warning("Unable to schedule orphan vector sweep: %s", exc)
 
     def maybe_schedule_vector_index_repair(self) -> bool:
         """Queue a non-destructive repair only when persisted state requires it."""
@@ -788,9 +863,9 @@ class MemoryService:
             logger.warning("Vector index repair check failed: %s", exc)
             return False
 
-        if sqlite_count == 0 or (
-            chroma_count >= sqlite_count and unsynced_count == 0
-        ):
+        # 双向不一致都要修：chroma 偏少 = 缺向量，chroma 偏多 = 删除时清理
+        # 失败留下的孤儿（修复任务内含反向清扫）。
+        if chroma_count == sqlite_count and unsynced_count == 0:
             return False
 
         logger.info(
@@ -1001,6 +1076,9 @@ class MemoryService:
         # resulting vector afterwards. If deletion wins the lock, later workers
         # observe the missing SQLite row and cannot recreate an orphan vector.
         with self._get_memory_reindex_lock(memory_id):
+            # 行删除前先取图片路径：行没了就查不到要清理哪些文件。
+            record = self._sqlite_manager.get_memory_by_id(memory_id)
+            image_paths = self._memory_image_paths(record) if record else []
             deleted_sqlite = self._sqlite_manager.delete_memory(memory_id)
             if not deleted_sqlite:
                 return False
@@ -1014,12 +1092,25 @@ class MemoryService:
                         "Vector cleanup deferred for deleted memory %s",
                         memory_id,
                     )
+                    self._schedule_orphan_vector_sweep()
             except Exception as exc:
                 logger.warning(
                     "Vector cleanup failed for deleted memory %s: %s",
                     memory_id,
                     exc,
                 )
+                self._schedule_orphan_vector_sweep()
+            # 图片文件随行删除（先删行后删文件：文件清理失败只是磁盘残留，
+            # 不会留下引用已删记忆的活条目）。无回收站功能，文件不删即泄漏。
+            for image_path in image_paths:
+                try:
+                    os.remove(image_path)
+                except OSError:
+                    logger.warning(
+                        "Failed to remove image file for deleted memory %s: %s",
+                        memory_id,
+                        image_path,
+                    )
             return True
 
     def get_memory(self, memory_id: str) -> Optional["MemoryRecord"]:

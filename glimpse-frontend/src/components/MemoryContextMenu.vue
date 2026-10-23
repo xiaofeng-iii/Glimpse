@@ -32,6 +32,9 @@ const position = ref({ x: 0, y: 0 })
 
 const isText = computed(() => (current.value ? isTextMemory(current.value) : false))
 const hasImage = computed(() => Boolean(current.value && getMemoryImageUrls(current.value).length))
+// 分析进行中禁止删除：后台 OCR/AI 还在写这条记忆，中途删除会让创建管线
+// 以失败收场并弹错误提示（侧栏与详情页同状态已隐藏删除入口）。
+const analyzing = computed(() => current.value?.analysis_status === 'PROCESSING')
 
 const focusableItems = () =>
   Array.from(
@@ -199,7 +202,8 @@ onBeforeUnmount(unbindListeners)
         type="button"
         role="menuitem"
         class="memory-context-menu__item memory-context-menu__item--danger"
-        @click="run('delete')"
+        :disabled="analyzing"
+        @click="!analyzing && run('delete')"
       >
         <TrashIcon class="h-4 w-4" aria-hidden="true" />
         <span>{{ t('action.delete') }}</span>
@@ -267,6 +271,22 @@ onBeforeUnmount(unbindListeners)
 .memory-context-menu__item--danger:hover,
 .memory-context-menu__item--danger:focus-visible {
   background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.memory-context-menu__item:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.memory-context-menu__item:disabled:hover,
+.memory-context-menu__item:disabled:focus-visible {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.memory-context-menu__item--danger:disabled:hover,
+.memory-context-menu__item--danger:disabled:focus-visible {
   color: var(--color-danger);
 }
 

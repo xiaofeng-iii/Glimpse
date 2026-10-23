@@ -625,6 +625,20 @@ class TestMemoryServiceVectorRepair:
         assert result["indexed"] == 1
         mock_services["chroma_manager"].reset_collection.assert_called_once()
 
+    def test_repair_removes_orphan_vectors_missing_from_sqlite(self, mock_services):
+        add_record(mock_services, sync_status="SYNCED")
+        # ghost 有向量但 SQLite 行已删（删除时向量清理失败的残留）
+        mock_services["chroma_manager"].get_all_memory_ids.return_value = [
+            "memory-1",
+            "ghost",
+        ]
+        service = make_service(mock_services)
+
+        result = service.repair_vector_index()
+
+        assert result["orphans_removed"] == 1
+        mock_services["chroma_manager"].delete_memory.assert_called_once_with("ghost")
+
     def test_conditional_repair_skips_when_counts_and_status_match(self, mock_services):
         add_record(mock_services, sync_status="SYNCED")
         mock_services["chroma_manager"].get_memory_count.return_value = 1
@@ -879,6 +893,35 @@ class TestMemoryServiceQueryAndDelete:
         service = make_service(mock_services)
         assert service.delete_memory("memory-1") is True
         assert "memory-1" not in mock_services["sqlite_manager"]._records
+
+    def test_delete_removes_image_files_from_disk(self, mock_services, tmp_path):
+        primary = tmp_path / "primary.png"
+        primary.write_bytes(b"primary")
+        extra = tmp_path / "extra.png"
+        extra.write_bytes(b"extra")
+        add_record(
+            mock_services,
+            image_path=str(primary),
+            extra_images=json.dumps([str(extra)]),
+        )
+        service = make_service(mock_services)
+
+        assert service.delete_memory("memory-1") is True
+        assert not primary.exists()
+        assert not extra.exists()
+
+    def test_delete_schedules_orphan_sweep_when_vector_cleanup_fails(
+        self,
+        mock_services,
+    ):
+        add_record(mock_services)
+        mock_services["chroma_manager"].delete_memory.return_value = False
+        service = make_service(mock_services, with_queue=True)
+
+        assert service.delete_memory("memory-1") is True
+        submitted = mock_services["task_queue"].submit.call_args
+        assert submitted.args[0].startswith("orphan_vector_sweep_")
+        assert callable(submitted.args[1])
 
     def test_delete_succeeds_when_chroma_cleanup_fails(self, mock_services):
         add_record(mock_services)

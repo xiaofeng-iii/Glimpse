@@ -312,6 +312,33 @@ describe('memories store', () => {
     expect(apiMocks.search).toHaveBeenCalledTimes(2)
   })
 
+  it('removing the selected memory clears selection instead of auto-picking a neighbor', async () => {
+    apiMocks.list.mockResolvedValue({ memories: [memory('1'), memory('2'), memory('3')], total: 3 })
+    apiMocks.delete.mockResolvedValue(undefined)
+
+    const store = useMemoriesStore()
+    await store.load()
+    store.select(store.entities['2'])
+    await store.remove('2')
+
+    // 自动补位会在浮层形态弹出侧栏，删除选中项只清空选中
+    expect(store.selectedId).toBeNull()
+    expect(store.selectedMemory).toBeNull()
+    expect(store.memories.map((item) => item.id)).toEqual(['1', '3'])
+  })
+
+  it('removing a non-selected memory keeps the current selection', async () => {
+    apiMocks.list.mockResolvedValue({ memories: [memory('1'), memory('2')], total: 2 })
+    apiMocks.delete.mockResolvedValue(undefined)
+
+    const store = useMemoriesStore()
+    await store.load()
+    store.select(store.entities['2'])
+    await store.remove('1')
+
+    expect(store.selectedId).toBe('2')
+  })
+
   it('updateTags reloads browse results when the active filter uses tags', async () => {
     apiMocks.list.mockResolvedValue({ memories: [], total: 0 })
     apiMocks.updateTags.mockResolvedValue({ ...memory('1'), tags: [] })

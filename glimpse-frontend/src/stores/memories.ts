@@ -270,8 +270,9 @@ export const useMemoriesStore = defineStore('memories', () => {
       delete nextEntities[id]
       entities.value = nextEntities
       total.value = Math.max(0, total.value - 1)
+      // 删除选中项时清空选中而不是自动补位：浮层形态下自动选中会弹出侧栏。
       if (selectedId.value === id) {
-        selectedId.value = resultIds.value[0] ?? null
+        selectedId.value = null
         selectedOutsideSearch.value = false
       }
     } catch (error) {

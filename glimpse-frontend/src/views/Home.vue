@@ -365,9 +365,6 @@ const confirmContextDelete = async () => {
     await memoriesStore.remove(target.id)
     notifications.show(t('message.deleted'), 'success', 1800)
     deleteDialogOpen.value = false
-    if (memoriesStore.selectedId === target.id) {
-      memoriesStore.select(null)
-    }
   } catch (error) {
     logger.error('Delete memory failed: %s', error)
     notifications.show(t('message.deleteFailed'), 'error', 2800)
