@@ -3,12 +3,16 @@ import { ref } from 'vue'
 
 type NotificationType = 'success' | 'error' | 'info' | 'warning'
 
-interface Notification {
+export interface Notification {
   id: number
   message: string
   type: NotificationType
-  timeout: ReturnType<typeof setTimeout> | null
+  /** 展示时长（ms）。定时器由展示组件持有（支持悬停暂停），store 只管队列。 */
+  duration: number
 }
+
+/** 同屏堆叠上限：超出立即淘汰最旧一条（swipe-toast 交互约定）。 */
+export const MAX_VISIBLE_NOTIFICATIONS = 3
 
 export const useNotificationStore = defineStore('notification', () => {
   const notifications = ref<Notification[]>([])
@@ -28,19 +32,9 @@ export const useNotificationStore = defineStore('notification', () => {
     lastShownAt = now
 
     const id = nextId++
-    const notification: Notification = {
-      id,
-      message,
-      type,
-      timeout: null,
-    }
-
-    notifications.value.push(notification)
-
-    if (duration > 0) {
-      notification.timeout = setTimeout(() => {
-        dismiss(id)
-      }, duration)
+    notifications.value.push({ id, message, type, duration })
+    while (notifications.value.length > MAX_VISIBLE_NOTIFICATIONS) {
+      notifications.value.shift()
     }
 
     return id
@@ -49,25 +43,13 @@ export const useNotificationStore = defineStore('notification', () => {
   const dismiss = (id: number) => {
     const index = notifications.value.findIndex(n => n.id === id)
     if (index > -1) {
-      const notification = notifications.value[index]
-      if (notification.timeout) {
-        clearTimeout(notification.timeout)
-      }
       notifications.value.splice(index, 1)
     }
-  }
-
-  const clear = () => {
-    notifications.value.forEach(n => {
-      if (n.timeout) clearTimeout(n.timeout)
-    })
-    notifications.value = []
   }
 
   return {
     notifications,
     show,
     dismiss,
-    clear,
   }
 })
