@@ -1,5 +1,5 @@
 """
-Capture - pynput 与 mss 的封装，包含滑动窗口截图限流
+Capture - mss 截图封装，包含滑动窗口截图限流
 注入PathManager
 """
 from collections import deque

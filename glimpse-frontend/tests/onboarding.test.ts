@@ -18,6 +18,7 @@ const appMocks = vi.hoisted(() => ({
   whenBackendRuntimeReady: vi.fn(),
   applyThemePreference: vi.fn(),
   watchSystemTheme: vi.fn(),
+  showNotification: vi.fn(),
 }))
 
 vi.mock('@/api/websocket', () => ({
@@ -32,6 +33,25 @@ vi.mock('@/stores/settings', () => ({
     settings: null,
     load: appMocks.loadSettings,
   }),
+}))
+
+vi.mock('@/stores/notification', () => ({
+  useNotificationStore: () => ({
+    show: appMocks.showNotification,
+  }),
+}))
+
+vi.mock('@/stores/hotkeyRegistration', () => ({
+  useHotkeyRegistrationStore: () => ({
+    hotkey: null,
+    error: null,
+    reportSuccess: vi.fn(),
+    reportFailure: vi.fn(),
+  }),
+}))
+
+vi.mock('@/platform/global-shortcut', () => ({
+  applyScreenshotShortcut: vi.fn().mockResolvedValue({ ok: true }),
 }))
 
 vi.mock('@/config/runtime', () => ({

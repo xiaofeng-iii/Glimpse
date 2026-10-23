@@ -2,7 +2,6 @@ import { ref, onUnmounted } from 'vue'
 import { useMemoriesStore } from '@/stores/memories'
 import { useClusterStore } from '@/stores/cluster'
 import { useNotificationStore } from '@/stores/notification'
-import { focusDesktopWindow } from '@/platform/desktop'
 import { appendBackendAuthToken, getWsBaseUrl } from '@/config/runtime'
 import { t } from '@/utils/i18n'
 import { isWideLayout } from '@/utils/layout'
@@ -151,18 +150,6 @@ export function useWebSocket() {
       case 'cluster_discarded':
         clusterStore.discard()
         notificationStore.show(t('message.clusterCancelled'), 'info')
-        break
-
-      case 'desktop_action':
-        if (event.data.action === 'focus_search') {
-          void focusDesktopWindow().then(() => {
-            window.dispatchEvent(new CustomEvent('glimpse:focus-search'))
-          })
-        } else if (event.data.action === 'trigger_screenshot') {
-          window.dispatchEvent(new CustomEvent('glimpse:shortcut-screenshot', {
-            detail: event.data,
-          }))
-        }
         break
 
       default:

@@ -455,7 +455,7 @@ const handleKeydown = (event: KeyboardEvent) => {
   }
 }
 
-const handleFocusSearchEvent = () => void focusSearch()
+// Tauri 全局热键（platform/global-shortcut 注册）触发时派发此事件。
 const handleShortcutCapture = () => {
   if (isDesktop) void handleScreenshot(true)
 }
@@ -466,7 +466,6 @@ onMounted(async () => {
   unmounted = false
   window.addEventListener('resize', handleResize)
   window.addEventListener('keydown', handleKeydown)
-  window.addEventListener('glimpse:focus-search', handleFocusSearchEvent)
   window.addEventListener('glimpse:shortcut-screenshot', handleShortcutCapture)
 
   scheduleStickyMetrics()
@@ -492,7 +491,6 @@ onUnmounted(() => {
   stickyResizeObserver?.disconnect()
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleKeydown)
-  window.removeEventListener('glimpse:focus-search', handleFocusSearchEvent)
   window.removeEventListener('glimpse:shortcut-screenshot', handleShortcutCapture)
   document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
 })
@@ -568,6 +566,7 @@ onUnmounted(() => {
           :adding-memory="isAddingTextMemory"
           :add-memory-disabled="!backendStatus.isReady"
           :filters="memoriesStore.activeFilters"
+          :shortcut-label="screenshotShortcutLabel"
           :max-columns="wideLayout ? undefined : 3"
           @select="handleSelectMemory"
           @open="handleOpenMemory"

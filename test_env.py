@@ -25,7 +25,6 @@ def test_dependencies():
     print("\n=== 测试依赖安装 ===")
 
     package_import_map = {
-        'PySide6': 'PySide6',
         'chromadb': 'chromadb',
         'sentence-transformers': 'sentence_transformers',
         'transformers': 'transformers',
@@ -34,7 +33,6 @@ def test_dependencies():
         'numpy': 'numpy',
         'mss': 'mss',
         'Pillow': 'PIL',
-        'pynput': 'pynput',
         'rapidocr': 'rapidocr',
         'onnxruntime': 'onnxruntime',
         'openai': 'openai',

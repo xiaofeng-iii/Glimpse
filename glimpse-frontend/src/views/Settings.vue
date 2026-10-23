@@ -22,6 +22,7 @@ import {
 import { useNotificationStore } from '@/stores/notification'
 import { useOcrRepairStore } from '@/stores/ocrRepair'
 import { useSettingsStore } from '@/stores/settings'
+import { useHotkeyRegistrationStore } from '@/stores/hotkeyRegistration'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
 import { DEV_UPDATE_CHANNEL, useUpdatesStore } from '@/stores/updates'
 import {
@@ -46,6 +47,7 @@ import UpdateNotesPopover from '@/components/UpdateNotesPopover.vue'
 const logger = createLogger('views/Settings')
 const route = useRoute()
 const settingsStore = useSettingsStore()
+const hotkeyRegistration = useHotkeyRegistrationStore()
 const notifications = useNotificationStore()
 const ocrRepair = useOcrRepairStore()
 const unsavedChanges = useUnsavedChangesStore()
@@ -816,6 +818,9 @@ onUnmounted(() => {
                 <div>
                   <label class="setting-label">{{ t('settings.screenshotHotkey') }}</label>
                   <p class="setting-help">{{ t('settings.recordHelp') }}</p>
+                  <p v-if="hotkeyRegistration.error" class="setting-help text-red-600">
+                    {{ t('settings.hotkeyConflict') }}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -827,13 +832,6 @@ onUnmounted(() => {
                   <span>{{ recordingHotkey ? t('settings.recording') : formatHotkey(screenshotHotkey) }}</span>
                   <CommandLineIcon class="h-5 w-5 flex-none text-[var(--shell-muted)]" aria-hidden="true" />
                 </button>
-              </div>
-              <div class="setting-row">
-                <div>
-                  <span class="setting-label">{{ t('settings.searchHotkey') }}</span>
-                  <p class="setting-help">{{ t('settings.searchHotkeyFixed') }}</p>
-                </div>
-                <div class="setting-readonly">Ctrl + F</div>
               </div>
             </template>
 

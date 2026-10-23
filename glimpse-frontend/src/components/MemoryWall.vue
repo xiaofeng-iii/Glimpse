@@ -26,6 +26,8 @@ const props = defineProps<{
   addingMemory?: boolean
   addMemoryDisabled?: boolean
   filters?: MemoryFilters
+  /** 空状态截图按钮 tooltip 显示的热键标签（由调用方从设置格式化传入）。 */
+  shortcutLabel?: string
   /** 列数上限：未显示右侧装饰板前封顶三列，宽度先攒着（由调用方传入）。 */
   maxColumns?: number
 }>()
@@ -228,6 +230,7 @@ const groups = computed<MemoryGroup[]>(() => {
           <CaptureButton
             :capturing="capturing"
             :disabled="captureDisabled"
+            :shortcut-label="shortcutLabel"
             @capture="emit('capture')"
           />
           <AddMemoryButton

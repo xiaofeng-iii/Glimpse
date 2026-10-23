@@ -113,7 +113,7 @@ def setup_signal_forwarding(loop: Optional[asyncio.AbstractEventLoop] = None):
         return
     _signal_forwarding_initialized = True
 
-    from ui.signals import signals
+    from core.signals import signals
 
     def make_sync_handler(event_type: str):
         """Create a signal handler that schedules async broadcast"""

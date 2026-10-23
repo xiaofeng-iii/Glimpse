@@ -16,7 +16,6 @@ def _initialize_with_inert_runtime_handlers(
     container: DIContainer,
     events: list[str],
 ) -> None:
-    container._shutdown_keyboard_manager = Mock()
     container._shutdown_task_queue = lambda: events.append("task_queue")
     container._shutdown_capture_manager = Mock()
     container._shutdown_cluster_buffer = Mock()

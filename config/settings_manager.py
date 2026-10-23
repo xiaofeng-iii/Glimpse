@@ -28,7 +28,6 @@ SETTINGS_SCHEMA: Set[str] = {
 
 HOTKEY_DEFAULTS = {
     "screenshot": "<ctrl>+<shift>+g",
-    "search": "<ctrl>+<f>",
 }
 
 

@@ -8,7 +8,6 @@ Services module
     container.get("ai_client")
     container.get("ocr_engine")
     container.get("embedding_client")
-    container.get("keyboard_manager")
 
 模块级不再提供全局实例，避免隐式全局状态和导入时副作用。
 """

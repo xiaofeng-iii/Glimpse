@@ -26,7 +26,7 @@ class TestSettingsManagerInit:
         from config.settings_manager import SettingsManager
         sm = SettingsManager(mock_path_manager)
         assert sm.get("hotkeys.screenshot") == "<ctrl>+<shift>+g"
-        assert set(sm.get("hotkeys").keys()) == {"screenshot", "search"}
+        assert set(sm.get("hotkeys").keys()) == {"screenshot"}
         assert sm.get("ai.provider") == "OpenAI"
         assert sm.get("ai.provider_type") == "openai_compatible"
         assert sm.get("ai.base_url") == "https://api.openai.com/v1"
@@ -140,7 +140,7 @@ class TestSettingsManagerUpdate:
         from config.settings_manager import SettingsManager
         sm = SettingsManager(mock_path_manager)
         # Partial sub-sections fail validation (all sub-keys required)
-        result = sm.update({"hotkeys": {"screenshot": "<ctrl>+x"}})
+        result = sm.update({"hotkeys": {}})
         assert result is False
         assert sm.get("hotkeys.screenshot") == "<ctrl>+<shift>+g"
 

@@ -130,7 +130,7 @@ class MemoryService:
         if memory is None:
             return
         try:
-            from ui.signals import signals
+            from core.signals import signals
 
             signals.memory_updated.emit(memory.to_dict())
         except Exception as exc:

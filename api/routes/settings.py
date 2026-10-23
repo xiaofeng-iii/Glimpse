@@ -20,7 +20,6 @@ from api.dependencies import (
     get_memory_service,
     get_task_queue,
 )
-from api.hotkeys import reload_global_hotkeys
 from services.bootstrap import configure_ai_client, resolve_ai_configuration
 from services.ai_client import AIClient
 from services.cloud_ocr import BaiduOCREngine
@@ -113,7 +112,6 @@ def get_default_settings() -> dict:
     return {
         "hotkeys": {
             "screenshot": "<ctrl>+<shift>+g",
-            "search": "<ctrl>+<f>",
         },
         "screenshot": {
             "capture_limit_window_seconds": 5.0,
@@ -233,9 +231,6 @@ async def update_settings(settings: SettingsUpdate):
             # 不做周期探测，平时由真实调用被动更新。
             if ai_client.is_configured():
                 asyncio.create_task(asyncio.to_thread(ai_client.test_model_connection))
-
-        if settings.hotkeys is not None:
-            reload_global_hotkeys()
 
         return {"success": True, "message": "Settings updated"}
 
@@ -456,7 +451,6 @@ async def reset_settings():
         settings_manager = get_settings_manager()
         settings_manager.reset()
         configure_ai_client(get_ai_client(), settings_manager)
-        reload_global_hotkeys()
         return {"success": True, "message": "Settings reset to defaults"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -14,7 +14,6 @@ import asyncio
 
 from api.routes import memories, search, screenshot, settings, cluster, images, tags
 from api.desktop_actions import setup_cluster_processing
-from api.hotkeys import setup_global_hotkeys, shutdown_global_hotkeys
 from api.websocket import websocket_endpoint, setup_signal_forwarding, manager
 from container import container
 from runtime_env import get_app_version
@@ -74,7 +73,6 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_running_loop()
     setup_signal_forwarding(loop)
     setup_cluster_processing(loop)
-    setup_global_hotkeys(loop)
 
     logger.info("API Server ready!")
 
@@ -82,7 +80,6 @@ async def lifespan(app: FastAPI):
 
     # Shutdown: Clean up resources
     logger.info("Shutting down API Server...")
-    shutdown_global_hotkeys()
     container.shutdown()
 
 

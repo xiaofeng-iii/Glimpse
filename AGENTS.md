@@ -66,7 +66,6 @@ The project is developed on Windows with a Tauri/Vue desktop shell and a Python 
 ## Runtime Entry Points
 
 - `main.py`: default source launcher. Loads `.env`, points Tauri at the current Python interpreter, and starts the Vue + Tauri desktop shell.
-- `main_legacy_qt.py`: legacy PySide6 desktop entry kept for fallback/debugging.
 - `main_api.py`: FastAPI backend entry used by the Tauri shell and browser development flow.
 - `container.py`: service registry and lifecycle owner. Add shared services here instead of constructing them ad hoc from UI code.
 - `glimpse-frontend/`: Vue 3 + Tauri desktop frontend.
@@ -103,7 +102,7 @@ maintenance OCR repair; never add automatic startup backfill.
 
 - Settings live in `GlimpseData/config/settings.json` and are managed by `config/settings_manager.py`.
 - Paths should come from `config/path_manager.py`; avoid writing generated data beside source files.
-- Global hotkeys are handled by `services/keyboard_manager.py`; settings dialogs should not let saved global hotkeys fire while editing shortcuts.
+- Global hotkeys are registered by the Vue app via the Tauri global-shortcut plugin (`src/platform/global-shortcut.ts`); the Python sidecar has no hotkey listener.
 - `Escape` clears search in the main window. It is not a configurable global hotkey.
 - AI providers are OpenAI-compatible. Provider/base URL/model/timeout settings belong under the `ai` settings section.
 - Chinese search needs fallback behavior because SQLite FTS does not tokenize Chinese reliably.
@@ -139,7 +138,7 @@ Keep `AGENTS.md` tracked. It is the one generic document meant for the next AI s
 按上述边界选择改动范围内的 focused tests。Useful defaults:
 
 ```powershell
-conda run -n glimpse python -m pytest tests/unit/config/test_settings_manager.py tests/unit/services/test_keyboard_manager.py -v
+conda run -n glimpse python -m pytest tests/unit/config/test_settings_manager.py tests/unit/api/test_memories.py -v
 conda run -n glimpse python -m pytest tests/unit/services/test_ai_client.py tests/unit/services/test_ocr_engine.py tests/unit/core/test_capture.py -v
 conda run -n glimpse python -m pytest tests/unit -v
 ```

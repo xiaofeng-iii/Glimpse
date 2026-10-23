@@ -56,7 +56,6 @@ FastAPI / Python
 |---|---|
 | `main.py` | 默认源码入口，启动 Vue + Tauri |
 | `main_api.py` | 单独启动 FastAPI 后端 |
-| `main_legacy_qt.py` | 旧 PySide6 界面，仅用于回退和调试 |
 | `build_release.bat` | 构建 Python sidecar 与 Tauri NSIS 安装包 |
 
 `container.py` 统一注册并关闭 Python 服务。API 通过
@@ -222,7 +221,6 @@ SQLite 是事实来源，保存 UUID、时间、图片路径、AI 摘要、来�
   重建相关索引，运行中状态栏显示进度。
 - 未配置 AI 凭据时，摘要回退为 OCR 文本前 200 个字符；没有可用文字时使用
   “无内容”，记忆仍会写入 SQLite。
-- `ui/` 是旧 PySide6 回退界面；新产品功能优先在 Vue/Tauri 路径实现。
 - `app_name` 在当前截图入口通常仍为 `unknown`。
 - FastAPI 接口字段优先通过 OpenAPI 与 Pydantic 模型维护，避免在 Markdown
   中重复完整签名。

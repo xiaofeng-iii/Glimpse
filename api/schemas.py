@@ -127,7 +127,6 @@ class SettingsResponse(BaseModel):
     """Settings response"""
     hotkeys: Dict[str, str] = Field(default_factory=lambda: {
         "screenshot": "<ctrl>+<shift>+g",
-        "search": "<ctrl>+<f>",
     })
     screenshot: Dict[str, Any] = Field(default_factory=lambda: {
         "capture_limit_window_seconds": 5.0,

@@ -81,7 +81,6 @@ def setup_logging(
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("chromadb").setLevel(logging.WARNING)
-    logging.getLogger("pynput").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:

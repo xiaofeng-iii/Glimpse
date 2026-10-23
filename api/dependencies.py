@@ -36,10 +36,6 @@ def get_cluster_buffer():
     return container.get("cluster_buffer")
 
 
-def get_keyboard_manager():
-    """Get keyboard manager from container"""
-    return container.get("keyboard_manager")
-
 
 def get_task_queue():
     """Get task queue from container"""

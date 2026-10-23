@@ -161,9 +161,6 @@ class DIContainer:
         from services.ai_client import AIClient
         self.register_singleton_factory("ai_client", lambda: AIClient(self.get("settings_manager")))
 
-        from services.keyboard_manager import keyboard_manager
-        self.register_singleton("keyboard_manager", keyboard_manager)
-
         from services.ocr_router import ConfiguredOCREngine
         self.register_singleton_factory(
             "ocr_engine",
@@ -207,7 +204,6 @@ class DIContainer:
 
         self.register_shutdown_handler(self._shutdown_sqlite_manager)
         self.register_shutdown_handler(self._shutdown_chroma_manager)
-        self.register_shutdown_handler(self._shutdown_keyboard_manager)
         self.register_shutdown_handler(self._shutdown_task_queue)
         self.register_shutdown_handler(self._shutdown_capture_manager)
         self.register_shutdown_handler(self._shutdown_cluster_buffer)
@@ -229,13 +225,6 @@ class DIContainer:
 
     def _shutdown_chroma_manager(self) -> None:
         self._close_initialized_service("chroma_manager")
-
-    def _shutdown_keyboard_manager(self) -> None:
-        if self.has("keyboard_manager"):
-            try:
-                self.get("keyboard_manager").stop_listening()
-            except Exception:
-                pass
 
     def _shutdown_task_queue(self) -> None:
         if self.has("task_queue"):

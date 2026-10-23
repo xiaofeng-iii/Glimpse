@@ -30,8 +30,6 @@ def test_lifespan_schedules_vector_repair_without_running_it_inline():
         patch.object(server, "configure_ai_client") as configure_ai,
         patch.object(server, "setup_signal_forwarding") as setup_websocket,
         patch.object(server, "setup_cluster_processing") as setup_cluster,
-        patch.object(server, "setup_global_hotkeys") as setup_hotkeys,
-        patch.object(server, "shutdown_global_hotkeys") as shutdown_hotkeys,
     ):
         asyncio.run(run_lifespan())
 
@@ -40,6 +38,4 @@ def test_lifespan_schedules_vector_repair_without_running_it_inline():
     configure_ai.assert_called_once_with(ai_client, settings_manager)
     setup_websocket.assert_called_once()
     setup_cluster.assert_called_once()
-    setup_hotkeys.assert_called_once()
-    shutdown_hotkeys.assert_called_once_with()
     fake_container.shutdown.assert_called_once_with()

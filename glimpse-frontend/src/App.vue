@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useWebSocket } from '@/api/websocket'
 import { useSettingsStore } from '@/stores/settings'
+import { useHotkeyRegistrationStore } from '@/stores/hotkeyRegistration'
+import { useNotificationStore } from '@/stores/notification'
 import { whenBackendRuntimeReady } from '@/config/runtime'
+import { applyScreenshotShortcut } from '@/platform/global-shortcut'
 import { applyThemePreference, watchSystemTheme } from '@/utils/theme'
-import { setLanguagePreference } from '@/utils/i18n'
+import { setLanguagePreference, t } from '@/utils/i18n'
 import {
   completeOnboarding,
   ONBOARDING_REQUEST_EVENT,
@@ -19,6 +22,8 @@ import NotificationToast from '@/components/NotificationToast.vue'
 
 const websocket = useWebSocket()
 const settingsStore = useSettingsStore()
+const hotkeyRegistration = useHotkeyRegistrationStore()
+const notifications = useNotificationStore()
 const firstRunGuideOpen = ref(shouldShowOnboarding())
 let stopWatchingSystemTheme: (() => void) | null = null
 const editTextMenu = ref<{
@@ -41,6 +46,24 @@ const applySavedTheme = async () => {
   applyThemePreference(settingsStore.settings?.ui?.theme)
   setLanguagePreference(settingsStore.settings?.ui?.language)
 }
+
+// 全局热键注册跟随设置：加载出热键或热键变更（设置页保存）时重挂；
+// 注册失败（被其他应用占用等）toast 一次并写入状态，设置页据此显示行内异常。
+const syncGlobalScreenshotShortcut = async () => {
+  const hotkey = settingsStore.settings?.hotkeys?.screenshot ?? ''
+  const result = await applyScreenshotShortcut(hotkey)
+  if (result.ok) {
+    hotkeyRegistration.reportSuccess(hotkey)
+  } else {
+    hotkeyRegistration.reportFailure(hotkey, result.error)
+    notifications.show(t('message.hotkeyRegisterFailed'), 'error', 4200)
+  }
+}
+
+watch(
+  () => settingsStore.settings?.hotkeys?.screenshot,
+  () => void syncGlobalScreenshotShortcut(),
+)
 
 // 应用内一律不显示 WebView 原生右键菜单（图二那种）。三处例外各有专属菜单：
 // 记忆卡片 → MemoryContextMenu；标题栏 → 系统窗口菜单；输入框 → 自定义文本编辑菜单；

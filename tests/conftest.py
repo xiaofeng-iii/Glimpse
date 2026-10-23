@@ -29,26 +29,6 @@ if importlib.util.find_spec("openai") is None:
     openai_stub.OpenAI = _OpenAI
     sys.modules["openai"] = openai_stub
 
-if importlib.util.find_spec("pynput") is None:
-    pynput_stub = types.ModuleType("pynput")
-    keyboard_stub = types.ModuleType("pynput.keyboard")
-
-    class GlobalHotKeys:
-        def __init__(self, hotkeys=None):
-            self.hotkeys = hotkeys
-
-        def start(self):
-            return None
-
-        def stop(self):
-            return None
-
-    keyboard_stub.GlobalHotKeys = GlobalHotKeys
-    pynput_stub.keyboard = keyboard_stub
-    sys.modules["pynput.keyboard"] = keyboard_stub
-    sys.modules["pynput"] = pynput_stub
-
-
 @pytest.fixture
 def project_root() -> Path:
     """返回项目根目录路径"""

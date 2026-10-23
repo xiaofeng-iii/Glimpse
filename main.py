@@ -1,8 +1,8 @@
 """
 Glimpse source launcher.
 
-The default desktop UI is the Vue + Tauri frontend. The old PySide6
-interface is kept in main_legacy_qt.py for fallback/debugging.
+The desktop UI is the Vue + Tauri frontend; the backend runs as the
+FastAPI sidecar (main_api.py).
 """
 from __future__ import annotations
 
