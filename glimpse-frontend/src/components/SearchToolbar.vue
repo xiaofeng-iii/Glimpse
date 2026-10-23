@@ -10,6 +10,7 @@ import {
 import type { SearchOptions } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useDevStateStore, type AnalysisOverride, type SyncOverride } from '@/stores/devState'
+import { useNotificationStore } from '@/stores/notification'
 import { t } from '@/utils/i18n'
 import { requestOnboarding } from '@/utils/onboarding'
 import AddMemoryButton from './AddMemoryButton.vue'
@@ -45,6 +46,7 @@ const emit = defineEmits<{
 
 const memoriesStore = useMemoriesStore()
 const devState = useDevStateStore()
+const notifications = useNotificationStore()
 const query = ref(props.modelValue)
 const source = ref(memoriesStore.searchSource || 'all')
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -66,6 +68,21 @@ const sources = [
   { value: 'exact', labelKey: 'search.exactOnly' },
   { value: 'semantic', labelKey: 'search.semanticOnly' },
 ] as const
+
+// DEV 面板的测试通知：按真实调用的分级时长发一条，验证通知浮层的各类型观感。
+const devNotificationTypes = [
+  { type: 'success', labelKey: 'search.devNotifySuccess', duration: 1800 },
+  { type: 'info', labelKey: 'search.devNotifyInfo', duration: 3000 },
+  { type: 'warning', labelKey: 'search.devNotifyWarning', duration: 3200 },
+  { type: 'error', labelKey: 'search.devNotifyError', duration: 4200 },
+] as const
+
+const fireTestNotification = (
+  type: 'success' | 'info' | 'warning' | 'error',
+  duration: number,
+) => {
+  notifications.show(t(`search.devNotifyMessage.${type}`), type, duration)
+}
 
 const analysisOverrideOptions = [
   { value: 'none', labelKey: 'search.devAnalysisDefault' },
@@ -405,6 +422,21 @@ defineExpose({ focus, clear })
               <input v-model="devOptions.debug" type="checkbox" class="h-4 w-4 accent-amber-600" />
               {{ t('search.showScores') }}
             </label>
+
+            <div class="mt-3 border-t border-amber-200/60 pt-3">
+              <p class="text-xs font-semibold text-amber-800">{{ t('search.devTestNotification') }}</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button
+                  v-for="item in devNotificationTypes"
+                  :key="item.type"
+                  type="button"
+                  class="h-7 rounded-md border border-amber-200/80 bg-white/50 px-2.5 text-xs text-amber-800 transition duration-[160ms] ease-[ease] hover:bg-amber-100"
+                  @click="fireTestNotification(item.type, item.duration)"
+                >
+                  {{ t(item.labelKey) }}
+                </button>
+              </div>
+            </div>
 
             <div class="mt-3 border-t border-amber-200/60 pt-3">
               <div class="flex items-center justify-between">
