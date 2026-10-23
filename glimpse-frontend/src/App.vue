@@ -18,7 +18,7 @@ import DesktopShell from '@/components/DesktopShell.vue'
 import EditTextContextMenu from '@/components/EditTextContextMenu.vue'
 import FirstRunGuide from '@/components/FirstRunGuide.vue'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
-import NotificationToast from '@/components/NotificationToast.vue'
+import SwipeToastHost from '@/components/toast/SwipeToastHost.vue'
 
 const websocket = useWebSocket()
 const settingsStore = useSettingsStore()
@@ -127,6 +127,6 @@ onUnmounted(() => {
       @close="closeEditTextMenu"
     />
     <ImagePreviewModal />
-    <NotificationToast />
+    <SwipeToastHost />
   </div>
 </template>

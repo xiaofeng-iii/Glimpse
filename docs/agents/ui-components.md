@@ -27,7 +27,8 @@
 | 低频破坏性操作（设置区"恢复默认"等） | `.btn-ghost-danger` | 32px md | 字重 400、无投影、hover 才显危险色——这是克制基调的现成榜样 |
 | 弹窗/浮层里的动作按钮（确认/取消、查看详情/立即更新等低频操作） | 在基础按钮类上叠 `.btn-sm`（如 `.btn-primary.btn-sm`、`.btn-secondary.btn-sm`） | **28px sm** | 字重 400、13px、无投影。弹窗操作不是主路径，别用默认 32px 的分量 |
 | 确认破坏性操作（弹窗内） | `.btn-danger`（弹窗内叠 `.btn-sm`） | 32px md（弹窗内 28px） | 实心危险色 |
-| 窗口级关闭按钮（弹窗、浮窗、侧栏头部的叉） | `XMarkIcon` `h-3.5 w-3.5`（14px）+ 32px 无框按钮（muted 色、hover `surface-hover`） | 32px md | 唯一例外：软件头窗口关闭 15px；列表内联小叉（toast、标签清除）不属此类；**禁止自绘叉形 SVG** |
+| 窗口级关闭按钮（弹窗、浮窗、侧栏头部的叉） | `XMarkIcon` `h-3.5 w-3.5`（14px）+ 32px 无框按钮（muted 色、hover `surface-hover`） | 32px md | 唯一例外：软件头窗口关闭 15px；**禁止自绘叉形 SVG** |
+| 通知浮层（swipe toast，`components/toast/`） | `SwipeToastHost`/`SwipeToastItem`：glass + rounded-md、右下角堆叠上限 3、z 用 `--z-toast`；手势/暂停/节奏规范见 DESIGN.md「动效、图标与滚动」节 | 正文 14px；内联关闭叉 = `XMarkIcon` 16px + `p-1` 命中区、muted 色、hover `--shell-control-hover`（2026-10-23 拍板：toast 内联叉规格独立于 32px 窗口级档） | 四类型图标底色走语义 token（success/danger/warning/primary）；交互参考 vue-bits（THIRD_PARTY_NOTICES 已登记） |
 | 顶栏/紧凑工具区的纯图标按钮 | `.shell-icon-button` | **裸用 40px**；顶栏须对齐 28px 档 | 裸用是 2.5rem 且 hover 带 transform 位移；放进顶栏要按"设置齿轮"的 `desktop-shell__settings-button` 覆盖到 1.75rem、hover 改纯背景。新加顶栏图标按钮务必与邻居同尺寸同 hover |
 | 顶栏带文字的导航（返回等） | `.shell-navigation-button` | 28px sm | 字重 600 |
 | 窗口最小化/关闭等系统区 | `.window-control` | 顶栏通高、直角贴右缘 | 不加圆角 |

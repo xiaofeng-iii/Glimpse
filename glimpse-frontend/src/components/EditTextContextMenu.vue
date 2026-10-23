@@ -233,7 +233,7 @@ onBeforeUnmount(unbindListeners)
 <style scoped>
 .edit-text-menu {
   position: fixed;
-  z-index: var(--z-toast);
+  z-index: var(--z-dropdown);
   min-width: 13rem;
   padding: 0.375rem;
   border: 1px solid var(--color-border);

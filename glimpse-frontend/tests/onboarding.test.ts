@@ -69,7 +69,7 @@ const mountApp = () => mount(App, {
       RouterView: true,
       DesktopShell: { template: '<div><slot /></div>' },
       ImagePreviewModal: true,
-      NotificationToast: true,
+      SwipeToastHost: true,
       Teleport: true,
     },
   },
