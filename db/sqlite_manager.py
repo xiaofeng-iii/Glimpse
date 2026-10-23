@@ -216,6 +216,37 @@ class SQLiteManager:
                 "ALTER TABLE memories ADD COLUMN analysis_status TEXT NOT NULL "
                 "DEFAULT 'COMPLETED'"
             )
+        # 本迁移块先于 tags/memory_tags 建表执行，全新库上表尚不存在，需先判存在。
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'memory_tags'"
+        )
+        memory_tags_exists = cursor.fetchone() is not None
+        cursor.execute("PRAGMA table_info(memory_tags)")
+        memory_tag_columns = [col[1] for col in cursor.fetchall()]
+        if memory_tags_exists and "position" not in memory_tag_columns:
+            cursor.execute(
+                "ALTER TABLE memory_tags ADD COLUMN position INTEGER NOT NULL DEFAULT 0"
+            )
+            # 旧库没有顺序概念：按此前展示所依赖的名称排序回填，升级后视觉顺序不变。
+            cursor.execute(
+                """
+                WITH ranked AS (
+                    SELECT mt.memory_id, mt.tag_id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY mt.memory_id
+                               ORDER BY t.name COLLATE NOCASE, t.name
+                           ) - 1 AS pos
+                    FROM memory_tags mt
+                    JOIN tags t ON t.id = mt.tag_id
+                )
+                UPDATE memory_tags
+                SET position = (
+                    SELECT pos FROM ranked
+                    WHERE ranked.memory_id = memory_tags.memory_id
+                      AND ranked.tag_id = memory_tags.tag_id
+                )
+                """
+            )
         cursor.execute(
             """
             UPDATE memories
@@ -256,6 +287,7 @@ class SQLiteManager:
             CREATE TABLE IF NOT EXISTS memory_tags (
                 memory_id TEXT NOT NULL,
                 tag_id INTEGER NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (memory_id, tag_id)
             )
         """)
@@ -323,7 +355,7 @@ class SQLiteManager:
                 FROM memory_tags mt
                 JOIN tags t ON t.id = mt.tag_id
                 WHERE mt.memory_id IN ({placeholders})
-                ORDER BY t.name COLLATE NOCASE, t.name
+                ORDER BY mt.memory_id, mt.position, t.name COLLATE NOCASE, t.name
                 """,
                 chunk,
             )
@@ -353,8 +385,8 @@ class SQLiteManager:
                     "DELETE FROM memory_tags WHERE memory_id = ?", (memory_id,)
                 )
                 cursor.executemany(
-                    "INSERT INTO memory_tags (memory_id, tag_id) VALUES (?, ?)",
-                    [(memory_id, tag_id) for tag_id in tag_ids],
+                    "INSERT INTO memory_tags (memory_id, tag_id, position) VALUES (?, ?, ?)",
+                    [(memory_id, tag_id, index) for index, tag_id in enumerate(tag_ids)],
                 )
                 self._delete_orphaned_tags(cursor)
                 self._conn.commit()

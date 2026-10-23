@@ -680,7 +680,7 @@ class TestSQLiteManagerTags:
         _insert(mgr, "m-1", ai_summary="hydration probe keyword")
         mgr.set_memory_tags("m-1", ["beta", "Alpha"])
 
-        expected = ["Alpha", "beta"]  # 按 name COLLATE NOCASE 排序
+        expected = ["beta", "Alpha"]  # 按提交顺序（position），不按名称排序
         assert [t.name for t in mgr.get_memory_by_id("m-1").tags] == expected
         assert [t.name for t in mgr.get_all_memories()[0].tags] == expected
         assert [t.name for t in mgr.search_memories("hydration probe")[0].tags] == expected
@@ -689,9 +689,64 @@ class TestSQLiteManagerTags:
 
         d = mgr.get_memory_by_id("m-1").to_dict()
         assert d["tags"] == [
-            {"id": d["tags"][0]["id"], "name": "Alpha"},
-            {"id": d["tags"][1]["id"], "name": "beta"},
+            {"id": d["tags"][0]["id"], "name": "beta"},
+            {"id": d["tags"][1]["id"], "name": "Alpha"},
         ]
+        mgr.close()
+
+    def test_tag_order_follows_submitted_list(self, mock_path_manager):
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        _insert(mgr, "m-1")
+        mgr.set_memory_tags("m-1", ["gamma", "alpha", "beta"])
+        assert [t.name for t in mgr.get_memory_by_id("m-1").tags] == ["gamma", "alpha", "beta"]
+
+        # 重排（拖动排序）整体替换后按新顺序读回。
+        mgr.set_memory_tags("m-1", ["beta", "gamma", "alpha"])
+        assert [t.name for t in mgr.get_memory_by_id("m-1").tags] == ["beta", "gamma", "alpha"]
+        mgr.close()
+
+    def test_legacy_memory_tags_gain_position_backfill(self, mock_path_manager):
+        import sqlite3 as legacy_sqlite3
+
+        # 模拟旧版库：表齐全但 memory_tags 无 position 列。
+        conn = legacy_sqlite3.connect(mock_path_manager.sqlite_path)
+        conn.executescript(
+            """
+            CREATE TABLE memories (
+                id TEXT PRIMARY KEY, created_at TEXT, image_path TEXT,
+                ai_summary TEXT, app_name TEXT, text_content TEXT,
+                extra_images TEXT, sync_status TEXT DEFAULT 'PENDING',
+                memory_type TEXT NOT NULL DEFAULT 'screenshot',
+                analysis_status TEXT NOT NULL DEFAULT 'COMPLETED',
+                user_text TEXT
+            );
+            CREATE TABLE tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE COLLATE NOCASE
+            );
+            CREATE TABLE memory_tags (
+                memory_id TEXT NOT NULL,
+                tag_id INTEGER NOT NULL,
+                PRIMARY KEY (memory_id, tag_id)
+            );
+            INSERT INTO memories (id, created_at, image_path, ai_summary)
+            VALUES ('m-1', '2026-01-01 12:00:00', '', 'legacy');
+            INSERT INTO tags (name) VALUES ('beta'), ('Alpha');
+            INSERT INTO memory_tags (memory_id, tag_id) VALUES ('m-1', 1), ('m-1', 2);
+            """
+        )
+        conn.close()
+
+        from db.sqlite_manager import SQLiteManager
+
+        mgr = SQLiteManager(mock_path_manager)
+        # 回填按旧展示所依赖的名称序，升级后视觉顺序不变。
+        assert [t.name for t in mgr.get_memory_by_id("m-1").tags] == ["Alpha", "beta"]
+        # 迁移后重排可持久化。
+        mgr.set_memory_tags("m-1", ["beta", "Alpha"])
+        assert [t.name for t in mgr.get_memory_by_id("m-1").tags] == ["beta", "Alpha"]
         mgr.close()
 
     def test_tag_filter_or_semantics_and_and_combination(self, mock_path_manager):
