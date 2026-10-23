@@ -21,6 +21,7 @@
     "@tauri-apps/plugin-opener": "^2.5.5",
     "@vueuse/core": "^10.7.2",
     "axios": "^1.19.0",
+    "motion-v": "^2.8.0",
     "pinia": "^2.1.7",
     "reka-ui": "^2.10.3",
     "vue": "^3.4.0",
