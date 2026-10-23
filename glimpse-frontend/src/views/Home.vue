@@ -15,6 +15,7 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { createLogger } from '@/utils/logger'
 import { memoryMatchesFilters, type MemoryFilters } from '@/utils/memory-filters'
+import { isWideLayout } from '@/utils/layout'
 import { getMemoryImagePaths } from '@/utils/memory-images'
 import { getMemoryDisplayText } from '@/utils/memory-types'
 import { copyImageFileToClipboard } from '@/platform/clipboard'
@@ -62,10 +63,7 @@ const deletingMemory = ref(false)
 const showSearchDebug = ref(false)
 const clusterModeEnabled = ref(false)
 const screenshotShortcutLabel = ref('Ctrl+Shift+G')
-// 1320 同时是排版分界与侧栏交互分界：侧栏占位后墙面仍保底三列 290px 卡片；
-// CSS 在 1319px 以下把侧栏面板变成右侧浮层，点外/Esc 关闭只在浮层形态生效。
-const WIDE_LAYOUT_BREAKPOINT = 1320
-const wideLayout = ref(window.innerWidth >= WIDE_LAYOUT_BREAKPOINT)
+const wideLayout = ref(isWideLayout())
 const isDesktop = isDesktopShell()
 // 浮条下方控件行的吸顶与紧凑态：布局/筛选控件已从墙头部上移到这里，
 // 三级吸顶（浮条 → 控件行 → 墙头标题）的 top 由脚本按实测高度级联写入。
@@ -285,7 +283,8 @@ const handleAddTextMemory = async (payload: { content: string; images: File[] })
       await nextTick()
     }
     memoriesStore.upsert(memory)
-    if (memoryMatchesFilters(memory, memoriesStore.activeFilters)) {
+    // 自动选中只限 docked 形态：浮层形态选中即弹出侧栏，添加记忆不应打断当前视图。
+    if (wideLayout.value && memoryMatchesFilters(memory, memoriesStore.activeFilters)) {
       memoriesStore.select(memory)
     }
     textMemoryDialogOpen.value = false
@@ -378,7 +377,7 @@ const confirmContextDelete = async () => {
 }
 
 const handleResize = () => {
-  wideLayout.value = window.innerWidth >= WIDE_LAYOUT_BREAKPOINT
+  wideLayout.value = isWideLayout()
 }
 
 // 记忆墙滚动条仅在滚动进行时浮现，停止片刻即隐回（详见 .home-memory-pane 样式注释）。
@@ -409,6 +408,9 @@ const handleDocumentPointerDown = (event: PointerEvent) => {
   const panel = inspectorPanelElement.value
   if (panel?.contains(event.target)) return
   if (event.target instanceof Element && event.target.closest('.memory-card')) return
+  // 右键菜单等浮层 Teleport 到 body，DOM 上不在面板内，但交互上属于侧栏操作；
+  // 若视为点外，侧栏先卸载、菜单项的 click 随菜单一起消失，操作永远丢失。
+  if (event.target instanceof Element && event.target.closest('[role="menu"], [role="listbox"]')) return
   void handleCloseInspector()
 }
 

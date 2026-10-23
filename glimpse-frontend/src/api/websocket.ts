@@ -5,6 +5,7 @@ import { useNotificationStore } from '@/stores/notification'
 import { focusDesktopWindow } from '@/platform/desktop'
 import { appendBackendAuthToken, getWsBaseUrl } from '@/config/runtime'
 import { t } from '@/utils/i18n'
+import { isWideLayout } from '@/utils/layout'
 
 type WebSocketEvent = {
   type: string
@@ -92,7 +93,8 @@ export function useWebSocket() {
           }
 
           const savedMemory = memoriesStore.memories.find((memory) => memory.id === memoryId)
-          if (savedMemory) {
+          // 自动选中只限 docked 形态；浮层形态（窄窗）选中即弹出侧栏，会打断当前视图。
+          if (savedMemory && isWideLayout()) {
             memoriesStore.select(savedMemory)
           }
         })
