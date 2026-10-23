@@ -23,7 +23,8 @@
         "transparent": false,
         "alwaysOnTop": false,
         "maximizable": true,
-        "minimizable": true
+        "minimizable": true,
+        "dragDropEnabled": false
       }
     ],
     "security": {

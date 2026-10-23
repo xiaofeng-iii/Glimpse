@@ -105,12 +105,13 @@ describe('MemoryTagsEditor', () => {
     expect(apiMocks.updateTags).not.toHaveBeenCalled()
   })
 
-  it('saves immediately on Enter and keeps the input active for rapid entry', async () => {
+  it('saves on Enter and collapses the input instead of chaining edits', async () => {
     const wrapper = mountEditor(createMemory())
     await typeAndEnter(wrapper, '第一个')
 
     expect(apiMocks.updateTags).toHaveBeenCalledWith('memory-1', ['第一个'])
-    expect(wrapper.find('.tags-editor__input').exists()).toBe(true)
+    expect(wrapper.find('.tags-editor__input').exists()).toBe(false)
+    expect(wrapper.find('.tags-editor__add').exists()).toBe(true)
 
     await typeAndEnter(wrapper, '第二个')
     expect(apiMocks.updateTags).toHaveBeenLastCalledWith('memory-1', ['第一个', '第二个'])
@@ -217,25 +218,96 @@ describe('MemoryTagsEditor', () => {
     expect(wrapper.find('.tags-editor__input').exists()).toBe(true)
   })
 
-  it('opens a right-click delete action and removes the tag immediately', async () => {
-    const wrapper = mount(MemoryTagsEditor, {
-      attachTo: document.body,
-      props: { memory: createMemory({ tags: [{ id: 1, name: '工作' }] }) },
-    })
+  it('arms a chip on click and deletes via the × button', async () => {
+    const wrapper = mountEditor(createMemory({
+      tags: [{ id: 1, name: '工作' }, { id: 2, name: '灵感' }],
+    }))
 
-    await wrapper.get('.tags-editor__chip').trigger('contextmenu', { clientX: 40, clientY: 40 })
-    await nextTick()
+    const chips = wrapper.findAll('.tags-editor__chip')
+    expect(wrapper.find('.tags-editor__chip-remove').exists()).toBe(false)
 
-    const deleteItem = document.querySelector<HTMLElement>('[role="menuitem"]')
-    expect(deleteItem?.textContent).toContain('删除标签')
-    deleteItem?.click()
+    // 点击 chip 出 ×；再点自身取消；点其他 chip 转移
+    await chips[0].trigger('click')
+    expect(chips[0].find('.tags-editor__chip-remove').exists()).toBe(true)
+    await chips[0].trigger('click')
+    expect(wrapper.find('.tags-editor__chip-remove').exists()).toBe(false)
+    await chips[0].trigger('click')
+    await wrapper.findAll('.tags-editor__chip')[1].trigger('click')
+    expect(wrapper.findAll('.tags-editor__chip')[0].find('.tags-editor__chip-remove').exists()).toBe(false)
+    expect(wrapper.findAll('.tags-editor__chip')[1].find('.tags-editor__chip-remove').exists()).toBe(true)
+
+    await wrapper.get('.tags-editor__chip-remove').trigger('click')
     await flushPromises()
 
-    expect(apiMocks.updateTags).toHaveBeenCalledWith('memory-1', [])
-    expect(wrapper.find('.tags-editor__chip').exists()).toBe(false)
-    expect(wrapper.find('.tags-editor__add').exists()).toBe(true)
-    expect(document.querySelector('.tag-context-menu')).toBeNull()
-    wrapper.unmount()
+    expect(apiMocks.updateTags).toHaveBeenCalledWith('memory-1', ['工作'])
+    expect(wrapper.findAll('.tags-editor__chip').map((chip) => chip.text())).toEqual(['工作'])
+  })
+
+  it('disarms the × when pressing anywhere outside the armed chip', async () => {
+    const wrapper = mountEditor(createMemory({ tags: [{ id: 1, name: '工作' }] }))
+
+    await wrapper.get('.tags-editor__chip').trigger('click')
+    expect(wrapper.find('.tags-editor__chip-remove').exists()).toBe(true)
+
+    document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+    await nextTick()
+    expect(wrapper.find('.tags-editor__chip-remove').exists()).toBe(false)
+  })
+
+  it('reorders tags by dragging and persists the new order', async () => {
+    const wrapper = mountEditor(createMemory({
+      tags: [
+        { id: 1, name: '工作' },
+        { id: 2, name: '灵感' },
+        { id: 3, name: '待办' },
+      ],
+    }))
+
+    // jsdom 无布局：为三个 chip  mock 一行几何，间隙中线分别为 43、89。
+    const rects = [
+      { left: 0, right: 40, top: 0, bottom: 24 },
+      { left: 46, right: 86, top: 0, bottom: 24 },
+      { left: 92, right: 132, top: 0, bottom: 24 },
+    ]
+    wrapper.findAll('.tags-editor__chip').forEach((chip, index) => {
+      const rect = rects[index]
+      chip.element.getBoundingClientRect = () => ({
+        ...rect,
+        width: rect.right - rect.left,
+        height: 24,
+        x: rect.left,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect
+    })
+
+    const chip = wrapper.findAll('.tags-editor__chip')[0]
+    await chip.trigger('pointerdown', { button: 0, clientX: 10, clientY: 10 })
+    // 越过「灵感|待办」间隙中线（89）之前、第一个中线（43）之后：插到「待办」前
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 60, clientY: 10 }))
+    await nextTick()
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 88, clientY: 10 }))
+    await nextTick()
+    window.dispatchEvent(new MouseEvent('pointerup', { clientX: 88, clientY: 10 }))
+    await flushPromises()
+
+    expect(
+      wrapper.findAll('.tags-editor__chip').map((item) => item.text()),
+    ).toEqual(['灵感', '工作', '待办'])
+    expect(apiMocks.updateTags).toHaveBeenCalledWith('memory-1', ['灵感', '工作', '待办'])
+  })
+
+  it('treats a press without movement as a click and does not persist', async () => {
+    const wrapper = mountEditor(createMemory({
+      tags: [{ id: 1, name: '工作' }, { id: 2, name: '灵感' }],
+    }))
+
+    const chip = wrapper.findAll('.tags-editor__chip')[0]
+    await chip.trigger('pointerdown', { button: 0, clientX: 5, clientY: 5 })
+    window.dispatchEvent(new MouseEvent('pointerup', { clientX: 5, clientY: 5 }))
+    await flushPromises()
+
+    expect(apiMocks.updateTags).not.toHaveBeenCalled()
   })
 
   it('reverts to the server state and toasts when a save fails', async () => {

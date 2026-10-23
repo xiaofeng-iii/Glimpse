@@ -18,6 +18,18 @@ window.addEventListener(
 
 installNativeTooltipGuard()
 
+// dragDropEnabled 关闭后（tauri.conf.json，为启用标签拖动排序等 HTML5 拖拽），
+// 从资源管理器拖文件落到窗口非放置区的默认行为是把窗口导航到该文件、顶替整个
+// 应用页面；这里全局拦掉文件类拖拽的默认行为，真正的放置目标（添加记忆对话框）
+// 各自的处理器不受影响。标签排序等应用内拖拽 types 不含 Files，不会被波及。
+const isFileDrag = (event: DragEvent) => event.dataTransfer?.types.includes('Files') ?? false
+window.addEventListener('dragover', (event) => {
+  if (isFileDrag(event)) event.preventDefault()
+})
+window.addEventListener('drop', (event) => {
+  if (isFileDrag(event)) event.preventDefault()
+})
+
 const bootstrap = async () => {
   applyThemePreference(getStoredThemePreference())
   setLanguagePreference(getStoredLanguagePreference())

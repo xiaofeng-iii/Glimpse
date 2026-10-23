@@ -2,13 +2,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   PlusIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import type { Memory } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
 import { useUnsavedChangesStore } from '@/stores/unsavedChanges'
 import { t } from '@/utils/i18n'
-import TagContextMenu from './TagContextMenu.vue'
 
 const TAG_NAME_MAX_LENGTH = 24
 const TAGS_PER_MEMORY_LIMIT = 10
@@ -36,7 +36,11 @@ const inputActive = ref(false)
 const inputHint = ref('')
 const inputElement = ref<HTMLInputElement | null>(null)
 const composing = ref(false)
-const tagMenu = ref<{ name: string; x: number; y: number } | null>(null)
+// 点击 chip 进入「待删」态：该 chip 显示 ×，再点自身取消，点其他 chip 转移。
+const armedTag = ref<string | null>(null)
+// 拖动排序：dragover 时实时重排 localNames，drop/dragend 时按新顺序整体保存。
+const draggingName = ref<string | null>(null)
+let orderDirty = false
 let unregisterGuard: (() => boolean) | null = null
 
 const currentTagNames = computed(() =>
@@ -61,6 +65,8 @@ watch(
     inputActive.value = false
     inputValue.value = ''
     inputHint.value = ''
+    armedTag.value = null
+    draggingName.value = null
   },
   { immediate: true },
 )
@@ -141,16 +147,134 @@ const addTag = (raw: string) => {
 
 const removeTag = (name: string) => {
   localNames.value = localNames.value.filter((tag) => tag !== name)
+  if (armedTag.value === name) armedTag.value = null
   inputHint.value = ''
   persist()
 }
 
-const openTagMenu = (name: string, event: MouseEvent) => {
-  tagMenu.value = { name, x: event.clientX, y: event.clientY }
+const toggleArm = (name: string) => {
+  armedTag.value = armedTag.value === name ? null : name
 }
 
-const closeTagMenu = () => {
-  tagMenu.value = null
+const finishDrag = () => {
+  if (draggingName.value && orderDirty) persist()
+  draggingName.value = null
+  orderDirty = false
+}
+
+// 拖动排序走 pointer 事件自实现，不用 HTML5 拖拽：WebView2 中原生拖拽的
+// dragover 事件链不稳定，光标反馈（禁止符）和实时换位都会闪烁。
+// 按下后移动超过阈值才开始拖；未超阈值视为点击（交给 click 出 ×）。
+const chipsElement = ref<HTMLElement | null>(null)
+const DRAG_THRESHOLD_PX = 4
+let dragPointer: { name: string; startX: number; startY: number; active: boolean } | null = null
+let suppressNextClick = false
+
+// 槽区模型：分界线在每相邻两个 chip 的间隙中线（行首/行尾延伸到 chip 外缘），
+// 每个 chip 占据自己前后两条中线之间的区域；光标落在哪个槽区，被拖标签就去哪个
+// 槽位。几何包含被拖 chip 本身，换位前后分界线不动，来回拖动判定对称、无回差。
+const reorderToPoint = (x: number, y: number) => {
+  const container = chipsElement.value
+  const dragging = draggingName.value
+  if (!container || !dragging) return
+  const chips = Array.from(container.querySelectorAll<HTMLElement>('.tags-editor__chip'))
+    .map((chip) => ({ name: chip.dataset.tagName ?? '', rect: chip.getBoundingClientRect() }))
+  if (!chips.length) return
+
+  // 分行（flex-wrap），按光标 y 就近取行
+  const rows: Array<typeof chips> = []
+  for (const chip of chips) {
+    const row = rows.find((candidate) => candidate[0].rect.top === chip.rect.top)
+    if (row) row.push(chip)
+    else rows.push([chip])
+  }
+  rows.sort((a, b) => a[0].rect.top - b[0].rect.top)
+  for (const row of rows) row.sort((a, b) => a.rect.left - b.rect.left)
+  let bestRow = rows[0]
+  let bestDistance = Infinity
+  for (const row of rows) {
+    const { top, bottom } = row[0].rect
+    const distance = y < top ? top - y : y > bottom ? y - bottom : 0
+    if (distance < bestDistance) {
+      bestDistance = distance
+      bestRow = row
+    }
+  }
+
+  const boundaries = [
+    bestRow[0].rect.left,
+    ...bestRow.slice(1).map((chip, index) => (bestRow[index].rect.right + chip.rect.left) / 2),
+    bestRow[bestRow.length - 1].rect.right,
+  ]
+  const draggedInRow = bestRow.some((chip) => chip.name === dragging)
+  const othersInRow = bestRow.length - (draggedInRow ? 1 : 0)
+  const crossed = boundaries.filter((boundary) => x >= boundary).length
+  const rowSlot = Math.min(Math.max(crossed - 1, 0), othersInRow)
+
+  // 行内槽位换算成全列表下标：本行之前各行贡献的（不含被拖 chip 的）chip 数
+  let rowStart = 0
+  for (const row of rows) {
+    if (row === bestRow) break
+    rowStart += row.length - (row.some((chip) => chip.name === dragging) ? 1 : 0)
+  }
+
+  const names = chips.map((chip) => chip.name).filter((name) => name !== dragging)
+  names.splice(rowStart + rowSlot, 0, dragging)
+  if (names.some((tag, index) => tag !== localNames.value[index])) {
+    localNames.value = names
+    orderDirty = true
+  }
+}
+
+const handleChipPointerDown = (name: string, event: PointerEvent) => {
+  if (event.button !== 0) return
+  dragPointer = { name, startX: event.clientX, startY: event.clientY, active: false }
+  window.addEventListener('pointermove', handleWindowPointerMove, true)
+  window.addEventListener('pointerup', handleWindowPointerUp, true)
+  window.addEventListener('pointercancel', handleWindowPointerUp, true)
+}
+
+const handleWindowPointerMove = (event: PointerEvent) => {
+  const drag = dragPointer
+  if (!drag) return
+  if (!drag.active) {
+    const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY)
+    if (moved < DRAG_THRESHOLD_PX) return
+    drag.active = true
+    draggingName.value = drag.name
+    orderDirty = false
+    armedTag.value = null
+  }
+  reorderToPoint(event.clientX, event.clientY)
+}
+
+const handleWindowPointerUp = () => {
+  window.removeEventListener('pointermove', handleWindowPointerMove, true)
+  window.removeEventListener('pointerup', handleWindowPointerUp, true)
+  window.removeEventListener('pointercancel', handleWindowPointerUp, true)
+  const drag = dragPointer
+  dragPointer = null
+  if (!drag?.active) return
+  // 拖完松手会紧跟着触发 click，吞掉这一次，避免误触 × 的开关。
+  suppressNextClick = true
+  finishDrag()
+}
+
+const handleChipClick = (name: string) => {
+  if (suppressNextClick) {
+    suppressNextClick = false
+    return
+  }
+  toggleArm(name)
+}
+
+// × 只在「待删」chip 上停留：点到别处（含其他 chip、面板空白）即收起。
+const disarmOnOutsidePointerDown = (event: PointerEvent) => {
+  if (!armedTag.value) return
+  const target = event.target
+  const chip = target instanceof Element ? target.closest<HTMLElement>('.tags-editor__chip') : null
+  if (chip?.dataset.tagName === armedTag.value) return
+  armedTag.value = null
 }
 
 // 点击空白（失焦）：有未确认输入则自动提交，空输入则收起；非法输入保留待改。
@@ -176,7 +300,8 @@ const handleInputKeydown = (event: KeyboardEvent) => {
 
   if (event.key === 'Enter') {
     event.preventDefault()
-    addTag(inputValue.value)
+    // 回车保存并收起输入框，不连续进入下一个标签的编辑。
+    if (addTag(inputValue.value)) collapseInput()
     return
   }
 
@@ -198,10 +323,12 @@ const canLeave = async () => {
 
 onMounted(() => {
   unregisterGuard = unsavedChanges.register(canLeave)
+  document.addEventListener('pointerdown', disarmOnOutsidePointerDown, true)
 })
 
 onBeforeUnmount(() => {
   unregisterGuard?.()
+  document.removeEventListener('pointerdown', disarmOnOutsidePointerDown, true)
 })
 
 defineExpose({
@@ -215,15 +342,32 @@ defineExpose({
       <h3 class="flex-none text-sm font-semibold text-[var(--shell-ink)]">{{ t('tags.title') }}</h3>
     </div>
 
-    <!-- 直接操作模型：右键 chip 打开删除菜单，行尾「＋」/输入框即点即加，无显式保存 -->
-    <div class="tags-editor__chips" data-testid="tags-chips">
+    <!-- 直接操作模型：点击 chip 出 × 删除、拖动 chip 排序，行尾「＋」/输入框即点即加，无显式保存 -->
+    <div
+      ref="chipsElement"
+      class="tags-editor__chips"
+      data-testid="tags-chips"
+    >
       <span
         v-for="name in localNames"
         :key="name"
         class="tags-editor__chip"
-        @contextmenu.prevent="openTagMenu(name, $event)"
+        :class="{ 'tags-editor__chip--dragging': draggingName === name }"
+        :data-tag-name="name"
+        @pointerdown="handleChipPointerDown(name, $event)"
+        @click="handleChipClick(name)"
       >
         <span class="tags-editor__chip-text">{{ name }}</span>
+        <button
+          v-if="armedTag === name"
+          type="button"
+          class="tags-editor__chip-remove"
+          :aria-label="t('tags.deleteTag')"
+          @click.stop="removeTag(name)"
+          @pointerdown.stop
+        >
+          <XMarkIcon class="h-3 w-3" aria-hidden="true" />
+        </button>
       </span>
       <input
         v-if="inputActive"
@@ -280,14 +424,6 @@ defineExpose({
     >
       {{ t('tags.noMatch') }}
     </p>
-
-    <TagContextMenu
-      :tag-name="tagMenu?.name ?? null"
-      :x="tagMenu?.x ?? 0"
-      :y="tagMenu?.y ?? 0"
-      @delete="removeTag"
-      @close="closeTagMenu"
-    />
   </section>
 </template>
 
@@ -310,6 +446,28 @@ defineExpose({
   color: var(--shell-ink);
   font-size: 0.75rem;
   line-height: 1.25rem;
+  cursor: default;
+}
+
+.tags-editor__chip--dragging {
+  opacity: 0.4;
+}
+
+.tags-editor__chip-remove {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--shell-muted);
+  cursor: default;
+  transition: color 160ms ease;
+}
+
+.tags-editor__chip-remove:hover {
+  color: var(--color-danger);
 }
 
 .tags-editor__chip-text {
