@@ -4,7 +4,6 @@ import { useSettingsStore } from '@/stores/settings'
 import { isDesktopShell } from '@/platform/desktop'
 import { createLogger } from '@/utils/logger'
 import {
-  aggregateNotes,
   createNotesLoader,
   parseNotes,
   type Notes,
@@ -57,14 +56,11 @@ export const useUpdatesStore = defineStore('updates', () => {
   const installFailed = ref(false)
 
   const updateNotes = ref<Notes | null>(null)
-  const updateNotesLoading = ref(false)
-  const updateNotesPartial = ref(false)
   const currentNotes = ref<Notes | null>(null)
   const currentNotesError = ref<'' | 'settings.notesMissing' | 'settings.notesNetwork'>('')
   const currentNotesLoading = ref(false)
 
   const loadNotes = createNotesLoader()
-  let notesGeneration = 0
   let currentNotesRequested = false
 
   const showAvailableBadge = computed(() => Boolean(availableUpdate.value))
@@ -86,19 +82,6 @@ export const useUpdatesStore = defineStore('updates', () => {
       // localStorage 不可用时仅本次会话生效。
     }
   }
-
-  // 开发通道用内存里的假索引，真实通道照旧抓 GitHub Pages。
-  const loadNotesFor = async (targetChannel: string) => {
-    if (import.meta.env.DEV && targetChannel === DEV_UPDATE_CHANNEL) {
-      const { devReleaseNotes } = await import('@/dev/fakeUpdateChannel')
-      return devReleaseNotes()
-    }
-    return loadNotes()
-  }
-
-  // dev-test 按预览语义聚合，再交给 aggregateNotes 的截断规则。
-  const aggregationChannel = (targetChannel: string): 'stable' | 'preview' =>
-    targetChannel === 'stable' ? 'stable' : 'preview'
 
   const recordCurrentVersion = (version: string) => {
     if (!version) return
@@ -132,19 +115,10 @@ export const useUpdatesStore = defineStore('updates', () => {
             logger.error('Failed to sync update mirror mode: %s', error)
           })
         }
-        const generation = ++notesGeneration
-        updateNotes.value = null
-        updateNotesPartial.value = false
-        updateNotesLoading.value = true
-        void loadNotesFor(requestedChannel).then((entries) => {
-          if (generation !== notesGeneration) return
-          updateNotes.value = aggregateNotes(entries, currentVersion.value, target.version, aggregationChannel(requestedChannel))
-          updateNotesPartial.value = !updateNotes.value
-        }).catch(() => {
-          if (generation === notesGeneration) updateNotesPartial.value = true
-        }).finally(() => {
-          if (generation === notesGeneration) updateNotesLoading.value = false
-        })
+        // 更新弹窗直接渲染 updater manifest 带回的目标版正文：与版本检测
+        // 同一次响应，不存在第二数据源的陈旧/缺录问题（原 index 聚合路径
+        // 会被 WebView/CDN 缓存打穿，表现为发布后检查更新只见裸 markdown）。
+        updateNotes.value = target.notes ? parseNotes(target.notes) : null
       }
       return target
     } catch (error) {
@@ -201,22 +175,9 @@ export const useUpdatesStore = defineStore('updates', () => {
     }
   }
 
-  // 手动重新检查到新版本后调用，让顶栏浮窗展示同一份聚合说明。
-  const refreshUpdateNotes = (version: string) => {
-    const generation = ++notesGeneration
-    const requestedChannel = channel.value
-    updateNotes.value = null
-    updateNotesPartial.value = false
-    updateNotesLoading.value = true
-    void loadNotesFor(requestedChannel).then((entries) => {
-      if (generation !== notesGeneration) return
-      updateNotes.value = aggregateNotes(entries, currentVersion.value, version, aggregationChannel(requestedChannel))
-      updateNotesPartial.value = !updateNotes.value
-    }).catch(() => {
-      if (generation === notesGeneration) updateNotesPartial.value = true
-    }).finally(() => {
-      if (generation === notesGeneration) updateNotesLoading.value = false
-    })
+  // 手动重新检查到新版本后调用，让顶栏浮窗展示同一份说明。
+  const refreshUpdateNotes = (notes: string | null) => {
+    updateNotes.value = notes ? parseNotes(notes) : null
   }
 
   return {
@@ -227,8 +188,6 @@ export const useUpdatesStore = defineStore('updates', () => {
     installFailed,
     showAvailableBadge,
     updateNotes,
-    updateNotesLoading,
-    updateNotesPartial,
     currentNotes,
     currentNotesError,
     currentNotesLoading,

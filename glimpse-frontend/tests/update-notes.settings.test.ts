@@ -217,8 +217,11 @@ describe('Settings update notes', () => {
     expect(document.body.textContent).not.toContain('更新说明获取失败')
   })
 
-  it('opens the update dialog with aggregated notes after finding a new version', async () => {
-    apiMocks.invoke.mockResolvedValue({ version: '0.3.3-preview.20261003', notes: '预览正文' })
+  it('opens the update dialog with the manifest notes after finding a new version', async () => {
+    apiMocks.invoke.mockResolvedValue({
+      version: '0.3.3-preview.20261003',
+      notes: '**新特性**\n- 预览新能力\n\n**优化**\n- 预览优化\n\n**修复**\n\n**Full Changelog**: x',
+    })
     const wrapper = await openUpdates(await mountSettings())
 
     await checkButton(wrapper).trigger('click')
@@ -229,26 +232,30 @@ describe('Settings update notes', () => {
     expect(dialog.props('open')).toBe(true)
     expect(dialog.props('title')).toContain('0.3.3-preview.20261003')
     const bodyText = document.body.textContent ?? ''
+    // 正文来自版本检测同一份 manifest 返回值，弹窗不再依赖 index.json
+    // （fetchIndex 仅剩设置页挂载时的当前版本日志预取这一次）
+    expect(apiMocks.fetchIndex).toHaveBeenCalledTimes(1)
     expect(bodyText).toContain('预览新能力')
     expect(bodyText).toContain('优化')
-    expect(bodyText).not.toContain('0.3.2 已有功能')
+    expect(bodyText).not.toContain('**新特性**')
   })
 
-  it('falls back to raw target notes when the index load fails', async () => {
-    apiMocks.invoke.mockResolvedValue({ version: '0.3.3-preview.20261003', notes: '单版正文' })
-    apiMocks.fetchIndex.mockRejectedValue(new TypeError('offline'))
+  it('renders an unrecognised manifest body as a plain paragraph', async () => {
+    apiMocks.invoke.mockResolvedValue({ version: '0.3.3-preview.20261003', notes: '单版正文，无分组标题' })
     const wrapper = await openUpdates(await mountSettings())
 
     await checkButton(wrapper).trigger('click')
     await flushPromises()
     await flushPromises()
 
-    expect(document.body.textContent).toContain('部分版本说明获取失败')
-    expect(document.body.textContent).toContain('单版正文')
+    expect(document.body.textContent).toContain('单版正文，无分组标题')
   })
 
   it('keeps the discovered update available after dismissing the dialog', async () => {
-    apiMocks.invoke.mockResolvedValue({ version: '0.3.3-preview.20261003', notes: null })
+    apiMocks.invoke.mockResolvedValue({
+      version: '0.3.3-preview.20261003',
+      notes: '**优化**\n- 0.3.3 正文条目',
+    })
     const wrapper = await openUpdates(await mountSettings())
 
     await checkButton(wrapper).trigger('click')
@@ -261,11 +268,11 @@ describe('Settings update notes', () => {
     expect(dialog.props('open')).toBe(false)
     expect(wrapper.text()).toContain('发现新版本 0.3.3-preview.20261003')
 
-    // 箭头浮层复用同一份聚合内容并可以再次打开。
+    // 箭头浮层复用同一份说明内容并可以再次打开。
     const arrow = wrapper.findAll('button').find((button) => button.attributes('aria-label') === '查看更新说明')!
     await arrow.trigger('click')
     await flushPromises()
-    expect(document.body.textContent).toContain('预览新能力')
+    expect(document.body.textContent).toContain('0.3.3 正文条目')
   })
 
   it('offers the dev channel and never writes it into settings', async () => {
@@ -293,9 +300,6 @@ describe('Settings update notes', () => {
     expect(dialog.props('title')).toContain('1.0.0-beta.1')
     const bodyText = document.body.textContent ?? ''
     expect(bodyText).toContain('记忆墙支持自定义排序')
-    expect(bodyText).toContain('新增记忆连拍合并开关')
-    expect(bodyText).not.toContain('仅预览版测试条目（聚合时应被剔除）')
-    expect(bodyText).not.toContain('部分版本说明获取失败')
     expect(bodyText).not.toContain('**新特性**')
     expect(bodyText).not.toContain('Full Changelog')
   })
@@ -410,7 +414,6 @@ describe('Settings update notes', () => {
     const updatesStore = useUpdatesStore()
     updatesStore.recordCurrentVersion('0.3.2')
     await updatesStore.checkForUpdate()
-    await vi.waitFor(() => expect(updatesStore.updateNotesLoading).toBe(false))
     // adoptStoreUpdate 在 onMounted 已跑过；这里直接驱动一次同步以验证展示路径。
     ;(wrapper.vm as unknown as { adoptStoreUpdate?: () => void }).adoptStoreUpdate?.()
 

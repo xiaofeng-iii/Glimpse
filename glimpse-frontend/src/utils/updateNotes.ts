@@ -39,32 +39,19 @@ export function parseNotes(body: string): Notes {
   if (!recognized && body.trim()) result.miscellaneous.push(body)
   return result
 }
-export function aggregateNotes(releases: ReleaseNotes[], current: string, target: string, channel: 'stable' | 'preview'): Notes | null {
-  const lower = releases.find((r) => r.version === current)?.sortKey ?? versionKey(current)
-  const upper = releases.find((r) => r.version === target)
-  if (!lower || !upper || (channel === 'stable' && upper.preview) || compareKeys(lower, upper.sortKey) >= 0) return null
-  let candidates = releases.filter((r) => compareKeys(r.sortKey, lower) > 0 && compareKeys(r.sortKey, upper.sortKey) <= 0 && (channel === 'preview' || !r.preview)).sort((a, b) => compareKeys(b.sortKey, a.sortKey))
-  const newestStable = candidates.find((r) => !r.preview)
-  if (newestStable) candidates = candidates.filter((r) => !r.preview || compareKeys(r.sortKey, newestStable.sortKey) > 0)
-  const result = parseNotes('')
-  for (const release of candidates) {
-    const parsed = parseNotes(release.notes)
-    for (const category of ['features', 'improvements', 'fixes'] as const) result.sections[category].push(...parsed.sections[category])
-    result.miscellaneous.push(...parsed.miscellaneous)
-  }
-  return result
-}
 
 // Page-session cache; public fetch never uses the authenticated local API client.
 // 只缓存成功的结果：网络失败时丢弃 promise，下次调用重新发起请求。
 // 若缓存 rejected promise，瞬时断网会把整段会话锁死在失败态，再无重试入口。
+// no-cache：index 部署后旧副本可能仍驻留在 WebView 磁盘缓存与 CDN 边缘
+// （max-age=600），条件请求回源的开销极小，换当前版本日志发布后即刻可见。
 export function createNotesLoader() {
   let cached: Promise<ReleaseNotes[]> | undefined
   return () => cached ??= (async () => {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 12000)
     try {
-      const response = await fetch(notesIndexUrl, { credentials: 'omit', signal: controller.signal })
+      const response = await fetch(notesIndexUrl, { credentials: 'omit', cache: 'no-cache', signal: controller.signal })
       if (!response.ok) throw new Error('Notes unavailable')
       const entries = parseIndex(await response.json())
       cached = Promise.resolve(entries)

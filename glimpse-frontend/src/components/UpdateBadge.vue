@@ -44,12 +44,7 @@ const installNow = async () => {
         <ArrowDownTrayIcon class="h-[15px] w-[15px]" aria-hidden="true" />
       </button>
     </template>
-    <UpdateNotesContent
-      :notes="updates.updateNotes"
-      :loading="updates.updateNotesLoading"
-      :partial="updates.updateNotesPartial"
-      :raw="updates.updateNotesPartial ? updates.availableUpdate.notes ?? '' : undefined"
-    />
+    <UpdateNotesContent :notes="updates.updateNotes" />
     <template #footer>
       <!-- 查看详情只是跳转设置页，下载安装状态在全局 store，不随导航丢失，下载中保持可点 -->
       <button type="button" class="btn-secondary" @click="viewDetails">

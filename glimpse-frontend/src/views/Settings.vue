@@ -130,8 +130,6 @@ const updateDialogOpen = ref(false)
 const currentNotesOpen = ref(false)
 const targetNotesOpen = ref(false)
 const updateNotes = computed(() => updatesStore.updateNotes)
-const updateNotesLoading = computed(() => updatesStore.updateNotesLoading)
-const updateNotesPartial = computed(() => updatesStore.updateNotesPartial)
 const installFailed = ref(false)
 let updateGeneration = 0
 let disposed = false
@@ -556,7 +554,7 @@ const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
     if (disposed || generation !== updateGeneration) return
     availableUpdate.value = target
     updatesStore.availableUpdate = target
-    if (target) updatesStore.refreshUpdateNotes(target.version)
+    if (target) updatesStore.refreshUpdateNotes(target.notes)
     if (!target) {
       if (!silent) notifications.show(t('settings.updateCurrent'), 'info')
       return
@@ -765,7 +763,7 @@ onUnmounted(() => {
 
 <template>
   <ConfirmDialog id="update-notes" :open="updateDialogOpen" :title="t('settings.updateAvailable', { version: availableUpdate?.version ?? '' })" :description="updatesStore.installing ? t('settings.updateInstalling') : ''" :confirm-label="t('settings.updateNow')" :cancel-label="t('settings.updateLater')" :busy="updatesStore.installing" hide-icon @cancel="updateDialogOpen = false" @confirm="installUpdate">
-    <UpdateNotesContent v-if="!updatesStore.installing" :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate?.notes ?? '' : undefined" />
+    <UpdateNotesContent v-if="!updatesStore.installing" :notes="updateNotes" />
   </ConfirmDialog>
   <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-4 sm:p-5">
     <div class="mx-auto flex h-full min-h-0 w-full max-w-[1020px] flex-col">
@@ -1132,7 +1130,7 @@ onUnmounted(() => {
                   <p class="setting-label">{{ t('settings.updateAvailable', { version: availableUpdate.version }) }}</p>
                   <UpdateNotesPopover v-model:open="targetNotesOpen" :label="t('settings.updateAvailable', { version: availableUpdate.version })">
                     <template #trigger><button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--shell-muted)]" :aria-label="t('settings.notesView')" :disabled="updatesStore.installing"><span aria-hidden="true">›</span></button></template>
-                    <UpdateNotesContent :notes="updateNotes" :loading="updateNotesLoading" :partial="updateNotesPartial" :raw="updateNotesPartial ? availableUpdate.notes ?? '' : undefined" />
+                    <UpdateNotesContent :notes="updateNotes" />
                   </UpdateNotesPopover>
                 </div>
                 <button type="button" class="btn-primary mt-3" :disabled="updatesStore.installing || checkingUpdate" @click="installUpdate">

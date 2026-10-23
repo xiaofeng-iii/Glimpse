@@ -49,20 +49,22 @@ describe('updates store', () => {
     } as never
   })
 
-  it('stores the available update and aggregates its notes', async () => {
+  it('stores the available update and parses its manifest notes inline', async () => {
     const store = useUpdatesStore()
     store.recordCurrentVersion('0.3.2')
-    apiMocks.invoke.mockResolvedValue({ version: '0.3.3', notes: '单版正文' })
+    apiMocks.invoke.mockResolvedValue({
+      version: '0.3.3',
+      notes: '**新特性**\n- 0.3.3 新能力',
+    })
 
     const target = await store.checkForUpdate()
 
     expect(apiMocks.invoke).toHaveBeenCalledWith('check_for_update', { channel: 'stable' })
     expect(target?.version).toBe('0.3.3')
     expect(store.showAvailableBadge).toBe(true)
-
-    await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
-    expect(store.updateNotes?.sections.features).toContain('0.3.3 新能力')
-    expect(store.updateNotes?.sections.features).not.toContain('0.3.2 已有功能')
+    // 说明正文来自版本检测的同一份 manifest 返回值，不再单独拉 index
+    expect(apiMocks.fetchIndex).not.toHaveBeenCalled()
+    expect(store.updateNotes?.sections.features).toEqual(['0.3.3 新能力'])
   })
 
   it('syncs mirror mode to Rust after a successful check', async () => {
@@ -112,12 +114,8 @@ describe('updates store', () => {
     expect(apiMocks.fetchIndex).not.toHaveBeenCalled()
     expect(target?.version).toBe('1.0.0-beta.1')
     expect(store.showAvailableBadge).toBe(true)
-    await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
-    expect(store.updateNotesPartial).toBe(false)
     expect(store.updateNotes?.sections.features).toContain('记忆墙支持自定义排序')
-    expect(store.updateNotes?.sections.features).toContain('新增记忆连拍合并开关')
-    expect(store.updateNotes?.sections.features).not.toContain('仅预览版测试条目（聚合时应被剔除）')
-    expect(store.updateNotes?.miscellaneous).toEqual([])
+    expect(store.updateNotes?.sections.fixes.length).toBeGreaterThan(0)
   })
 
   it.each(['1.0.0-beta.1', '1.0.0-beta.2', '1.0.0'])('does not offer the dev beta when already running %s', async (version) => {

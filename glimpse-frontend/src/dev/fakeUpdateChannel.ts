@@ -2,7 +2,7 @@
 // 没有可下载的安装包，用于检查更新相关页面的呈现。
 // 通道标识见 @/stores/updates 的 DEV_UPDATE_CHANNEL；本模块只在 import.meta.env.DEV
 // 分支里被动态导入，生产构建不会产出它。
-import { compareKeys, versionKey, type ReleaseNotes } from '@/utils/updateNotes'
+import { compareKeys, versionKey } from '@/utils/updateNotes'
 
 export const DEV_UPDATE_VERSION = '1.0.0-beta.1'
 
@@ -14,12 +14,7 @@ export interface DevAvailableUpdate {
   notes: string
 }
 
-const release = (version: string, notes: string): ReleaseNotes => {
-  const sortKey = versionKey(version)!
-  return { version, preview: sortKey[3] === 0, notes, sortKey }
-}
-
-// 目标版本正文，同时充当假索引不可用时的原始日志兜底。
+// 目标版本正文：与真实通道同源——检查更新的返回值里直接携带，供单版渲染。
 const targetNotes = `**新特性**
 - 记忆墙支持自定义排序
 - 详情页支持整段复制
@@ -68,12 +63,6 @@ const targetNotes = `**新特性**
 - 修复超长内容末尾可读性检查：这是开发模拟更新说明的最后一项，用于确认从顶部开始的长列表没有在中途截断；看到这句话后，应当仍能读到本条的完整句号，并能继续执行查看详情、关闭说明或稍后再说等原有操作。`
 
 // 假索引故意混入一条被最新正式版覆盖的预览条目：聚合结果里不该出现它。
-export const devReleaseNotes = (): ReleaseNotes[] => [
-  release(DEV_UPDATE_VERSION, targetNotes),
-  release('0.5.0-beta.1', '**新特性**\n- 仅预览版测试条目（聚合时应被剔除）'),
-  release('0.5.0', '**新特性**\n- 新增记忆连拍合并开关\n\n**优化**\n- 启动速度更快'),
-]
-
 export const devCheckForUpdate = (currentVersion: string): DevAvailableUpdate | null => {
   const current = versionKey(currentVersion)
   const target = versionKey(DEV_UPDATE_VERSION)
