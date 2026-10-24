@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Download04FreeIcons } from '@hugeicons/core-free-icons'
@@ -14,6 +14,16 @@ const updates = useUpdatesStore()
 const notifications = useNotificationStore()
 
 const updatePopoverOpen = ref(false)
+const installingLabel = computed(() => {
+  const progress = updates.downloadProgress
+  if (!progress) return t('settings.updateInstalling')
+  if (progress.total) {
+    const percent = Math.min(100, Math.floor((progress.downloaded / progress.total) * 100))
+    return t('settings.updateDownloadingPercent', { percent })
+  }
+  const size = Math.max(1, Math.floor(progress.downloaded / (1024 * 1024)))
+  return t('settings.updateDownloadingSize', { size })
+})
 
 const viewDetails = async () => {
   updatePopoverOpen.value = false
@@ -51,8 +61,17 @@ const installNow = async () => {
       <button type="button" class="btn-secondary" @click="viewDetails">
         {{ t('updates.viewDetails') }}
       </button>
+      <button
+        v-if="updates.installing"
+        type="button"
+        class="btn-secondary"
+        :disabled="updates.cancelling"
+        @click="updates.cancelUpdateDownload()"
+      >
+        {{ t('settings.updateCancel') }}
+      </button>
       <button type="button" class="btn-primary" :disabled="updates.installing" @click="installNow">
-        {{ updates.installing ? t('settings.updateInstalling') : t('settings.updateNow') }}
+        {{ updates.installing ? installingLabel : t('settings.updateNow') }}
       </button>
     </template>
   </UpdateNotesPopover>

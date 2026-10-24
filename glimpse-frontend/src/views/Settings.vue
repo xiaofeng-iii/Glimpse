@@ -113,7 +113,7 @@ const updateMirrorMode = ref<'auto' | 'direct' | 'mirror'>('auto')
 const lastRealChannel = ref<'stable' | 'preview'>('stable')
 const currentVersion = ref('')
 const availableUpdate = ref<{ version: string; notes: string | null } | null>(null)
-const checkingUpdate = ref(false)
+const checkingUpdate = computed(() => updatesStore.checking)
 const updateDialogOpen = ref(false)
 const currentNotesOpen = ref(false)
 const targetNotesOpen = ref(false)
@@ -524,27 +524,24 @@ const testOcr = async () => {
 // notify/silent 控制反馈：手动点击要给"已是最新/失败"提示并弹窗，自动检测静默、只把卡片摆上。
 const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
   if (!isDesktopShell() || checkingUpdate.value || updatesStore.installing) return
-  checkingUpdate.value = true
   availableUpdate.value = null
   installFailed.value = false
   targetNotesOpen.value = false
   const generation = ++updateGeneration
-  const channel = updateChannel.value
   try {
-    let target: { version: string; notes: string | null } | null
-    if (import.meta.env.DEV && channel === DEV_UPDATE_CHANNEL) {
-      const { devCheckForUpdate } = await import('@/dev/fakeUpdateChannel')
-      target = devCheckForUpdate(currentVersion.value)
-    } else {
-      const { invoke } = await import('@tauri-apps/api/core')
-      target = await invoke<{ version: string; notes: string | null } | null>('check_for_update', { channel })
-    }
+    const target = await updatesStore.checkForUpdate()
     if (disposed || generation !== updateGeneration) return
     availableUpdate.value = target
     updatesStore.availableUpdate = target
     if (target) updatesStore.refreshUpdateNotes(target.notes)
     if (!target) {
-      if (!silent) notifications.show(t('settings.updateCurrent'), 'info')
+      if (!silent && !disposed && generation === updateGeneration) {
+        if (updatesStore.checkFailed) {
+          notifications.show(t('settings.updateCheckFailed'), 'error')
+        } else {
+          notifications.show(t('settings.updateCurrent'), 'info')
+        }
+      }
       return
     }
     currentNotesOpen.value = false
@@ -552,8 +549,6 @@ const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
   } catch (error) {
     logger.error('Failed to check for updates: %s', error)
     if (!silent && !disposed && generation === updateGeneration) notifications.show(t('settings.updateCheckFailed'), 'error')
-  } finally {
-    checkingUpdate.value = false
   }
 }
 
@@ -566,13 +561,32 @@ const adoptStoreUpdate = () => {
 
 const checkForUpdate = () => runUpdateCheck({ silent: false })
 
+const updateInstallingLabel = computed(() => {
+  const progress = updatesStore.downloadProgress
+  if (!progress) return t('settings.updateInstalling')
+  if (progress.total) {
+    const percent = Math.min(100, Math.floor((progress.downloaded / progress.total) * 100))
+    return t('settings.updateDownloadingPercent', { percent })
+  }
+  const size = Math.max(1, Math.floor(progress.downloaded / (1024 * 1024)))
+  return t('settings.updateDownloadingSize', { size })
+})
+
+const handleUpdateDialogCancel = () => {
+  if (updatesStore.installing) {
+    void updatesStore.cancelUpdateDownload()
+    return
+  }
+  updateDialogOpen.value = false
+}
+
 // 安装状态统一存放在共享 store：设置页卡片、更新弹窗与顶栏浮窗读同一份 installing，
 // 任何一处发起下载，其余位置同步显示「正在下载」。这里只负责失败后的页面内收尾。
 const installUpdate = async () => {
   if (!availableUpdate.value || updatesStore.installing || updatesStore.checking) return
   targetNotesOpen.value = false
   currentNotesOpen.value = false
-  const ok = await updatesStore.installUpdate()
+  const ok = await updatesStore.installUpdate({ mirrorMode: updateMirrorMode.value })
   if (!ok) {
     updateDialogOpen.value = false
     notifications.show(t('settings.updateInstallFailed'), 'error')
@@ -750,7 +764,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <ConfirmDialog id="update-notes" :open="updateDialogOpen" :title="t('settings.updateAvailable', { version: availableUpdate?.version ?? '' })" :description="updatesStore.installing ? t('settings.updateInstalling') : ''" :confirm-label="t('settings.updateNow')" :cancel-label="t('settings.updateLater')" :busy="updatesStore.installing" hide-icon @cancel="updateDialogOpen = false" @confirm="installUpdate">
+  <ConfirmDialog id="update-notes" :open="updateDialogOpen" :title="t('settings.updateAvailable', { version: availableUpdate?.version ?? '' })" description="" :confirm-label="updatesStore.installing ? updateInstallingLabel : t('settings.updateNow')" :cancel-label="updatesStore.installing ? t('settings.updateCancel') : t('settings.updateLater')" :busy="updatesStore.installing" :cancel-while-busy="updatesStore.installing" hide-icon @cancel="handleUpdateDialogCancel" @confirm="installUpdate">
     <UpdateNotesContent v-if="!updatesStore.installing" :notes="updateNotes" />
   </ConfirmDialog>
   <main class="settings-page h-full min-h-0 bg-[var(--shell-window-bg)] p-4 sm:p-5">
@@ -1121,9 +1135,20 @@ onUnmounted(() => {
                     <UpdateNotesContent :notes="updateNotes" />
                   </UpdateNotesPopover>
                 </div>
-                <button type="button" class="btn-primary mt-3" :disabled="updatesStore.installing || checkingUpdate" @click="installUpdate">
-                  {{ updatesStore.installing ? t('settings.updateInstalling') : t('settings.updateInstall') }}
-                </button>
+                <div class="mt-3 flex items-center justify-end gap-2.5">
+                  <button
+                    v-if="updatesStore.installing"
+                    type="button"
+                    class="btn-secondary"
+                    :disabled="updatesStore.cancelling"
+                    @click="updatesStore.cancelUpdateDownload()"
+                  >
+                    {{ t('settings.updateCancel') }}
+                  </button>
+                  <button type="button" class="btn-primary" :disabled="updatesStore.installing || checkingUpdate" @click="installUpdate">
+                    {{ updatesStore.installing ? updateInstallingLabel : t('settings.updateInstall') }}
+                  </button>
+                </div>
               </div>
             </template>
 

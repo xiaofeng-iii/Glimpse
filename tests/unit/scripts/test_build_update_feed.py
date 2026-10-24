@@ -107,8 +107,8 @@ def test_signed_releases_skips_unsigned_and_uses_signature_contents(monkeypatch)
         "prerelease": True,
         "body": "更新说明",
         "assets": [
-            {"name": "Glimpse_0.3.4_x64-setup.exe", "browser_download_url": "https://example.com/setup.exe"},
-            {"name": "Glimpse_0.3.4_x64-setup.exe.sig", "browser_download_url": "https://example.com/setup.exe.sig"},
+            {"name": "Glimpse_0.3.4-preview.20261003_x64-setup.exe", "browser_download_url": "https://example.com/setup.exe"},
+            {"name": "Glimpse_0.3.4-preview.20261003_x64-setup.exe.sig", "browser_download_url": "https://example.com/setup.exe.sig"},
         ],
     }
 
@@ -125,6 +125,26 @@ def test_signed_releases_skips_unsigned_and_uses_signature_contents(monkeypatch)
     assert requests[1] == ("https://example.com/setup.exe.sig", "")
 
     release["assets"] = release["assets"][:1]
+    assert build_update_feed.signed_releases("api-token") == []
+
+
+def test_signed_releases_skips_installer_named_for_another_version(monkeypatch):
+    release = {
+        "tag_name": "v0.3.4-preview.20261003",
+        "draft": False,
+        "prerelease": True,
+        "body": "更新说明",
+        "assets": [
+            {"name": "Glimpse_0.3.3_x64-setup.exe", "browser_download_url": "https://example.com/old.exe"},
+            {"name": "Glimpse_0.3.3_x64-setup.exe.sig", "browser_download_url": "https://example.com/old.exe.sig"},
+        ],
+    }
+
+    monkeypatch.setattr(
+        build_update_feed,
+        "request",
+        lambda url, token: json.dumps([release]).encode("utf-8"),
+    )
     assert build_update_feed.signed_releases("api-token") == []
 
 

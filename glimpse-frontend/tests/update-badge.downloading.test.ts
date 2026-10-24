@@ -31,11 +31,12 @@ const footerStates = () =>
   }))
 
 describe('UpdateBadge 下载中按钮状态', () => {
-  it('下载中：查看详情保持可点（仅跳转设置页），立即更新禁用并显示正在下载', async () => {
+  it('下载中：查看详情与取消下载可点，立即更新禁用并显示正在下载', async () => {
     const wrapper = await mountBadge(true)
     const states = footerStates()
     expect(states).toEqual([
       { text: '查看详情', disabled: false },
+      { text: '取消下载', disabled: false },
       { text: '正在下载', disabled: true },
     ])
     wrapper.unmount()

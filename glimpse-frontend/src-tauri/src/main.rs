@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use futures_util::StreamExt;
+use memmap2::Mmap;
 use serde::Serialize;
 #[cfg(not(debug_assertions))]
 use std::fmt::Write as FmtWrite;
@@ -16,17 +17,19 @@ use std::net::TcpStream;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::str::FromStr;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
 };
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::image::Image;
 use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, Url, WindowEvent};
 use tauri_plugin_updater::{Update, UpdaterExt};
+use tokio::io::AsyncWriteExt;
+
+mod updater_signature;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -35,9 +38,12 @@ const DEV_API_ORIGIN: &str = "http://127.0.0.1:8000";
 const APP_VERSION_ENV: &str = "GLIMPSE_APP_VERSION";
 const STABLE_UPDATE_URL: &str = "https://xiaofeng-iii.github.io/Glimpse/updates/stable.json";
 const PREVIEW_UPDATE_URL: &str = "https://xiaofeng-iii.github.io/Glimpse/updates/preview.json";
-/// 与 tauri.conf.json > plugins > updater > pubkey 保持一致；修改公钥时必须同步。
-const UPDATER_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU0RUVCMzE2RTdGQTg5QzQKUldURWlmcm5GclB1NUNKVU91SXZHTndtc1M1VlNTaTNXcTZMUHpobG5WUTRyNWNlSVAzRk1pSXcK";
+const UPDATE_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const UPDATE_CANDIDATE_TOTAL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+const UPDATE_ALL_CANDIDATES_TIMEOUT: Duration = Duration::from_secs(20 * 60);
 const UPDATE_MIRROR_STALL_TIMEOUT: Duration = Duration::from_secs(15);
+const UPDATE_MAX_INSTALLER_BYTES: u64 = 512 * 1024 * 1024;
+const UPDATE_DOWNLOAD_TEMP_PREFIX: &str = "Glimpse-update-download-";
 const UPDATE_DOWNLOAD_UA: &str = "Glimpse-Updater";
 const DATA_ROOT_ENV: &str = "GLIMPSE_DATA_ROOT";
 const PROJECT_ROOT_ENV: &str = "GLIMPSE_PROJECT_ROOT";
@@ -65,7 +71,8 @@ struct AppState {
     backend_runtime: Mutex<BackendRuntime>,
     quitting: AtomicBool,
     pending_update: Mutex<Option<(Update, Vec<String>)>>,
-    update_mirror_prefer: Mutex<bool>,
+    update_installing: AtomicBool,
+    update_cancel_requested: AtomicBool,
 }
 
 #[derive(Clone, Serialize)]
@@ -91,7 +98,8 @@ impl Default for AppState {
             backend_runtime: Mutex::new(BackendRuntime::default()),
             quitting: AtomicBool::new(false),
             pending_update: Mutex::new(None),
-            update_mirror_prefer: Mutex::new(false),
+            update_installing: AtomicBool::new(false),
+            update_cancel_requested: AtomicBool::new(false),
         }
     }
 }
@@ -545,6 +553,40 @@ struct AvailableUpdate {
     notes: Option<String>,
 }
 
+#[derive(Clone, Serialize)]
+struct UpdateDownloadProgress {
+    downloaded: u64,
+    total: Option<u64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum UpdateInstallStatus {
+    Installed,
+    Cancelled,
+}
+
+struct DownloadedInstaller {
+    _temp_file: tempfile::NamedTempFile,
+    bytes: Mmap,
+}
+
+#[derive(Debug)]
+enum UpdateDownloadError {
+    Cancelled,
+    Sources(Vec<String>),
+}
+
+impl UpdateDownloadError {
+    fn message(&self) -> String {
+        match self {
+            Self::Cancelled => "update download cancelled".to_string(),
+            Self::Sources(errors) if errors.is_empty() => "no download candidates".to_string(),
+            Self::Sources(errors) => errors.join("; "),
+        }
+    }
+}
+
 fn parse_mirrors_from_update(update: &Update) -> Vec<String> {
     update
         .raw_json
@@ -559,101 +601,11 @@ fn parse_mirrors_from_update(update: &Update) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn verify_update_signature(
-    data: &[u8],
-    release_signature: &str,
-    announced_version: &str,
-) -> Result<(), String> {
-    let pub_key_decoded = base64_to_string(UPDATER_PUBKEY)?;
-    let public_key =
-        minisign_verify::PublicKey::decode(&pub_key_decoded).map_err(|error| error.to_string())?;
-    let signature_base64_decoded = base64_to_string(release_signature)?;
-    let signature = minisign_verify::Signature::decode(&signature_base64_decoded)
-        .map_err(|error| error.to_string())?;
-
-    public_key
-        .verify(data, &signature, true)
-        .map_err(|error| error.to_string())?;
-
-    let trusted_comment = signature.trusted_comment();
-    let signed_version = trusted_comment
-        .split('\t')
-        .find_map(|field| field.strip_prefix("version:"));
-    if let Some(signed_version) = signed_version {
-        let matches = match (
-            semver::Version::from_str(signed_version.trim_start_matches('v')),
-            semver::Version::from_str(announced_version.trim_start_matches('v')),
-        ) {
-            (Ok(signed), Ok(announced)) => signed == announced,
-            _ => signed_version == announced_version,
-        };
-        if !matches {
-            return Err(format!(
-                "signed version mismatch: signed={}, announced={}",
-                signed_version, announced_version
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn base64_to_string(base64_string: &str) -> Result<String, String> {
-    use base64::Engine;
-    let decoded = base64::engine::general_purpose::STANDARD
-        .decode(base64_string)
-        .map_err(|error| error.to_string())?;
-    String::from_utf8(decoded).map_err(|error| error.to_string())
-}
-
-async fn download_from_candidate(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, String> {
-    let response = client
-        .get(url)
-        .header(reqwest::header::USER_AGENT, UPDATE_DOWNLOAD_UA)
-        .send()
-        .await
-        .map_err(|error| error.to_string())?;
-
-    if !response.status().is_success() {
-        return Err(format!("HTTP {}", response.status()));
-    }
-
-    if let Some(content_type) = response.headers().get(reqwest::header::CONTENT_TYPE) {
-        if let Ok(value) = content_type.to_str() {
-            if value.contains("text/html") {
-                return Err("mirror returned HTML page".to_string());
-            }
-        }
-    }
-
-    let mut stream = response.bytes_stream();
-    let mut buffer = Vec::new();
-    let mut sniffed = false;
-
-    while let Some(chunk_result) = tokio::time::timeout(UPDATE_MIRROR_STALL_TIMEOUT, stream.next())
-        .await
-        .map_err(|_| "download stalled".to_string())?
-    {
-        let chunk = chunk_result.map_err(|error| error.to_string())?;
-        if !sniffed {
-            if chunk.starts_with(b"<") {
-                return Err("mirror returned HTML content".to_string());
-            }
-            sniffed = true;
-        }
-        buffer.extend_from_slice(&chunk);
-    }
-
-    Ok(buffer)
-}
-
-async fn download_update_with_mirrors(
+fn update_download_candidates(
     original_url: &Url,
-    signature: &str,
-    announced_version: &str,
     mirror_prefixes: &[String],
     prefer_mirror: bool,
-) -> Result<Vec<u8>, String> {
-    let client = reqwest::Client::new();
+) -> Vec<String> {
     let mut candidates = Vec::new();
     if prefer_mirror {
         for prefix in mirror_prefixes {
@@ -661,29 +613,261 @@ async fn download_update_with_mirrors(
         }
     }
     candidates.push(original_url.to_string());
+    candidates
+}
 
-    let mut last_error = "no download candidates".to_string();
-    for candidate in candidates {
-        match download_from_candidate(&client, &candidate).await {
-            Ok(bytes) => {
-                verify_update_signature(&bytes, signature, announced_version)?;
-                return Ok(bytes);
-            }
-            Err(error) => {
-                last_error = format!("{}: {}", candidate, error);
+fn update_installer_file_name(update: &Update) -> Result<&str, String> {
+    update
+        .download_url
+        .path_segments()
+        .and_then(|segments| segments.last())
+        .filter(|file_name| !file_name.is_empty())
+        .ok_or_else(|| {
+            format!(
+                "update download URL has no installer file name: {}",
+                update.download_url
+            )
+        })
+}
+
+fn emit_update_progress(app: &AppHandle, progress: &UpdateDownloadProgress) {
+    if app
+        .emit("glimpse://update-download-progress", progress)
+        .is_err()
+    {
+        eprintln!("Failed to emit update download progress");
+    }
+}
+
+fn update_download_cancelled(cancel_requested: &AtomicBool) -> bool {
+    cancel_requested.load(Ordering::SeqCst)
+}
+
+async fn download_from_candidate(
+    client: &reqwest::Client,
+    url: &str,
+    app: &AppHandle,
+    cancel_requested: &AtomicBool,
+) -> Result<DownloadedInstaller, UpdateDownloadError> {
+    if update_download_cancelled(cancel_requested) {
+        return Err(UpdateDownloadError::Cancelled);
+    }
+
+    let response = client
+        .get(url)
+        .header(reqwest::header::USER_AGENT, UPDATE_DOWNLOAD_UA)
+        .send()
+        .await
+        .map_err(|error| UpdateDownloadError::Sources(vec![error.to_string()]))?;
+
+    if !response.status().is_success() {
+        return Err(UpdateDownloadError::Sources(vec![format!(
+            "HTTP {}",
+            response.status()
+        )]));
+    }
+
+    if let Some(content_type) = response.headers().get(reqwest::header::CONTENT_TYPE) {
+        if let Ok(value) = content_type.to_str() {
+            if value.contains("text/html") {
+                return Err(UpdateDownloadError::Sources(vec![
+                    "mirror returned HTML page".to_string(),
+                ]));
             }
         }
     }
-    Err(last_error)
+
+    let total = response.content_length();
+    if total.is_some_and(|length| length > UPDATE_MAX_INSTALLER_BYTES) {
+        return Err(UpdateDownloadError::Sources(vec![format!(
+            "installer is larger than {} bytes",
+            UPDATE_MAX_INSTALLER_BYTES
+        )]));
+    }
+
+    let temp_file = tempfile::Builder::new()
+        .prefix(UPDATE_DOWNLOAD_TEMP_PREFIX)
+        .suffix(".installer")
+        .tempfile()
+        .map_err(|error| UpdateDownloadError::Sources(vec![error.to_string()]))?;
+    let mut writer = tokio::fs::File::from_std(
+        temp_file
+            .reopen()
+            .map_err(|error| UpdateDownloadError::Sources(vec![error.to_string()]))?,
+    );
+
+    let mut stream = response.bytes_stream();
+    let mut downloaded: u64 = 0;
+    let mut sniffed = false;
+    let mut last_percent = 0;
+    let mut last_mib = 0;
+    emit_update_progress(app, &UpdateDownloadProgress { downloaded, total });
+
+    loop {
+        if update_download_cancelled(cancel_requested) {
+            return Err(UpdateDownloadError::Cancelled);
+        }
+
+        let chunk_result = tokio::time::timeout(UPDATE_MIRROR_STALL_TIMEOUT, stream.next())
+            .await
+            .map_err(|_| UpdateDownloadError::Sources(vec!["download stalled".to_string()]))?;
+        let Some(chunk) = chunk_result else {
+            break;
+        };
+        let chunk = chunk.map_err(|error| UpdateDownloadError::Sources(vec![error.to_string()]))?;
+
+        if !sniffed {
+            if chunk.starts_with(b"<") {
+                return Err(UpdateDownloadError::Sources(vec![
+                    "mirror returned HTML content".to_string(),
+                ]));
+            }
+            sniffed = true;
+        }
+
+        downloaded = downloaded.checked_add(chunk.len() as u64).ok_or_else(|| {
+            UpdateDownloadError::Sources(vec!["installer size overflow".to_string()])
+        })?;
+        if downloaded > UPDATE_MAX_INSTALLER_BYTES {
+            return Err(UpdateDownloadError::Sources(vec![format!(
+                "installer is larger than {} bytes",
+                UPDATE_MAX_INSTALLER_BYTES
+            )]));
+        }
+
+        writer
+            .write_all(&chunk)
+            .await
+            .map_err(|error| UpdateDownloadError::Sources(vec![error.to_string()]))?;
+
+        let progress = UpdateDownloadProgress { downloaded, total };
+        let should_emit = match total {
+            Some(total) if total > 0 => {
+                let percent = (downloaded * 100 / total).min(100);
+                if percent > last_percent {
+                    last_percent = percent;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => {
+                let mib = downloaded / (1024 * 1024);
+                if mib > last_mib {
+                    last_mib = mib;
+                    true
+                } else {
+                    false
+                }
+            }
+        };
+        if should_emit {
+            emit_update_progress(app, &progress);
+        }
+    }
+
+    writer
+        .sync_all()
+        .await
+        .map_err(|error| UpdateDownloadError::Sources(vec![error.to_string()]))?;
+    drop(writer);
+
+    let bytes = unsafe { Mmap::map(temp_file.as_file()) }
+        .map_err(|error| UpdateDownloadError::Sources(vec![error.to_string()]))?;
+    emit_update_progress(
+        app,
+        &UpdateDownloadProgress {
+            downloaded,
+            total: Some(downloaded),
+        },
+    );
+
+    Ok(DownloadedInstaller {
+        _temp_file: temp_file,
+        bytes,
+    })
+}
+
+async fn download_update_with_mirrors(
+    app: &AppHandle,
+    original_url: &Url,
+    signature: &str,
+    announced_version: &str,
+    expected_file_name: &str,
+    mirror_prefixes: &[String],
+    prefer_mirror: bool,
+    cancel_requested: &AtomicBool,
+) -> Result<DownloadedInstaller, UpdateDownloadError> {
+    let client = reqwest::Client::builder()
+        .connect_timeout(UPDATE_CONNECT_TIMEOUT)
+        .timeout(UPDATE_CANDIDATE_TOTAL_TIMEOUT)
+        .build()
+        .map_err(|error| UpdateDownloadError::Sources(vec![error.to_string()]))?;
+    let candidates = update_download_candidates(original_url, mirror_prefixes, prefer_mirror);
+    let deadline = Instant::now() + UPDATE_ALL_CANDIDATES_TIMEOUT;
+
+    // 下载失败与签名失败都只淘汰当前候选源；全部失败时汇总每个源的报错，
+    // 避免只把最后的直连错误暴露给前端，掩盖镜像是否被尝试过。
+    let mut errors = Vec::new();
+    for candidate in candidates {
+        if update_download_cancelled(cancel_requested) {
+            return Err(UpdateDownloadError::Cancelled);
+        }
+        if Instant::now() >= deadline {
+            errors.push("all update sources exceeded the total download timeout".to_string());
+            return Err(UpdateDownloadError::Sources(errors));
+        }
+
+        let installer =
+            match download_from_candidate(&client, &candidate, app, cancel_requested).await {
+                Ok(installer) => installer,
+                Err(UpdateDownloadError::Cancelled) => {
+                    return Err(UpdateDownloadError::Cancelled);
+                }
+                Err(UpdateDownloadError::Sources(source_errors)) => {
+                    for error in source_errors {
+                        errors.push(format!("{}: {}", candidate, error));
+                    }
+                    continue;
+                }
+            };
+
+        if let Err(error) = updater_signature::verify_update_signature(
+            &installer.bytes,
+            signature,
+            announced_version,
+            expected_file_name,
+        ) {
+            errors.push(format!(
+                "{}: signature verification failed: {}",
+                candidate, error
+            ));
+            continue;
+        }
+        return Ok(installer);
+    }
+
+    Err(UpdateDownloadError::Sources(errors))
+}
+
+struct UpdateInstallGuard<'a> {
+    installing: &'a AtomicBool,
+    cancel_requested: &'a AtomicBool,
+}
+
+impl Drop for UpdateInstallGuard<'_> {
+    fn drop(&mut self) {
+        self.cancel_requested.store(false, Ordering::SeqCst);
+        self.installing.store(false, Ordering::SeqCst);
+    }
 }
 
 #[tauri::command]
-async fn set_update_mirror_mode(app: AppHandle, prefer_mirror: bool) -> Result<(), String> {
+async fn cancel_update_download(app: AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
-    *state
-        .update_mirror_prefer
-        .lock()
-        .map_err(|error| error.to_string())? = prefer_mirror;
+    if state.update_installing.load(Ordering::SeqCst) {
+        state.update_cancel_requested.store(true, Ordering::SeqCst);
+    }
     Ok(())
 }
 
@@ -692,6 +876,11 @@ async fn check_for_update(
     app: AppHandle,
     channel: String,
 ) -> Result<Option<AvailableUpdate>, String> {
+    let state = app.state::<AppState>();
+    if state.update_installing.load(Ordering::SeqCst) {
+        return Err("An update installation is already in progress".to_string());
+    }
+
     let endpoint = match channel.as_str() {
         "stable" => STABLE_UPDATE_URL,
         "preview" => PREVIEW_UPDATE_URL,
@@ -730,28 +919,57 @@ async fn check_for_update(
 }
 
 #[tauri::command]
-async fn install_checked_update(app: AppHandle) -> Result<(), String> {
-    let (update, mirrors) = app
-        .state::<AppState>()
+async fn install_checked_update(
+    app: AppHandle,
+    prefer_mirror: bool,
+) -> Result<UpdateInstallStatus, String> {
+    let state = app.state::<AppState>();
+    if state
+        .update_installing
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err("An update installation is already in progress".to_string());
+    }
+    let _install_guard = UpdateInstallGuard {
+        installing: &state.update_installing,
+        cancel_requested: &state.update_cancel_requested,
+    };
+
+    let (update, mirrors) = state
         .pending_update
         .lock()
         .map_err(|error| error.to_string())?
-        .take()
+        .as_ref()
+        .cloned()
         .ok_or("No checked update available")?;
-    let prefer_mirror = *app
-        .state::<AppState>()
-        .update_mirror_prefer
-        .lock()
-        .map_err(|error| error.to_string())?;
-    let bytes = download_update_with_mirrors(
+    let expected_file_name = update_installer_file_name(&update)?.to_owned();
+
+    let installer = match download_update_with_mirrors(
+        &app,
         &update.download_url,
         &update.signature,
         &update.version,
+        &expected_file_name,
         &mirrors,
         prefer_mirror,
+        &state.update_cancel_requested,
     )
-    .await?;
-    update.install(&bytes).map_err(|error| error.to_string())
+    .await
+    {
+        Ok(installer) => installer,
+        Err(UpdateDownloadError::Cancelled) => return Ok(UpdateInstallStatus::Cancelled),
+        Err(error) => return Err(error.message()),
+    };
+
+    if update_download_cancelled(&state.update_cancel_requested) {
+        return Ok(UpdateInstallStatus::Cancelled);
+    }
+
+    update
+        .install(&installer.bytes)
+        .map_err(|error| error.to_string())?;
+    Ok(UpdateInstallStatus::Installed)
 }
 
 #[tauri::command]
@@ -931,7 +1149,32 @@ fn harden_webview2_default_ui(window: &tauri::WebviewWindow) {
     }
 }
 
+fn cleanup_stale_update_downloads() {
+    let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Some(file_name) = entry.file_name().to_str().map(ToString::to_string) else {
+            continue;
+        };
+        if !file_name.starts_with(UPDATE_DOWNLOAD_TEMP_PREFIX) {
+            continue;
+        }
+        if let Ok(file_type) = entry.file_type() {
+            if file_type.is_file() {
+                if let Err(error) = std::fs::remove_file(entry.path()) {
+                    eprintln!(
+                        "Failed to clean stale update download {}: {error}",
+                        entry.path().display()
+                    );
+                }
+            }
+        }
+    }
+}
+
 fn main() {
+    cleanup_stale_update_downloads();
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -941,7 +1184,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             check_for_update,
             install_checked_update,
-            set_update_mirror_mode,
+            cancel_update_download,
             quit_app,
             get_backend_runtime,
             hide_window,
@@ -1031,8 +1274,10 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::redirect_command_stdio;
+    use super::{update_download_candidates, UpdateDownloadError};
     use std::path::Path;
     use std::process::Command;
+    use tauri::Url;
 
     fn output_command(label: &str) -> Command {
         #[cfg(target_os = "windows")]
@@ -1061,6 +1306,46 @@ mod tests {
         redirect_command_stdio(&mut command, log_path).expect("redirect probe output");
         let status = command.status().expect("run redirected probe");
         assert!(status.success());
+    }
+
+    #[test]
+    fn update_download_candidates_prefer_mirrors_then_direct() {
+        let url = Url::parse("https://github.com/example/Glimpse_0.5.0_x64-setup.exe").unwrap();
+        let mirrors = vec![
+            "https://mirror-1.example/".to_owned(),
+            "https://mirror-2.example/".to_owned(),
+        ];
+
+        assert_eq!(
+            update_download_candidates(&url, &mirrors, true),
+            vec![
+                "https://mirror-1.example/https://github.com/example/Glimpse_0.5.0_x64-setup.exe"
+                    .to_owned(),
+                "https://mirror-2.example/https://github.com/example/Glimpse_0.5.0_x64-setup.exe"
+                    .to_owned(),
+                "https://github.com/example/Glimpse_0.5.0_x64-setup.exe".to_owned(),
+            ]
+        );
+        assert_eq!(
+            update_download_candidates(&url, &mirrors, false),
+            vec!["https://github.com/example/Glimpse_0.5.0_x64-setup.exe".to_owned()]
+        );
+    }
+
+    #[test]
+    fn update_download_error_reports_every_source() {
+        let error = UpdateDownloadError::Sources(vec![
+            "mirror-a: HTTP 429".to_owned(),
+            "direct: connection closed".to_owned(),
+        ]);
+        assert_eq!(
+            error.message(),
+            "mirror-a: HTTP 429; direct: connection closed"
+        );
+        assert_eq!(
+            UpdateDownloadError::Sources(Vec::new()).message(),
+            "no download candidates"
+        );
     }
 
     #[test]

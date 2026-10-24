@@ -24,6 +24,8 @@ base64 = "0.22"
 url = "2"
 semver = "1"
 futures-util = "0.3"
+tempfile = "3"
+memmap2 = "0.9"
 
 # 与 tauri 2.11 的内部依赖版本保持一致，直接复用编译缓存。
 # 引入 global-shortcut（global-hotkey 0.8 → windows 0.62）后，tauri 树内的

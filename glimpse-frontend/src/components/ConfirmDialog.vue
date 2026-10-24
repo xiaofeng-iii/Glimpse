@@ -22,10 +22,12 @@ const props = withDefaults(defineProps<{
   cancelLabel: string
   destructive?: boolean
   busy?: boolean
+  cancelWhileBusy?: boolean
   hideIcon?: boolean
 }>(), {
   destructive: false,
   busy: false,
+  cancelWhileBusy: false,
   hideIcon: false,
 })
 
@@ -39,7 +41,7 @@ const cancelButton = ref<HTMLButtonElement | null>(null)
 let originElement: HTMLElement | null = null
 
 const cancel = () => {
-  if (!props.busy) emit('cancel')
+  if (!props.busy || props.cancelWhileBusy) emit('cancel')
 }
 
 const focusableElements = () => (
@@ -148,7 +150,7 @@ onBeforeUnmount(() => {
             type="button"
             class="inline-flex h-[var(--control-h-md)] w-[var(--control-h-md)] min-h-[var(--control-h-md)] flex-none items-center justify-center rounded-[var(--radius-md)] text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--shell-control-hover)]"
             :aria-label="cancelLabel"
-            :disabled="busy"
+            :disabled="busy && !cancelWhileBusy"
             @click="cancel"
           >
             <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
@@ -157,7 +159,7 @@ onBeforeUnmount(() => {
 
         <div v-if="$slots.default" class="confirm-dialog__body mt-4 max-h-[50dvh] overflow-y-auto overflow-x-hidden"><slot /></div>
         <div class="mt-4 flex justify-end gap-2.5">
-          <button ref="cancelButton" type="button" class="btn-secondary" :disabled="busy" @click="cancel">
+          <button ref="cancelButton" type="button" class="btn-secondary" :disabled="busy && !cancelWhileBusy" @click="cancel">
             {{ cancelLabel }}
           </button>
           <button

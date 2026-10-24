@@ -48,6 +48,10 @@ def version_key(match: re.Match[str]) -> tuple[int, ...]:
     return (*base, 1, 0, 0)
 
 
+def expected_installer_name(version: str) -> str:
+    return f"Glimpse_{version}_x64-setup.exe"
+
+
 def signed_releases(token: str) -> list[tuple[tuple[int, ...], bool, dict]]:
     releases = []
     page = 1
@@ -60,11 +64,15 @@ def signed_releases(token: str) -> list[tuple[tuple[int, ...], bool, dict]]:
             match = VERSION_RE.fullmatch(release["tag_name"])
             if release["draft"] or not match or release["prerelease"] != is_preview(match):
                 continue
+            version = release["tag_name"][1:]
             assets = release["assets"]
             installers = [asset for asset in assets if asset["name"].endswith("-setup.exe")]
             if len(installers) != 1:
                 continue
             installer = installers[0]
+            # feed 版本必须与安装包资产名绑定，防止旧安装包被挂到新版本 Release 上。
+            if installer["name"] != expected_installer_name(version):
+                continue
             signatures = [asset for asset in assets if asset["name"] == installer["name"] + ".sig"]
             if len(signatures) != 1:
                 continue
@@ -72,7 +80,7 @@ def signed_releases(token: str) -> list[tuple[tuple[int, ...], bool, dict]]:
             if not signature:
                 raise ValueError(f"Empty update signature: {release['tag_name']}")
             manifest = {
-                "version": release["tag_name"][1:],
+                "version": version,
                 "notes": release["body"] or "",
                 "mirrors": MIRROR_PREFIXES,
                 "platforms": {

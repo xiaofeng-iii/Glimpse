@@ -12,7 +12,7 @@
 
 | 场景 | 用这个 | 说明 |
 |---|---|---|
-| 需要用户"确认/取消"的打断式询问（含删除等破坏性操作） | `ConfirmDialog.vue` | 非 destructive 分支默认带琥珀警示三角图标；常规提示不要直接套这个壳，先按 `ui-checklist.md` 第 1 条判断该用 alert 还是无图标中性变体 |
+| 需要用户"确认/取消"的打断式询问（含删除等破坏性操作） | `ConfirmDialog.vue` | 非 destructive 分支默认带琥珀警示三角图标；常规提示不要直接套这个壳，先按 `ui-checklist.md` 第 1 条判断该用 alert 还是无图标中性变体。busy 期默认禁用取消；确需允许中止（如更新下载）才传 `cancel-while-busy` |
 | 信息展示型浮层（更新说明、详情速览），跟随某个触发元素弹出 | `UpdateNotesPopover.vue` | reka-ui Popover，自带标题栏+右上角关闭按钮（已统一 `XMarkIcon` 14px）+`notes-popover` 样式与进场动画；body 已隐藏滚动条、禁横滑 |
 | 大图预览 | `ImagePreviewModal.vue` | `.image-preview-dialog`；关闭按钮 = 32px 无框标准规格（见"按钮"表叉号行），翻页箭头用 `.image-preview-stage__arrow` 40px 大档 |
 | 右键/上下文菜单 | `MemoryContextMenu.vue` / `ImageContextMenu.vue` / `EditTextContextMenu.vue` | 菜单项 28px（`--control-h-sm`，2026-10-19 由 32px 调紧凑），结构 `.x-context-menu` + `__item` + `__divider`。标签 chip 不走右键菜单：点击 chip 在该 chip 上出现 × 删除（再点自身取消、点其他 chip 转移），chip 可拖动排序（顺序按 `memory_tags.position` 持久化），悬浮光标保持默认 |

@@ -17,6 +17,7 @@ const apiMocks = vi.hoisted(() => ({
   indexStatus: vi.fn(),
   ocrStatus: vi.fn(),
   invoke: vi.fn(),
+  listen: vi.fn(),
   getVersion: vi.fn(),
   fetchIndex: vi.fn(),
   isDesktopShell: vi.fn(),
@@ -39,6 +40,7 @@ vi.mock('@/api/client', async (importOriginal) => {
 })
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: apiMocks.invoke }))
+vi.mock('@tauri-apps/api/event', () => ({ listen: apiMocks.listen }))
 vi.mock('@tauri-apps/api/app', () => ({ getVersion: apiMocks.getVersion }))
 vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: apiMocks.openUrl }))
 vi.mock('@/platform/desktop', () => ({ isDesktopShell: apiMocks.isDesktopShell }))
@@ -112,12 +114,13 @@ describe('Settings update notes', () => {
       screenshot: {},
       ai: {},
       ocr: {},
-      ui: { theme: 'light', language: 'zh-CN', close_action: 'ask', update_channel: 'preview' },
+      ui: { theme: 'light', language: 'zh-CN', close_action: 'ask', update_channel: 'preview', update_mirror_mode: 'direct' },
       cluster: {},
     })
     apiMocks.indexStatus.mockResolvedValue({ task_id: 'x', status: 'idle', running: false, result: null, error: null })
     apiMocks.ocrStatus.mockResolvedValue({ task_id: 'y', status: 'idle', running: false, result: null, error: null })
     apiMocks.updateSettings.mockResolvedValue({})
+    apiMocks.listen.mockResolvedValue(vi.fn())
     apiMocks.isDesktopShell.mockReturnValue(true)
     apiMocks.getVersion.mockResolvedValue('0.3.2')
     apiMocks.fetchIndex.mockResolvedValue({
@@ -325,7 +328,7 @@ describe('Settings update notes', () => {
     dialog.vm.$emit('confirm')
     await flushPromises()
     expect(dialog.props('busy')).toBe(true)
-    // 状态文案在弹窗内只出现一次（标题下方的描述行），不再描述、正文各来一份。
+    // 状态文案只落在弹窗动作按钮上，不再描述、正文各来一份。
     const dialogPanel = document.querySelector('[role="alertdialog"]')
     expect(dialogPanel?.textContent?.match(/正在下载/g)).toHaveLength(1)
 
@@ -364,11 +367,49 @@ describe('Settings update notes', () => {
 
     // 点击后就地进入下载态：不再弹窗，按钮自身变为共享的「正在下载」状态。
     expect(dialog.props('open')).toBe(false)
+    expect(apiMocks.invoke).toHaveBeenCalledWith('install_checked_update', { preferMirror: false })
     expect(wrapper.findAll('button').find((button) => button.text() === '正在下载')).toBeDefined()
 
     releaseInstall()
     await flushPromises()
     expect(wrapper.text()).toContain('安装失败，请重新检查更新后再试。')
+  })
+
+  it('exposes cancellation from the settings card and keeps the update after cancelling', async () => {
+    let releaseInstall!: (value: 'cancelled') => void
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'check_for_update') {
+        return { version: '0.3.3-preview.20261003', notes: null }
+      }
+      if (command === 'install_checked_update') {
+        return new Promise((resolve) => { releaseInstall = resolve })
+      }
+      if (command === 'cancel_update_download') return null
+      throw new Error(`unexpected command ${command}`)
+    })
+    const wrapper = await openUpdates(await mountSettings())
+
+    await checkButton(wrapper).trigger('click')
+    await flushPromises()
+    const dialog = wrapper.findAllComponents(ConfirmDialog).find((item) => item.vm.$attrs.id === 'update-notes')!
+    dialog.vm.$emit('cancel')
+    await flushPromises()
+
+    const installButton = wrapper.findAll('button').find((button) => button.text() === '下载并安装')!
+    await installButton.trigger('click')
+    const cancelButton = await vi.waitFor(() => {
+      const button = wrapper.findAll('button').find((item) => item.text() === '取消下载')
+      expect(button).toBeDefined()
+      return button!
+    })
+    await cancelButton.trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.invoke).toHaveBeenCalledWith('cancel_update_download')
+    releaseInstall('cancelled')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('安装失败，请重新检查更新后再试。')
+    expect(wrapper.text()).toContain('发现新版本 0.3.3-preview.20261003')
   })
 
   it('mirrors an install started elsewhere as 正在下载 in the updates section', async () => {

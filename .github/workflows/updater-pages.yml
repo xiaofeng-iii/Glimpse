@@ -6,6 +6,8 @@ on:
       - Build and publish release
       - Build preview release
     types: [completed]
+  release:
+    types: [edited]
   workflow_dispatch:
 
 permissions:
@@ -19,7 +21,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'release' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

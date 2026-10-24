@@ -32,3 +32,10 @@ def test_dev_release_is_manual_only():
 
     assert "push:" not in trigger
     assert "workflow_dispatch:" in trigger
+
+
+def test_updater_pages_rebuilds_when_a_release_is_edited():
+    trigger = _trigger_block("updater-pages.yml")
+
+    assert "release:" in trigger
+    assert "types: [edited]" in trigger

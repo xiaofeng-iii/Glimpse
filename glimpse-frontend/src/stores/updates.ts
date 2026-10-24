@@ -25,7 +25,20 @@ function isMainlandChina(): boolean {
   return navigator.language.startsWith('zh-CN')
 }
 
-function resolvePreferMirror(mode: 'auto' | 'direct' | 'mirror'): boolean {
+export type UpdateMirrorMode = 'auto' | 'direct' | 'mirror'
+
+export interface UpdateDownloadProgress {
+  downloaded: number
+  total: number | null
+}
+
+export type UpdateInstallResult = 'installed' | 'cancelled'
+
+export interface InstallUpdateOptions {
+  mirrorMode?: UpdateMirrorMode
+}
+
+function resolvePreferMirror(mode: UpdateMirrorMode): boolean {
   if (mode === 'direct') return false
   if (mode === 'mirror') return true
   return isMainlandChina()
@@ -52,8 +65,11 @@ export const useUpdatesStore = defineStore('updates', () => {
   const currentVersion = ref('')
   const availableUpdate = ref<AvailableUpdate | null>(null)
   const checking = ref(false)
+  const checkFailed = ref(false)
   const installing = ref(false)
+  const cancelling = ref(false)
   const installFailed = ref(false)
+  const downloadProgress = ref<UpdateDownloadProgress | null>(null)
 
   const updateNotes = ref<Notes | null>(null)
   const currentNotes = ref<Notes | null>(null)
@@ -62,6 +78,7 @@ export const useUpdatesStore = defineStore('updates', () => {
 
   const loadNotes = createNotesLoader()
   let currentNotesRequested = false
+  let pendingCheck: Promise<AvailableUpdate | null> | null = null
 
   const showAvailableBadge = computed(() => Boolean(availableUpdate.value))
 
@@ -89,57 +106,79 @@ export const useUpdatesStore = defineStore('updates', () => {
   }
 
   const checkForUpdate = async (): Promise<AvailableUpdate | null> => {
-    if (!isDesktopShell() || checking.value || installing.value) return null
+    if (!isDesktopShell() || installing.value) return null
+    if (pendingCheck) return pendingCheck
     checking.value = true
+    checkFailed.value = false
     installFailed.value = false
     const requestedChannel = channel.value
-    try {
-      let target: AvailableUpdate | null
-      if (import.meta.env.DEV && requestedChannel === DEV_UPDATE_CHANNEL) {
-        const { devCheckForUpdate } = await import('@/dev/fakeUpdateChannel')
-        target = devCheckForUpdate(currentVersion.value)
-      } else {
-        const { invoke } = await import('@tauri-apps/api/core')
-        target = await invoke<AvailableUpdate | null>('check_for_update', {
-          channel: requestedChannel,
-        })
-      }
-      availableUpdate.value = target
-      if (target) {
-        // 仅真实通道同步镜像模式；dev-test 通道没有 Rust 侧下载，不需要。
-        if (!(import.meta.env.DEV && requestedChannel === DEV_UPDATE_CHANNEL)) {
-          const mirrorMode = settingsStore.settings?.ui?.update_mirror_mode ?? 'auto'
-          const preferMirror = resolvePreferMirror(mirrorMode)
+    pendingCheck = (async () => {
+      try {
+        let target: AvailableUpdate | null
+        if (import.meta.env.DEV && requestedChannel === DEV_UPDATE_CHANNEL) {
+          const { devCheckForUpdate } = await import('@/dev/fakeUpdateChannel')
+          target = devCheckForUpdate(currentVersion.value)
+        } else {
           const { invoke } = await import('@tauri-apps/api/core')
-          void invoke('set_update_mirror_mode', { preferMirror }).catch((error) => {
-            logger.error('Failed to sync update mirror mode: %s', error)
+          target = await invoke<AvailableUpdate | null>('check_for_update', {
+            channel: requestedChannel,
           })
         }
-        // 更新弹窗直接渲染 updater manifest 带回的目标版正文：与版本检测
-        // 同一次响应，不存在第二数据源的陈旧/缺录问题（原 index 聚合路径
-        // 会被 WebView/CDN 缓存打穿，表现为发布后检查更新只见裸 markdown）。
-        updateNotes.value = target.notes ? parseNotes(target.notes) : null
+        // 通道在检测期间被切换时，旧响应只代表旧通道，不得写回共享状态。
+        if (channel.value !== requestedChannel) return null
+        availableUpdate.value = target
+        if (target) {
+          // 更新弹窗直接渲染 updater manifest 带回的目标版正文：与版本检测
+          // 同一次响应，不存在第二数据源的陈旧/缺录问题（原 index 聚合路径
+          // 会被 WebView/CDN 缓存打穿，表现为发布后检查更新只见裸 markdown）。
+          updateNotes.value = target.notes ? parseNotes(target.notes) : null
+        }
+        return target
+      } catch (error) {
+        // 启动静默检测失败不打扰用户；手动检查由设置页按 checkFailed 提示。
+        logger.error('Failed to check for updates: %s', error)
+        checkFailed.value = true
+        return null
+      } finally {
+        checking.value = false
+        pendingCheck = null
       }
-      return target
-    } catch (error) {
-      // 启动静默检测失败不打扰用户；手动检查由调用方决定是否提示。
-      logger.error('Failed to check for updates: %s', error)
-      return null
-    } finally {
-      checking.value = false
-    }
+    })()
+    return pendingCheck
   }
 
-  const installUpdate = async (): Promise<boolean> => {
+  const installUpdate = async (options: InstallUpdateOptions = {}): Promise<boolean> => {
     if (!availableUpdate.value || installing.value || checking.value) return false
     installing.value = true
+    cancelling.value = false
+    downloadProgress.value = null
+
+    let unlistenProgress: (() => void) | null = null
     try {
       if (import.meta.env.DEV && channel.value === DEV_UPDATE_CHANNEL) {
         const { devInstallUpdate } = await import('@/dev/fakeUpdateChannel')
         await devInstallUpdate()
       } else {
-        const { invoke } = await import('@tauri-apps/api/core')
-        await invoke('install_checked_update')
+        const [{ listen }, { invoke }] = await Promise.all([
+          import('@tauri-apps/api/event'),
+          import('@tauri-apps/api/core'),
+        ])
+        unlistenProgress = await listen<UpdateDownloadProgress>(
+          'glimpse://update-download-progress',
+          (event) => {
+            downloadProgress.value = event.payload
+          },
+        )
+        const mirrorMode = options.mirrorMode
+          ?? settingsStore.settings?.ui?.update_mirror_mode
+          ?? 'auto'
+        const result = await invoke<UpdateInstallResult>('install_checked_update', {
+          preferMirror: resolvePreferMirror(mirrorMode),
+        })
+        if (result === 'cancelled') {
+          installFailed.value = false
+          return true
+        }
       }
       return true
     } catch (error) {
@@ -148,7 +187,22 @@ export const useUpdatesStore = defineStore('updates', () => {
       installFailed.value = true
       return false
     } finally {
+      unlistenProgress?.()
+      downloadProgress.value = null
+      cancelling.value = false
       installing.value = false
+    }
+  }
+
+  const cancelUpdateDownload = async () => {
+    if (!installing.value || cancelling.value) return
+    cancelling.value = true
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke('cancel_update_download')
+    } catch (error) {
+      cancelling.value = false
+      logger.error('Failed to cancel update download: %s', error)
     }
   }
 
@@ -184,8 +238,11 @@ export const useUpdatesStore = defineStore('updates', () => {
     currentVersion,
     availableUpdate,
     checking,
+    checkFailed,
     installing,
+    cancelling,
     installFailed,
+    downloadProgress,
     showAvailableBadge,
     updateNotes,
     currentNotes,
@@ -196,6 +253,7 @@ export const useUpdatesStore = defineStore('updates', () => {
     recordCurrentVersion,
     checkForUpdate,
     installUpdate,
+    cancelUpdateDownload,
     loadCurrentNotes,
     refreshUpdateNotes,
   }

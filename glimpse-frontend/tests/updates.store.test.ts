@@ -5,11 +5,13 @@ import { useSettingsStore } from '@/stores/settings'
 
 const apiMocks = vi.hoisted(() => ({
   invoke: vi.fn(),
+  listen: vi.fn(),
   fetchIndex: vi.fn(),
   isDesktopShell: vi.fn(),
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: apiMocks.invoke }))
+vi.mock('@tauri-apps/api/event', () => ({ listen: apiMocks.listen }))
 vi.mock('@/platform/desktop', () => ({ isDesktopShell: apiMocks.isDesktopShell }))
 
 const indexEntries = [
@@ -34,6 +36,7 @@ describe('updates store', () => {
     window.localStorage.clear()
     setActivePinia(createPinia())
     apiMocks.isDesktopShell.mockReturnValue(true)
+    apiMocks.listen.mockResolvedValue(vi.fn())
     apiMocks.fetchIndex.mockResolvedValue({
       json: async () => ({ schemaVersion: 1, releases: indexEntries }),
       ok: true,
@@ -67,29 +70,114 @@ describe('updates store', () => {
     expect(store.updateNotes?.sections.features).toEqual(['0.3.3 新能力'])
   })
 
-  it('syncs mirror mode to Rust after a successful check', async () => {
+  it('shares one pending check instead of issuing duplicate update checks', async () => {
     const store = useUpdatesStore()
     store.recordCurrentVersion('0.3.2')
-    apiMocks.invoke.mockResolvedValue({ version: '0.3.3', notes: null })
+    let releaseCheck!: (value: { version: string; notes: string | null }) => void
+    apiMocks.invoke.mockReturnValue(new Promise((resolve) => { releaseCheck = resolve }))
 
-    await store.checkForUpdate()
+    const first = store.checkForUpdate()
+    const second = store.checkForUpdate()
+    releaseCheck({ version: '0.3.3', notes: null })
+    const [firstResult, secondResult] = await Promise.all([first, second])
 
-    expect(apiMocks.invoke).toHaveBeenCalledWith('set_update_mirror_mode', { preferMirror: true })
+    expect(apiMocks.invoke).toHaveBeenCalledTimes(1)
+    expect(firstResult?.version).toBe('0.3.3')
+    expect(secondResult).toBe(firstResult)
   })
 
-  it('syncs direct mode when user selects direct', async () => {
+  it('passes the selected mirror mode directly when installing', async () => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.3.2')
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'check_for_update') return { version: '0.3.3', notes: null }
+      if (command === 'install_checked_update') return 'installed'
+      throw new Error(`unexpected command ${command}`)
+    })
+
+    await store.checkForUpdate()
+    apiMocks.invoke.mockClear()
+    await store.installUpdate({ mirrorMode: 'direct' })
+
+    expect(apiMocks.invoke).toHaveBeenCalledWith('install_checked_update', { preferMirror: false })
+    expect(apiMocks.listen).toHaveBeenCalledWith(
+      'glimpse://update-download-progress',
+      expect.any(Function),
+    )
+  })
+
+  it('falls back to the persisted mirror mode outside the settings page', async () => {
     const settings = useSettingsStore()
     settings.settings = {
       ...settings.settings,
-      ui: { update_channel: 'stable', update_mirror_mode: 'direct' },
+      ui: { update_channel: 'stable', update_mirror_mode: 'mirror' },
     } as never
     const store = useUpdatesStore()
     store.recordCurrentVersion('0.3.2')
-    apiMocks.invoke.mockResolvedValue({ version: '0.3.3', notes: null })
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'check_for_update') return { version: '0.3.3', notes: null }
+      if (command === 'install_checked_update') return 'installed'
+      throw new Error(`unexpected command ${command}`)
+    })
 
     await store.checkForUpdate()
+    apiMocks.invoke.mockClear()
+    await store.installUpdate()
 
-    expect(apiMocks.invoke).toHaveBeenCalledWith('set_update_mirror_mode', { preferMirror: false })
+    expect(apiMocks.invoke).toHaveBeenCalledWith('install_checked_update', { preferMirror: true })
+  })
+
+  it('tracks download progress from the Rust event', async () => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.3.2')
+    let progressHandler: ((event: { payload: { downloaded: number; total: number | null } }) => void) | null = null
+    apiMocks.listen.mockImplementation(async (_event: string, handler: typeof progressHandler) => {
+      progressHandler = handler
+      return vi.fn()
+    })
+    let releaseInstall!: (value: 'installed') => void
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'check_for_update') return { version: '0.3.3', notes: null }
+      if (command === 'install_checked_update') {
+        return new Promise((resolve) => { releaseInstall = resolve })
+      }
+      throw new Error(`unexpected command ${command}`)
+    })
+
+    await store.checkForUpdate()
+    const install = store.installUpdate({ mirrorMode: 'direct' })
+    await vi.waitFor(() => expect(progressHandler).not.toBeNull())
+    progressHandler!({ payload: { downloaded: 1024, total: 4096 } })
+    expect(store.downloadProgress).toEqual({ downloaded: 1024, total: 4096 })
+
+    releaseInstall('installed')
+    expect(await install).toBe(true)
+    expect(store.downloadProgress).toBeNull()
+  })
+
+  it('cancels without presenting cancellation as an installation failure', async () => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.3.2')
+    let releaseInstall!: (value: 'cancelled') => void
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'check_for_update') return { version: '0.3.3', notes: null }
+      if (command === 'install_checked_update') {
+        return new Promise((resolve) => { releaseInstall = resolve })
+      }
+      if (command === 'cancel_update_download') return null
+      throw new Error(`unexpected command ${command}`)
+    })
+
+    await store.checkForUpdate()
+    const install = store.installUpdate({ mirrorMode: 'mirror' })
+    await vi.waitFor(() => expect(store.installing).toBe(true))
+    await store.cancelUpdateDownload()
+    releaseInstall('cancelled')
+    expect(await install).toBe(true)
+    expect(store.installFailed).toBe(false)
+    expect(store.availableUpdate?.version).toBe('0.3.3')
+    expect(store.installing).toBe(false)
+    expect(apiMocks.invoke).toHaveBeenCalledWith('cancel_update_download')
   })
 
   it('stays silent when the startup check fails', async () => {

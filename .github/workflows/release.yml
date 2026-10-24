@@ -63,6 +63,20 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: build_release.bat
 
+      - name: Verify updater signatures
+        shell: pwsh
+        run: |
+          $bundleDirectory = "glimpse-frontend/src-tauri/target/release/bundle/nsis"
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          $installers = @(Get-ChildItem -Path $bundleDirectory -Filter "*.exe" -File)
+          foreach ($installer in $installers) {
+            $signature = "$($installer.FullName).sig"
+            if (-not (Test-Path -LiteralPath $signature)) {
+              throw "Missing Tauri update signature: $signature"
+            }
+            cargo run --quiet --manifest-path glimpse-frontend/src-tauri/Cargo.toml --bin verify_update_signature -- $installer.FullName $signature $version
+          }
+
       - name: Smoke test bundled backend sidecar
         shell: pwsh
         run: |
