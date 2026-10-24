@@ -90,10 +90,6 @@ const markImageError = (url: string) => {
       </span>
     </div>
 
-    <p v-if="activeImage && !compact" class="mt-3 text-center text-sm text-[var(--shell-muted)]">
-      {{ t('preview.hint') }}
-    </p>
-
     <div v-if="images.length > 1" class="mt-2.5 flex items-center gap-2.5">
       <span class="w-11 flex-none text-sm tabular-nums text-[var(--shell-muted)]">
         {{ activeIndex + 1 }} / {{ images.length }}
