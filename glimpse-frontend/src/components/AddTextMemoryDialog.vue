@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
-import { ArrowPathIcon, DocumentTextIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Cancel01FreeIcons, FileTextFreeIcons, PlusFreeIcons, Refresh01FreeIcons } from '@hugeicons/core-free-icons'
 import {
   DialogContent,
   DialogDescription,
@@ -221,7 +222,7 @@ const preventOutsideDismiss = (event: Event) => {
       >
         <header class="flex flex-none items-center gap-3 px-5 pb-1 pt-3">
           <div class="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
-            <DocumentTextIcon class="h-4 w-4" aria-hidden="true" />
+            <HugeiconsIcon :icon="FileTextFreeIcons" class="h-4 w-4" aria-hidden="true" />
           </div>
           <div class="min-w-0 flex-1">
             <DialogTitle class="text-base font-semibold text-[var(--shell-ink)]">
@@ -238,7 +239,7 @@ const preventOutsideDismiss = (event: Event) => {
             :disabled="busy"
             @click="requestCancel"
           >
-            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </header>
 
@@ -290,7 +291,7 @@ const preventOutsideDismiss = (event: Event) => {
                   :aria-label="t('addMemory.removeImage', { name: images[index]?.name ?? '' })"
                   @click="removeImage(index)"
                 >
-                  <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                  <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
               <button
@@ -302,7 +303,7 @@ const preventOutsideDismiss = (event: Event) => {
                 :disabled="busy"
                 @click="openFilePicker"
               >
-                <PlusIcon v-if="!dragging" class="h-5 w-5" aria-hidden="true" />
+                <HugeiconsIcon :icon="PlusFreeIcons" v-if="!dragging" class="h-5 w-5" aria-hidden="true" />
                 <span v-else class="px-1 text-center text-xs leading-4">{{ t('addMemory.dropHint') }}</span>
               </button>
             </div>
@@ -340,7 +341,7 @@ const preventOutsideDismiss = (event: Event) => {
               :disabled="busy"
               :aria-busy="busy"
             >
-              <ArrowPathIcon v-if="busy" class="h-4 w-4 animate-spin" aria-hidden="true" />
+              <HugeiconsIcon :icon="Refresh01FreeIcons" v-if="busy" class="h-4 w-4 animate-spin" aria-hidden="true" />
               <span>{{ t('action.addMemory') }}</span>
             </button>
           </footer>

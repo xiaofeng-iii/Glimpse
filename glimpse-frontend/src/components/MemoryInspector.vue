@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import {
-  ArrowTopRightOnSquareIcon,
-  ClipboardDocumentIcon,
-  TrashIcon,
-  XMarkIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Cancel01FreeIcons, ClipboardFreeIcons, Delete02FreeIcons, ExternalLinkFreeIcons } from '@hugeicons/core-free-icons'
 import type { Memory } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
@@ -106,7 +102,7 @@ defineExpose({ canLeave })
         :aria-label="t('action.close')"
         @click="emit('close')"
       >
-        <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+        <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </header>
 
@@ -140,11 +136,11 @@ defineExpose({ canLeave })
         :class="displayText ? 'grid-cols-2' : 'grid-cols-1'"
       >
         <button v-if="displayText" type="button" class="btn-secondary btn-secondary--on-canvas justify-center" @click="copySummary">
-          <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+          <HugeiconsIcon :icon="ClipboardFreeIcons" class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t(textMemory || hasUserNote(props.memory) ? 'action.copyContent' : 'action.copySummary') }}
         </button>
         <button type="button" class="btn-secondary btn-secondary--on-canvas justify-center" @click="emit('open', memory.id)">
-          <ArrowTopRightOnSquareIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+          <HugeiconsIcon :icon="ExternalLinkFreeIcons" class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t('action.viewDetail') }}
         </button>
       </div>
@@ -166,7 +162,7 @@ defineExpose({ canLeave })
         class="btn-ghost-danger w-full"
         @click="deleteDialogOpen = true"
       >
-        <TrashIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+        <HugeiconsIcon :icon="Delete02FreeIcons" class="h-4 w-4 flex-none" aria-hidden="true" />
         {{ t('action.delete') }}
       </button>
     </div>

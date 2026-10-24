@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { ExclamationTriangleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Alert02FreeIcons, Cancel01FreeIcons } from '@hugeicons/core-free-icons'
 
 defineOptions({ inheritAttrs: false })
 
@@ -130,7 +131,7 @@ onBeforeUnmount(() => {
             class="flex h-9 w-9 flex-none items-center justify-center rounded-lg"
             :class="destructive ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'"
           >
-            <ExclamationTriangleIcon class="h-5 w-5" aria-hidden="true" />
+            <HugeiconsIcon :icon="Alert02FreeIcons" class="h-5 w-5" aria-hidden="true" />
           </div>
           <div class="min-w-0 flex-1">
             <h2 :id="`${$attrs.id ?? 'confirm'}-title`" class="text-base font-semibold text-[var(--shell-ink)]">
@@ -150,7 +151,7 @@ onBeforeUnmount(() => {
             :disabled="busy"
             @click="cancel"
           >
-            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
 

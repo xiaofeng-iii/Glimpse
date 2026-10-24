@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from 'reka-ui'
-import { XMarkIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Cancel01FreeIcons } from '@hugeicons/core-free-icons'
 import { t } from '@/utils/i18n'
 defineProps<{ label: string }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -19,7 +20,7 @@ function restoreFocus(event: Event) {
         <div class="notes-popover__header">
           <h2 class="text-sm font-semibold text-[var(--shell-ink)]">{{ label }}</h2>
           <button type="button" class="notes-popover__close" :aria-label="t('settings.notesClose')" @click="open = false">
-            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
         <div class="notes-popover__body px-4 pb-4"><slot /></div>

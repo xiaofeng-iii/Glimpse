@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { HugeiconsIcon } from '@hugeicons/vue'
 import {
-  AdjustmentsHorizontalIcon,
-  MagnifyingGlassIcon,
-  QuestionMarkCircleIcon,
-  ArrowPathIcon,
-  XMarkIcon,
-} from '@heroicons/vue/24/outline'
+  Cancel01FreeIcons,
+  CircleQuestionMarkFreeIcons,
+  PreferenceHorizontalFreeIcons,
+  Refresh01FreeIcons,
+  SearchFreeIcons,
+} from '@hugeicons/core-free-icons'
 import type { SearchOptions } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useDevStateStore, type AnalysisOverride, type SyncOverride } from '@/stores/devState'
@@ -276,7 +277,9 @@ defineExpose({ focus, clear })
     <div class="search-toolbar__surface">
       <div class="search-toolbar__layout">
         <div class="search-toolbar__input relative min-w-0">
-          <MagnifyingGlassIcon
+          <!-- 图标库对照实验（hugeicons 免费集 vs heroicons）：仅本组件替换，供目检对比 -->
+          <HugeiconsIcon
+            :icon="SearchFreeIcons"
             class="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--shell-muted)]"
             aria-hidden="true"
           />
@@ -298,7 +301,7 @@ defineExpose({ focus, clear })
               :aria-label="t('search.clear')"
               @click="clear"
             >
-              <XMarkIcon class="h-3 w-3" aria-hidden="true" />
+              <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3 w-3" aria-hidden="true" />
             </button>
             <kbd class="search-toolbar__detail-control search-toolbar__detail-control--kbd px-1 py-0 text-xs">
               {{ shortcutLabel }}
@@ -357,7 +360,7 @@ defineExpose({ focus, clear })
             :disabled="refreshing"
             @click="emit('refresh')"
           >
-            <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': refreshing }" aria-hidden="true" />
+            <HugeiconsIcon :icon="Refresh01FreeIcons" class="h-4 w-4" :class="{ 'animate-spin': refreshing }" aria-hidden="true" />
           </button>
 
         <details
@@ -371,14 +374,14 @@ defineExpose({ focus, clear })
             class="search-toolbar__control flex h-8 cursor-pointer list-none items-center gap-1.5 bg-amber-50/75 px-3 text-amber-800 transition duration-[160ms] ease-[ease] hover:bg-amber-100"
             :aria-label="t('search.debugTitle')"
           >
-            <AdjustmentsHorizontalIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+            <HugeiconsIcon :icon="PreferenceHorizontalFreeIcons" class="h-4 w-4 flex-none" aria-hidden="true" />
             <span class="search-toolbar__dev-label text-[10px] tracking-wide">DEV</span>
           </summary>
           <div
             class="search-toolbar__debug-panel absolute right-0 top-[calc(100%+.5rem)] w-[min(440px,calc(100vw-2.5rem))] rounded-lg border border-amber-200/80 bg-[var(--shell-card)] p-4 text-left shadow-2xl"
           >
             <div class="flex items-start gap-2 text-xs text-amber-800">
-              <AdjustmentsHorizontalIcon class="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+              <HugeiconsIcon :icon="PreferenceHorizontalFreeIcons" class="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
               <div>
                 <p class="font-semibold">{{ t('search.debugTitle') }}</p>
                 <p class="mt-0.5 text-[var(--shell-muted)]">{{ t('search.debugHint') }}</p>
@@ -491,7 +494,7 @@ defineExpose({ focus, clear })
               class="mt-4 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-amber-300/80 bg-amber-50 px-3 text-xs text-amber-800 transition duration-[160ms] ease-[ease] hover:bg-amber-100"
               @click="handleShowOnboarding"
             >
-              <QuestionMarkCircleIcon class="h-4 w-4" aria-hidden="true" />
+              <HugeiconsIcon :icon="CircleQuestionMarkFreeIcons" class="h-4 w-4" aria-hidden="true" />
               {{ t('search.showOnboarding') }}
             </button>
           </div>

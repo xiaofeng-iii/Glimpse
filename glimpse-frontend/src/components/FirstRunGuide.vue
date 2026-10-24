@@ -1,13 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import {
-  ArrowRightIcon,
-  CameraIcon,
-  Cog6ToothIcon,
-  MagnifyingGlassIcon,
-  SparklesIcon,
-  XMarkIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Camera01FreeIcons, Cancel01FreeIcons, ChevronRightFreeIcons, SearchFreeIcons, Settings02FreeIcons, SparklesFreeIcons } from '@hugeicons/core-free-icons'
 import { t } from '@/utils/i18n'
 
 const FOCUSABLE_SELECTOR = [
@@ -29,19 +23,19 @@ const emit = defineEmits<{
 
 const guideItems = [
   {
-    icon: CameraIcon,
+    icon: Camera01FreeIcons,
     titleKey: 'onboarding.captureTitle',
     descriptionKey: 'onboarding.captureDescription',
     shortcut: 'Ctrl + Shift + G',
   },
   {
-    icon: SparklesIcon,
+    icon: SparklesFreeIcons,
     titleKey: 'onboarding.organizeTitle',
     descriptionKey: 'onboarding.organizeDescription',
     shortcut: '',
   },
   {
-    icon: MagnifyingGlassIcon,
+    icon: SearchFreeIcons,
     titleKey: 'onboarding.searchTitle',
     descriptionKey: 'onboarding.searchDescription',
     shortcut: 'Ctrl + F',
@@ -180,7 +174,7 @@ onBeforeUnmount(() => {
             :aria-label="t('onboarding.dismiss')"
             @click="finish"
           >
-            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
 
@@ -195,7 +189,7 @@ onBeforeUnmount(() => {
                 0{{ index + 1 }}
               </span>
               <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
-                <component :is="item.icon" class="h-5 w-5" aria-hidden="true" />
+                <HugeiconsIcon :icon="item.icon" class="h-5 w-5" aria-hidden="true" />
               </div>
               <h2 class="mt-4 text-sm font-semibold text-[var(--shell-ink)]">
                 {{ t(item.titleKey) }}
@@ -213,7 +207,7 @@ onBeforeUnmount(() => {
           </ol>
 
           <div class="mt-5 flex items-start gap-3 rounded-xl bg-[var(--color-primary-soft)] px-4 py-3.5">
-            <Cog6ToothIcon class="mt-0.5 h-5 w-5 flex-none text-[var(--color-primary)]" aria-hidden="true" />
+            <HugeiconsIcon :icon="Settings02FreeIcons" class="mt-0.5 h-5 w-5 flex-none text-[var(--color-primary)]" aria-hidden="true" />
             <p class="text-sm text-[var(--shell-ink)]">
               <span>{{ t('onboarding.aiTitle') }}</span>
               {{ t('onboarding.aiDescription') }}
@@ -229,7 +223,7 @@ onBeforeUnmount(() => {
               @click="finish"
             >
               {{ t('onboarding.start') }}
-              <ArrowRightIcon class="h-4 w-4" aria-hidden="true" />
+              <HugeiconsIcon :icon="ChevronRightFreeIcons" class="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>

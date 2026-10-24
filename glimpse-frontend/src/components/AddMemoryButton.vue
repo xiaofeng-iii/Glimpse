@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ArrowPathIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { PlusFreeIcons, Refresh01FreeIcons } from '@hugeicons/core-free-icons'
 import { t } from '@/utils/i18n'
 
 withDefaults(defineProps<{
@@ -27,8 +28,8 @@ const emit = defineEmits<{
     :aria-label="busy ? t('action.addMemoryProcessing') : undefined"
     @click="emit('add')"
   >
-    <ArrowPathIcon v-if="busy" class="h-5 w-5 flex-none animate-spin" aria-hidden="true" />
-    <PlusIcon v-else class="h-5 w-5 flex-none" aria-hidden="true" />
+    <HugeiconsIcon :icon="Refresh01FreeIcons" v-if="busy" class="h-5 w-5 flex-none animate-spin" aria-hidden="true" />
+    <HugeiconsIcon :icon="PlusFreeIcons" v-else class="h-5 w-5 flex-none" aria-hidden="true" />
     <span>{{ t('action.addMemory') }}</span>
   </button>
 </template>

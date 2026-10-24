@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import {
-  PlusIcon,
-  XMarkIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Cancel01FreeIcons, PlusFreeIcons } from '@hugeicons/core-free-icons'
 import type { Memory } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
@@ -366,7 +364,7 @@ defineExpose({
           @click.stop="removeTag(name)"
           @pointerdown.stop
         >
-          <XMarkIcon class="h-3 w-3" aria-hidden="true" />
+          <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3 w-3" aria-hidden="true" />
         </button>
       </span>
       <input
@@ -390,7 +388,7 @@ defineExpose({
         :aria-label="t('tags.add')"
         @click="activateInput"
       >
-        <PlusIcon class="h-3.5 w-3.5" aria-hidden="true" />
+        <HugeiconsIcon :icon="PlusFreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </div>
 

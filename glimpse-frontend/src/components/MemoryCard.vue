@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { PhotoIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Image01FreeIcons } from '@hugeicons/core-free-icons'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
 import { getMatchSourceKinds } from '@/utils/match-sources'
@@ -142,7 +143,7 @@ onBeforeUnmount(cancelSelectIntent)
         @error="imageFailed = true"
       />
       <div v-else class="flex flex-col items-center gap-1.5 text-[var(--shell-muted)]">
-        <PhotoIcon class="h-9 w-9" aria-hidden="true" />
+        <HugeiconsIcon :icon="Image01FreeIcons" class="h-9 w-9" aria-hidden="true" />
         <span class="text-xs">{{ t('memory.previewFailed') }}</span>
       </div>
     </div>

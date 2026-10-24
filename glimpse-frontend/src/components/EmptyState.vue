@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { PhotoIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Image01FreeIcons } from '@hugeicons/core-free-icons'
 import { t } from '@/utils/i18n'
 
 const props = defineProps<{
@@ -19,7 +20,7 @@ const shortcutParts = computed(() => {
 <template>
   <div class="flex flex-col items-center justify-center py-16 text-center">
     <div class="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-violet-100">
-      <PhotoIcon class="h-10 w-10 text-violet-500" aria-hidden="true" />
+      <HugeiconsIcon :icon="Image01FreeIcons" class="h-10 w-10 text-violet-500" aria-hidden="true" />
     </div>
 
     <h3 class="text-base text-gray-900 mb-2">{{ t('memory.emptyTitle') }}</h3>

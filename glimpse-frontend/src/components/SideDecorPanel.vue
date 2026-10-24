@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { SparklesIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { SparklesFreeIcons } from '@hugeicons/core-free-icons'
 import { languagePreference, t, type MessageKey } from '@/utils/i18n'
 
 const PHRASE_POOL_SIZE = 5
@@ -37,7 +38,7 @@ const phrase = computed(() =>
         </div>
       </div>
       <div class="side-decor__divider" aria-hidden="true" />
-      <SparklesIcon class="side-decor__spark" aria-hidden="true" />
+      <HugeiconsIcon :icon="SparklesFreeIcons" class="side-decor__spark" aria-hidden="true" />
       <p class="side-decor__phrase">{{ phrase }}</p>
     </div>
   </div>

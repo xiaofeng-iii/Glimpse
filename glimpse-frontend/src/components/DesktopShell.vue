@@ -1,17 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  ArrowLeftIcon,
-  ArrowPathIcon,
-  CheckCircleIcon,
-  Cog6ToothIcon,
-  ExclamationCircleIcon,
-  MinusIcon,
-  Square2StackIcon,
-  StopIcon,
-  XMarkIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { AlertCircleFreeIcons, Cancel01FreeIcons, ChevronLeftFreeIcons, Copy01FreeIcons, MinusFreeIcons, Refresh01FreeIcons, Settings02FreeIcons, StopFreeIcons, Tick02FreeIcons } from '@hugeicons/core-free-icons'
 import CloseActionDialog from '@/components/CloseActionDialog.vue'
 import UpdateBadge from '@/components/UpdateBadge.vue'
 import glimpseLogo from '@/assets/glimpse.svg'
@@ -287,7 +278,7 @@ onUnmounted(() => {
             :aria-label="t('action.settings')"
             @click="navigateSettings"
           >
-            <Cog6ToothIcon class="h-[15px] w-[15px]" aria-hidden="true" />
+            <HugeiconsIcon :icon="Settings02FreeIcons" class="h-[15px] w-[15px]" aria-hidden="true" />
           </button>
           <UpdateBadge v-if="isHome" />
           <button
@@ -296,7 +287,7 @@ onUnmounted(() => {
             class="shell-navigation-button"
             @click="navigateHome"
           >
-            <ArrowLeftIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <HugeiconsIcon :icon="ChevronLeftFreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
             <span>{{ t('action.back') }}</span>
           </button>
         </slot>
@@ -314,22 +305,22 @@ onUnmounted(() => {
           role="status"
           :aria-live="showOcrRepair ? 'off' : 'polite'"
         >
-          <ArrowPathIcon
+          <HugeiconsIcon :icon="Refresh01FreeIcons"
             v-if="showOcrRepair"
             class="service-status__icon animate-spin"
             aria-hidden="true"
           />
-          <CheckCircleIcon
+          <HugeiconsIcon :icon="Tick02FreeIcons"
             v-else-if="backendStatus.isReady && !backendStatus.aiUnavailable"
             class="service-status__icon"
             aria-hidden="true"
           />
-          <ArrowPathIcon
+          <HugeiconsIcon :icon="Refresh01FreeIcons"
             v-else-if="backendStatus.isStarting"
             class="service-status__icon animate-spin"
             aria-hidden="true"
           />
-          <ExclamationCircleIcon
+          <HugeiconsIcon :icon="AlertCircleFreeIcons"
             v-else
             class="service-status__icon"
             aria-hidden="true"
@@ -344,7 +335,7 @@ onUnmounted(() => {
             :aria-label="t('action.minimize')"
             @click="minimizeDesktopWindow"
           >
-            <MinusIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <HugeiconsIcon :icon="MinusFreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -352,12 +343,12 @@ onUnmounted(() => {
             :aria-label="isWindowMaximized ? t('action.restore') : t('action.maximize')"
             @click="handleToggleMaximize"
           >
-            <Square2StackIcon
+            <HugeiconsIcon :icon="Copy01FreeIcons"
               v-if="isWindowMaximized"
               class="h-[13px] w-[13px]"
               aria-hidden="true"
             />
-            <StopIcon
+            <HugeiconsIcon :icon="StopFreeIcons"
               v-else
               class="h-[13px] w-[13px]"
               aria-hidden="true"
@@ -369,7 +360,7 @@ onUnmounted(() => {
             :aria-label="t('action.close')"
             @click="requestWindowClose"
           >
-            <XMarkIcon class="h-[15px] w-[15px]" aria-hidden="true" />
+            <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-[15px] w-[15px]" aria-hidden="true" />
           </button>
         </div>
       </div>

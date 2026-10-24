@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import {
-  ArrowPathIcon,
-  ClipboardDocumentIcon,
-  TrashIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ClipboardFreeIcons, Delete02FreeIcons, Refresh01FreeIcons } from '@hugeicons/core-free-icons'
 import {
   onBeforeRouteLeave,
   onBeforeRouteUpdate,
@@ -132,13 +129,13 @@ const confirmDelete = async () => {
           class="btn-ghost-danger"
           @click="deleteDialogOpen = true"
         >
-          <TrashIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+          <HugeiconsIcon :icon="Delete02FreeIcons" class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t('action.delete') }}
         </button>
       </header>
 
       <div v-if="loading" class="flex min-h-[65vh] items-center justify-center">
-        <ArrowPathIcon class="h-8 w-8 animate-spin text-[var(--color-primary)]" :aria-label="t('memory.loading')" />
+        <HugeiconsIcon :icon="Refresh01FreeIcons" class="h-8 w-8 animate-spin text-[var(--color-primary)]" :aria-label="t('memory.loading')" />
       </div>
 
       <div
@@ -148,7 +145,7 @@ const confirmDelete = async () => {
         <h2 class="text-xl font-semibold text-[var(--shell-ink)]">{{ t('memory.missing') }}</h2>
         <p class="mt-2 text-sm text-[var(--shell-muted)]">{{ t('memory.loadFailedHint') }}</p>
         <button type="button" class="btn-primary mt-4" @click="loadMemory">
-          <ArrowPathIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+          <HugeiconsIcon :icon="Refresh01FreeIcons" class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ t('action.retry') }}
         </button>
       </div>
@@ -177,7 +174,7 @@ const confirmDelete = async () => {
                 class="btn-secondary btn-secondary--on-canvas"
                 @click="copySummary"
               >
-                <ClipboardDocumentIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+                <HugeiconsIcon :icon="ClipboardFreeIcons" class="h-4 w-4 flex-none" aria-hidden="true" />
                 {{ t(textMemory || hasNote ? 'action.copyContent' : 'action.copySummary') }}
               </button>
             </template>

@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import {
-  ArrowTopRightOnSquareIcon,
-  ClipboardDocumentIcon,
-  PhotoIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ClipboardFreeIcons, ExternalLinkFreeIcons, Image01FreeIcons } from '@hugeicons/core-free-icons'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { useNotificationStore } from '@/stores/notification'
 import { copyImageFileToClipboard, copyImageFilesToClipboard } from '@/platform/clipboard'
@@ -182,7 +179,7 @@ const runCopyAllImages = async () => {
         class="image-context-menu__item"
         @click="runOpen"
       >
-        <ArrowTopRightOnSquareIcon class="h-4 w-4" aria-hidden="true" />
+        <HugeiconsIcon :icon="ExternalLinkFreeIcons" class="h-4 w-4" aria-hidden="true" />
         <span>{{ t('action.viewImage') }}</span>
       </button>
       <button
@@ -191,7 +188,7 @@ const runCopyAllImages = async () => {
         class="image-context-menu__item"
         @click="runCopyImage"
       >
-        <ClipboardDocumentIcon class="h-4 w-4" aria-hidden="true" />
+        <HugeiconsIcon :icon="ClipboardFreeIcons" class="h-4 w-4" aria-hidden="true" />
         <span>{{ t('action.copyImage') }}</span>
       </button>
       <button
@@ -201,7 +198,7 @@ const runCopyAllImages = async () => {
         class="image-context-menu__item"
         @click="runCopyAllImages"
       >
-        <PhotoIcon class="h-4 w-4" aria-hidden="true" />
+        <HugeiconsIcon :icon="Image01FreeIcons" class="h-4 w-4" aria-hidden="true" />
         <span>{{ t('action.copyAllImages', { count: snapshot.paths.length }) }}</span>
       </button>
     </div>

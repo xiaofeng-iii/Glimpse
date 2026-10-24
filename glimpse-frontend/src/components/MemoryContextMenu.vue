@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import {
-  ArrowTopRightOnSquareIcon,
-  ClipboardDocumentIcon,
-  PhotoIcon,
-  TrashIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ClipboardFreeIcons, Delete02FreeIcons, ExternalLinkFreeIcons, Image01FreeIcons } from '@hugeicons/core-free-icons'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
 import { isTextMemory } from '@/utils/memory-types'
@@ -173,7 +169,7 @@ onBeforeUnmount(unbindListeners)
         class="memory-context-menu__item"
         @click="run('open')"
       >
-        <ArrowTopRightOnSquareIcon class="h-4 w-4" aria-hidden="true" />
+        <HugeiconsIcon :icon="ExternalLinkFreeIcons" class="h-4 w-4" aria-hidden="true" />
         <span>{{ t('action.viewDetail') }}</span>
       </button>
       <button
@@ -182,7 +178,7 @@ onBeforeUnmount(unbindListeners)
         class="memory-context-menu__item"
         @click="run('copy')"
       >
-        <ClipboardDocumentIcon class="h-4 w-4" aria-hidden="true" />
+        <HugeiconsIcon :icon="ClipboardFreeIcons" class="h-4 w-4" aria-hidden="true" />
         <span>{{ isText ? t('action.copyContent') : t('action.copySummary') }}</span>
       </button>
       <button
@@ -192,7 +188,7 @@ onBeforeUnmount(unbindListeners)
         class="memory-context-menu__item"
         @click="run('copy-image')"
       >
-        <PhotoIcon class="h-4 w-4" aria-hidden="true" />
+        <HugeiconsIcon :icon="Image01FreeIcons" class="h-4 w-4" aria-hidden="true" />
         <span>{{ t('action.copyImage') }}</span>
       </button>
 
@@ -205,7 +201,7 @@ onBeforeUnmount(unbindListeners)
         :disabled="analyzing"
         @click="!analyzing && run('delete')"
       >
-        <TrashIcon class="h-4 w-4" aria-hidden="true" />
+        <HugeiconsIcon :icon="Delete02FreeIcons" class="h-4 w-4" aria-hidden="true" />
         <span>{{ t('action.delete') }}</span>
       </button>
     </div>

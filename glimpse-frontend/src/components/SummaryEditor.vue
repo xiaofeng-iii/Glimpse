@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import {
-  ArrowPathIcon,
-  ExclamationTriangleIcon,
-  PencilSquareIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Alert02FreeIcons, Edit02FreeIcons, Refresh01FreeIcons } from '@hugeicons/core-free-icons'
 import type { Memory } from '@/api/client'
 import { useMemoriesStore } from '@/stores/memories'
 import { useNotificationStore } from '@/stores/notification'
@@ -258,7 +255,7 @@ defineExpose({
           class="summary-editor__edit-action btn-secondary btn-secondary--on-canvas text-sm"
           @click="startEditing"
         >
-          <PencilSquareIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+          <HugeiconsIcon :icon="Edit02FreeIcons" class="h-4 w-4 flex-none" aria-hidden="true" />
           {{ editorText('edit') }}
         </button>
         <div v-else class="summary-editor__edit-actions flex flex-none items-center gap-2">
@@ -276,7 +273,7 @@ defineExpose({
             :disabled="!canSave"
             @click="save"
           >
-            <ArrowPathIcon v-if="saving" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
+            <HugeiconsIcon :icon="Refresh01FreeIcons" v-if="saving" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
             {{ saving ? editorText('saving') : editorText('save') }}
           </button>
         </div>
@@ -330,8 +327,8 @@ defineExpose({
       class="mt-3 flex min-h-5 items-center gap-2 text-xs"
       :class="displaySyncStatus === 'FAILED' ? 'text-red-600' : 'text-amber-600'"
     >
-      <ExclamationTriangleIcon v-if="displaySyncStatus === 'FAILED'" class="h-4 w-4 flex-none" aria-hidden="true" />
-      <ArrowPathIcon v-else class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
+      <HugeiconsIcon :icon="Alert02FreeIcons" v-if="displaySyncStatus === 'FAILED'" class="h-4 w-4 flex-none" aria-hidden="true" />
+      <HugeiconsIcon :icon="Refresh01FreeIcons" v-else class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
       {{
         displaySyncStatus === 'FAILED'
           ? editorText('indexFailed')

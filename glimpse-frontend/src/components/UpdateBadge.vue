@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Download04FreeIcons } from '@hugeicons/core-free-icons'
 import { useUpdatesStore } from '@/stores/updates'
 import { useNotificationStore } from '@/stores/notification'
 import UpdateNotesContent from '@/components/UpdateNotesContent.vue'
@@ -41,7 +42,7 @@ const installNow = async () => {
         class="shell-icon-button update-badge update-badge--available"
         :aria-label="t('updates.badgeAvailable')"
       >
-        <ArrowDownTrayIcon class="h-[15px] w-[15px]" aria-hidden="true" />
+        <HugeiconsIcon :icon="Download04FreeIcons" class="h-[15px] w-[15px]" aria-hidden="true" />
       </button>
     </template>
     <UpdateNotesContent :notes="updates.updateNotes" />

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { CameraIcon, FunnelIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Camera01FreeIcons, FilterFreeIcons, SearchFreeIcons } from '@hugeicons/core-free-icons'
 import type { Memory } from '@/api/client'
 import { languagePreference, t } from '@/utils/i18n'
 import {
@@ -204,9 +205,9 @@ const groups = computed<MemoryGroup[]>(() => {
             ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
             : 'memory-wall__capture-icon'"
         >
-          <FunnelIcon v-if="filtering" class="h-7 w-7" aria-hidden="true" />
-          <MagnifyingGlassIcon v-else-if="renderedSearching" class="h-7 w-7" aria-hidden="true" />
-          <CameraIcon v-else class="h-7 w-7" aria-hidden="true" />
+          <HugeiconsIcon :icon="FilterFreeIcons" v-if="filtering" class="h-7 w-7" aria-hidden="true" />
+          <HugeiconsIcon :icon="SearchFreeIcons" v-else-if="renderedSearching" class="h-7 w-7" aria-hidden="true" />
+          <HugeiconsIcon :icon="Camera01FreeIcons" v-else class="h-7 w-7" aria-hidden="true" />
         </div>
         <h2 class="mt-4 text-base font-semibold text-[var(--shell-ink)]">
           {{ filtering

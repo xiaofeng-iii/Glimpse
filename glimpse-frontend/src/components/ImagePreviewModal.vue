@@ -1,12 +1,8 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  PhotoIcon,
-  XMarkIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Cancel01FreeIcons, ChevronLeftFreeIcons, ChevronRightFreeIcons, Image01FreeIcons } from '@hugeicons/core-free-icons'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { t } from '@/utils/i18n'
 import ImageContextMenu from './ImageContextMenu.vue'
@@ -228,7 +224,7 @@ onUnmounted(() => {
             :aria-label="t('action.close')"
             @click="previewStore.close"
           >
-            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </header>
 
@@ -241,7 +237,7 @@ onUnmounted(() => {
             :aria-label="t('preview.previous')"
             @click="previewStore.previous"
           >
-            <ChevronLeftIcon class="h-6 w-6" aria-hidden="true" />
+            <HugeiconsIcon :icon="ChevronLeftFreeIcons" class="h-6 w-6" aria-hidden="true" />
           </button>
 
           <div
@@ -249,7 +245,7 @@ onUnmounted(() => {
             class="image-preview-error"
             role="status"
           >
-            <PhotoIcon class="h-10 w-10" aria-hidden="true" />
+            <HugeiconsIcon :icon="Image01FreeIcons" class="h-10 w-10" aria-hidden="true" />
             <p>{{ t('memory.previewFailed') }}</p>
           </div>
           <img
@@ -271,7 +267,7 @@ onUnmounted(() => {
             :aria-label="t('preview.next')"
             @click="previewStore.next"
           >
-            <ChevronRightIcon class="h-6 w-6" aria-hidden="true" />
+            <HugeiconsIcon :icon="ChevronRightFreeIcons" class="h-6 w-6" aria-hidden="true" />
           </button>
         </div>
 

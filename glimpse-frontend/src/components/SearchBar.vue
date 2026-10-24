@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { SearchFreeIcons } from '@hugeicons/core-free-icons'
 import { useMemoriesStore } from '@/stores/memories'
 import type { SearchOptions } from '@/api/client'
 import { t } from '@/utils/i18n'
@@ -105,7 +106,7 @@ defineExpose({ focus })
     <!-- Search Input -->
     <div class="search-bar relative flex items-center p-1">
       <!-- Search Icon -->
-      <MagnifyingGlassIcon class="ml-4 h-5 w-5 text-gray-400" aria-hidden="true" />
+      <HugeiconsIcon :icon="SearchFreeIcons" class="ml-4 h-5 w-5 text-gray-400" aria-hidden="true" />
 
       <!-- Input -->
       <input

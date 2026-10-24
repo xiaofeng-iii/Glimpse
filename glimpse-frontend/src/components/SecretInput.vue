@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { EyeFreeIcons, EyeOffFreeIcons } from '@hugeicons/core-free-icons'
 
 defineOptions({ inheritAttrs: false })
 
@@ -38,8 +39,8 @@ const onInput = (event: Event) => {
       :aria-label="visible ? hideLabel : showLabel"
       @click="visible = !visible"
     >
-      <EyeSlashIcon v-if="visible" class="h-4 w-4" aria-hidden="true" />
-      <EyeIcon v-else class="h-4 w-4" aria-hidden="true" />
+      <HugeiconsIcon :icon="EyeOffFreeIcons" v-if="visible" class="h-4 w-4" aria-hidden="true" />
+      <HugeiconsIcon :icon="EyeFreeIcons" v-else class="h-4 w-4" aria-hidden="true" />
     </button>
   </div>
 </template>

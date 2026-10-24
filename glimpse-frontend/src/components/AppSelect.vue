@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick } from 'vue'
-import { CheckIcon, ChevronDownIcon } from '@heroicons/vue/20/solid'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ChevronDownFreeIcons, Tick02FreeIcons } from '@hugeicons/core-free-icons'
 import {
   SelectContent,
   SelectIcon,
@@ -79,7 +80,7 @@ const handleOpenChange = async (open: boolean) => {
         <span class="app-select__value">{{ selectedOption?.label }}</span>
       </SelectValue>
       <SelectIcon class="app-select__icon" aria-hidden="true">
-        <ChevronDownIcon />
+        <HugeiconsIcon :icon="ChevronDownFreeIcons" />
       </SelectIcon>
     </SelectTrigger>
 
@@ -104,7 +105,7 @@ const handleOpenChange = async (open: boolean) => {
           >
             <SelectItemText>{{ option.label }}</SelectItemText>
             <SelectItemIndicator class="app-select__indicator">
-              <CheckIcon aria-hidden="true" />
+              <HugeiconsIcon :icon="Tick02FreeIcons" aria-hidden="true" />
             </SelectItemIndicator>
           </SelectItem>
         </SelectViewport>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Alert02FreeIcons, Refresh01FreeIcons } from '@hugeicons/core-free-icons'
 import { t } from '@/utils/i18n'
 import { startSynchronizedProgress } from '@/utils/synchronized-progress'
 
@@ -43,8 +44,8 @@ onBeforeUnmount(() => progressAnimation?.cancel())
     :aria-live="failed ? 'assertive' : 'polite'"
     :aria-busy="!failed"
   >
-    <ArrowPathIcon v-if="!failed" class="h-3.5 w-3.5 flex-none animate-spin" aria-hidden="true" />
-    <ExclamationTriangleIcon v-else class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
+    <HugeiconsIcon :icon="Refresh01FreeIcons" v-if="!failed" class="h-3.5 w-3.5 flex-none animate-spin" aria-hidden="true" />
+    <HugeiconsIcon :icon="Alert02FreeIcons" v-else class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
     <span>{{ t(failed ? 'memory.imageAnalysisFailed' : 'memory.imageAnalyzing') }}</span>
   </div>
 
@@ -57,7 +58,7 @@ onBeforeUnmount(() => progressAnimation?.cancel())
     :aria-busy="!failed"
   >
     <div class="memory-analysis-state__heading">
-      <ExclamationTriangleIcon
+      <HugeiconsIcon :icon="Alert02FreeIcons"
         v-if="failed"
         class="memory-analysis-state__icon"
         aria-hidden="true"

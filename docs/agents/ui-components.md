@@ -55,4 +55,4 @@
 正文/控件 13–14px、标题 16px 起、元数据 11–12px。行高 token `--line-height-*`
 镜像 main.css。英文 Segoe UI、中文 PingFang SC 优先 Windows 回退雅黑；需稳定
 对齐的数量与日期用等宽数字（`font-variant-numeric: tabular-nums`）。图标只用
-Heroicons Outline，控件图标约 18–20px、空状态 24–28px，不用 emoji 替代。
+Hugeicons 免费集（HugeiconsIcon + `XxxFreeIcons` 数据），控件图标约 18–20px、空状态 24–28px，不用 emoji 替代。

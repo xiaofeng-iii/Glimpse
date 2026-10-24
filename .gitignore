@@ -121,3 +121,6 @@ design-qa.md
 
 # Keep one shared guide for future vibe-coding sessions.
 !AGENTS.md
+
+# 仓库根误生成的 vitest 缓存目录（GlimpseData 旁）
+node_modules/

@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import {
-  ArrowPathIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  ClipboardDocumentIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ChevronDownFreeIcons, ClipboardFreeIcons, Refresh01FreeIcons, Tick02FreeIcons } from '@hugeicons/core-free-icons'
 import { memoriesApi, type Memory } from '@/api/client'
 import { useNotificationStore } from '@/stores/notification'
 import { t } from '@/utils/i18n'
@@ -108,7 +104,7 @@ onBeforeUnmount(() => {
           role="status"
           aria-live="polite"
         >
-          <ArrowPathIcon class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
+          <HugeiconsIcon :icon="Refresh01FreeIcons" class="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
           {{ t('action.reRecognizing') }}
         </span>
         <div
@@ -121,8 +117,8 @@ onBeforeUnmount(() => {
             class="ocr-text__copy ocr-text__copy--text inline-flex h-full items-center gap-2 text-sm transition duration-[160ms] ease-[ease]"
             @click="copyText"
           >
-            <CheckIcon v-if="copied" class="h-4 w-4 flex-none text-emerald-600" aria-hidden="true" />
-            <ClipboardDocumentIcon v-else class="h-4 w-4 flex-none" aria-hidden="true" />
+            <HugeiconsIcon :icon="Tick02FreeIcons" v-if="copied" class="h-4 w-4 flex-none text-emerald-600" aria-hidden="true" />
+            <HugeiconsIcon :icon="ClipboardFreeIcons" v-else class="h-4 w-4 flex-none" aria-hidden="true" />
             {{ copied ? t('action.copied') : t('action.copyText') }}
           </button>
           <button
@@ -135,7 +131,7 @@ onBeforeUnmount(() => {
             :aria-expanded="menuOpen"
             @click.stop="toggleMenu"
           >
-            <ChevronDownIcon class="h-4 w-4" aria-hidden="true" />
+            <HugeiconsIcon :icon="ChevronDownFreeIcons" class="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
         <Transition name="ocr-menu">
@@ -152,7 +148,7 @@ onBeforeUnmount(() => {
               :disabled="reocring"
               @click="reocr"
             >
-              <ArrowPathIcon
+              <HugeiconsIcon :icon="Refresh01FreeIcons"
                 class="h-4 w-4 flex-none"
                 :class="{ 'animate-spin': reocring }"
                 aria-hidden="true"

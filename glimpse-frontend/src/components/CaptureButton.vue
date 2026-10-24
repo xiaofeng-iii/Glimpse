@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ArrowPathIcon, CameraIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Camera01FreeIcons, ArrowReloadHorizontalFreeIcons } from '@hugeicons/core-free-icons'
 import { t } from '@/utils/i18n'
 
 withDefaults(defineProps<{
@@ -30,8 +31,14 @@ const emit = defineEmits<{
     :aria-label="capturing ? t('action.captureProcessing') : undefined"
     @click="emit('capture')"
   >
-    <ArrowPathIcon v-if="capturing" class="h-5 w-5 flex-none animate-spin" aria-hidden="true" />
-    <CameraIcon v-else class="h-5 w-5 flex-none" aria-hidden="true" />
+    <!-- 图标库对照实验（hugeicons 免费集 vs heroicons）：仅本组件替换，供目检对比 -->
+    <HugeiconsIcon
+      v-if="capturing"
+      :icon="ArrowReloadHorizontalFreeIcons"
+      class="h-5 w-5 flex-none animate-spin"
+      aria-hidden="true"
+    />
+    <HugeiconsIcon v-else :icon="Camera01FreeIcons" class="h-5 w-5 flex-none" aria-hidden="true" />
     <span>{{ t('action.capture') }}</span>
   </button>
 </template>

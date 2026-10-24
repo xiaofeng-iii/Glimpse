@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { PhotoIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Image01FreeIcons } from '@hugeicons/core-free-icons'
 import type { Memory } from '@/api/client'
 import { useImagePreviewStore } from '@/stores/imagePreview'
 import { getMemoryImagePaths, getMemoryImageUrls } from '@/utils/memory-images'
@@ -78,7 +79,7 @@ const markImageError = (url: string) => {
         @error="markImageError(activeImage)"
       />
       <div v-else class="flex flex-col items-center gap-2 text-[var(--shell-muted)]">
-        <PhotoIcon class="h-9 w-9" aria-hidden="true" />
+        <HugeiconsIcon :icon="Image01FreeIcons" class="h-9 w-9" aria-hidden="true" />
         <span class="text-sm">{{ t('memory.previewFailed') }}</span>
       </div>
       <span
@@ -116,7 +117,7 @@ const markImageError = (url: string) => {
             loading="lazy"
             @error="markImageError(image)"
           />
-          <PhotoIcon v-else class="mx-auto h-6 w-6 text-[var(--shell-muted)]" aria-hidden="true" />
+          <HugeiconsIcon :icon="Image01FreeIcons" v-else class="mx-auto h-6 w-6 text-[var(--shell-muted)]" aria-hidden="true" />
         </button>
       </div>
     </div>

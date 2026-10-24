@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import {
-  CheckIcon,
-  ExclamationTriangleIcon,
-  InformationCircleIcon,
-  XMarkIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Alert02FreeIcons, Cancel01FreeIcons, InformationCircleFreeIcons, Tick02FreeIcons } from '@hugeicons/core-free-icons'
 import { animate, motionValue, useReducedMotion } from 'motion-v'
 import type { Notification } from '@/stores/notification'
 import { useNotificationStore } from '@/stores/notification'
@@ -32,11 +28,11 @@ const TYPE_TOKENS: Record<Notification['type'], string> = {
   warning: 'var(--color-warning)',
   info: 'var(--color-primary)',
 }
-const TYPE_ICONS: Record<Notification['type'], typeof CheckIcon> = {
-  success: CheckIcon,
-  error: XMarkIcon,
-  warning: ExclamationTriangleIcon,
-  info: InformationCircleIcon,
+const TYPE_ICONS: Record<Notification['type'], typeof Tick02FreeIcons> = {
+  success: Tick02FreeIcons,
+  error: Cancel01FreeIcons,
+  warning: Alert02FreeIcons,
+  info: InformationCircleFreeIcons,
 }
 const iconToken = (type: Notification['type']) => TYPE_TOKENS[type]
 const iconOf = (type: Notification['type']) => TYPE_ICONS[type]
@@ -310,7 +306,7 @@ onBeforeUnmount(() => {
           class="flex h-6 w-6 flex-none items-center justify-center rounded-full"
           :style="{ background: iconToken(notification.type) }"
         >
-          <component :is="iconOf(notification.type)" class="h-4 w-4 text-white" aria-hidden="true" />
+          <HugeiconsIcon :icon="iconOf(notification.type)" class="h-4 w-4 text-white" aria-hidden="true" />
         </div>
 
         <p class="flex-1 text-sm text-[var(--shell-ink)]">{{ notification.message }}</p>
@@ -322,7 +318,7 @@ onBeforeUnmount(() => {
           @click.stop="close()"
           @pointerdown.stop
         >
-          <XMarkIcon class="h-4 w-4" aria-hidden="true" />
+          <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { PhotoIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Image01FreeIcons } from '@hugeicons/core-free-icons'
 import type { Memory } from '@/api/client'
 import { getMemoryImageUrls } from '@/utils/memory-images'
 import { getMatchSourceKinds } from '@/utils/match-sources'
@@ -104,7 +105,7 @@ const markImageError = (memoryId: string) => {
                     loading="lazy"
                     @error="markImageError(memory.id)"
                   />
-                  <PhotoIcon v-else class="h-6 w-6 text-gray-400" aria-hidden="true" />
+                  <HugeiconsIcon :icon="Image01FreeIcons" v-else class="h-6 w-6 text-gray-400" aria-hidden="true" />
                 </div>
               </div>
 

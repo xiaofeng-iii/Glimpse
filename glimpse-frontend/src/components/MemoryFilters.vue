@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
-import { CalendarDaysIcon, ChevronDownIcon, FunnelIcon as FunnelOutlineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Calendar03FreeIcons, Cancel01FreeIcons, ChevronDownFreeIcons, FilterFreeIcons as FunnelOutlineIcon } from '@hugeicons/core-free-icons'
 import { languagePreference, t } from '@/utils/i18n'
 import { describeMemoryPeriod } from '@/utils/memory-grouping'
 import { useMemoriesStore } from '@/stores/memories'
@@ -276,7 +277,7 @@ onUnmounted(() => {
             :aria-label="t('action.close')"
             @click="close(true)"
           >
-            <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
 
@@ -293,7 +294,7 @@ onUnmounted(() => {
                   :aria-label="t('wall.clearPeriod')"
                   @click="clearPeriod"
                 >
-                  <XMarkIcon class="h-3 w-3" aria-hidden="true" />
+                  <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3 w-3" aria-hidden="true" />
                 </button>
               </span>
               <label v-hint-tooltip="t('wall.rangeModeHint')" class="memory-filters__range-mode">
@@ -319,12 +320,12 @@ onUnmounted(() => {
                 :aria-controls="calendarId"
                 @click="calendarOpen = !calendarOpen"
               >
-                <CalendarDaysIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <HugeiconsIcon :icon="Calendar03FreeIcons" class="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span
                   class="memory-filters__date-text"
                   :class="{ 'memory-filters__date-text--range': dateActive }"
                 >{{ dateRangeText }}</span>
-                <ChevronDownIcon
+                <HugeiconsIcon :icon="ChevronDownFreeIcons"
                   class="memory-filters__date-chevron h-4 w-4 shrink-0"
                   :class="{ 'memory-filters__date-chevron--open': calendarOpen }"
                   aria-hidden="true"
@@ -375,7 +376,7 @@ onUnmounted(() => {
                   :aria-label="t('filter.clearTags')"
                   @click="clearTags"
                 >
-                  <XMarkIcon class="h-3 w-3" aria-hidden="true" />
+                  <HugeiconsIcon :icon="Cancel01FreeIcons" class="h-3 w-3" aria-hidden="true" />
                 </button>
               </span>
             </legend>

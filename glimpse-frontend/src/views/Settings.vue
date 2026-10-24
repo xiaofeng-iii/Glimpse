@@ -1,19 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import {
-  ArrowPathIcon,
-  CameraIcon,
-  CheckCircleIcon,
-  CircleStackIcon,
-  CloudIcon,
-  CpuChipIcon,
-  ExclamationCircleIcon,
-  CommandLineIcon,
-  LockClosedIcon,
-  PaintBrushIcon,
-  SparklesIcon,
-  ArrowDownTrayIcon,
-} from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { AlertCircleFreeIcons, Camera01FreeIcons, CloudFreeIcons, ComputerTerminal01FreeIcons, CpuChargeFreeIcons, Database01FreeIcons, Download04FreeIcons, LockFreeIcons, PaintBoardFreeIcons, Refresh01FreeIcons, SparklesFreeIcons, Tick02FreeIcons } from '@hugeicons/core-free-icons'
 import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import {
   indexApi,
@@ -54,12 +42,12 @@ const unsavedChanges = useUnsavedChangesStore()
 const updatesStore = useUpdatesStore()
 
 const sections = [
-  { id: 'hotkeys', labelKey: 'settings.hotkeys', descriptionKey: 'settings.hotkeysDescription', icon: CommandLineIcon },
-  { id: 'screenshot', labelKey: 'settings.screenshot', descriptionKey: 'settings.screenshotDescription', icon: CameraIcon },
-  { id: 'ai', labelKey: 'settings.ai', descriptionKey: 'settings.aiDescription', icon: SparklesIcon },
-  { id: 'ui', labelKey: 'settings.ui', descriptionKey: 'settings.uiDescription', icon: PaintBrushIcon },
-  { id: 'updates', labelKey: 'settings.updates', descriptionKey: 'settings.updatesDescription', icon: ArrowDownTrayIcon },
-  { id: 'maintenance', labelKey: 'settings.maintenance', descriptionKey: 'settings.maintenanceDescription', icon: CircleStackIcon },
+  { id: 'hotkeys', labelKey: 'settings.hotkeys', descriptionKey: 'settings.hotkeysDescription', icon: ComputerTerminal01FreeIcons },
+  { id: 'screenshot', labelKey: 'settings.screenshot', descriptionKey: 'settings.screenshotDescription', icon: Camera01FreeIcons },
+  { id: 'ai', labelKey: 'settings.ai', descriptionKey: 'settings.aiDescription', icon: SparklesFreeIcons },
+  { id: 'ui', labelKey: 'settings.ui', descriptionKey: 'settings.uiDescription', icon: PaintBoardFreeIcons },
+  { id: 'updates', labelKey: 'settings.updates', descriptionKey: 'settings.updatesDescription', icon: Download04FreeIcons },
+  { id: 'maintenance', labelKey: 'settings.maintenance', descriptionKey: 'settings.maintenanceDescription', icon: Database01FreeIcons },
 ] as const
 
 const sectionGroups = ([
@@ -772,7 +760,7 @@ onUnmounted(() => {
       </header>
 
       <div v-if="loading" class="flex min-h-[65vh] items-center justify-center">
-        <ArrowPathIcon class="h-8 w-8 animate-spin text-[var(--color-primary)]" :aria-label="t('settings.loading')" />
+        <HugeiconsIcon :icon="Refresh01FreeIcons" class="h-8 w-8 animate-spin text-[var(--color-primary)]" :aria-label="t('settings.loading')" />
       </div>
 
       <div v-else class="settings-layout min-h-0 flex-1">
@@ -790,7 +778,7 @@ onUnmounted(() => {
               :aria-current="activeSection === section.id ? 'page' : undefined"
               @click="activeSection = section.id"
             >
-              <component :is="section.icon" class="h-4 w-4 flex-none" aria-hidden="true" />
+              <HugeiconsIcon :icon="section.icon" class="h-4 w-4 flex-none" aria-hidden="true" />
               {{ t(section.labelKey) }}
             </button>
           </div>
@@ -828,7 +816,7 @@ onUnmounted(() => {
                   @keydown="recordHotkey"
                 >
                   <span>{{ recordingHotkey ? t('settings.recording') : formatHotkey(screenshotHotkey) }}</span>
-                  <CommandLineIcon class="h-5 w-5 flex-none text-[var(--shell-muted)]" aria-hidden="true" />
+                  <HugeiconsIcon :icon="ComputerTerminal01FreeIcons" class="h-5 w-5 flex-none text-[var(--shell-muted)]" aria-hidden="true" />
                 </button>
               </div>
             </template>
@@ -902,7 +890,7 @@ onUnmounted(() => {
                   <p class="setting-help">{{ t('settings.fixedBuiltin') }}</p>
                 </div>
                 <div class="setting-readonly flex items-center gap-2">
-                  <LockClosedIcon class="h-4 w-4 flex-none" aria-hidden="true" />
+                  <HugeiconsIcon :icon="LockFreeIcons" class="h-4 w-4 flex-none" aria-hidden="true" />
                   BAAI/bge-small-zh-v1.5
                 </div>
               </div>
@@ -924,15 +912,15 @@ onUnmounted(() => {
                   class="flex items-center gap-2 text-sm"
                   :class="aiTestResult.success ? 'text-emerald-600' : 'text-red-600'"
                 >
-                  <CheckCircleIcon v-if="aiTestResult.success" class="h-5 w-5 flex-none" aria-hidden="true" />
-                  <ExclamationCircleIcon v-else class="h-5 w-5 flex-none" aria-hidden="true" />
+                  <HugeiconsIcon :icon="Tick02FreeIcons" v-if="aiTestResult.success" class="h-5 w-5 flex-none" aria-hidden="true" />
+                  <HugeiconsIcon :icon="AlertCircleFreeIcons" v-else class="h-5 w-5 flex-none" aria-hidden="true" />
                   {{ aiTestResult.message }}
                 </p>
               </div>
 
               <div class="settings-panel__card bg-[var(--color-primary-soft)]">
                 <div class="flex items-center gap-2 text-sm font-semibold text-[var(--color-primary-hover)]">
-                  <CpuChipIcon class="h-5 w-5 flex-none" aria-hidden="true" />
+                  <HugeiconsIcon :icon="CpuChargeFreeIcons" class="h-5 w-5 flex-none" aria-hidden="true" />
                   {{ t('settings.localOcr') }}
                 </div>
                 <dl class="mt-3 grid gap-2.5 text-sm sm:grid-cols-2">
@@ -946,7 +934,7 @@ onUnmounted(() => {
               <div class="settings-panel__card bg-[var(--color-surface-subtle)]" data-testid="ocr-cloud-card">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div class="flex items-center gap-2 text-sm font-semibold text-[var(--shell-ink)]">
-                    <CloudIcon class="h-5 w-5 flex-none text-[var(--shell-muted)]" aria-hidden="true" />
+                    <HugeiconsIcon :icon="CloudFreeIcons" class="h-5 w-5 flex-none text-[var(--shell-muted)]" aria-hidden="true" />
                     {{ t('settings.cloudOcr') }}
                   </div>
                   <label class="flex items-center gap-2">
@@ -1007,8 +995,8 @@ onUnmounted(() => {
                     class="flex items-center gap-2 text-sm"
                     :class="ocrTestResult.success ? 'text-emerald-600' : 'text-red-600'"
                   >
-                    <CheckCircleIcon v-if="ocrTestResult.success" class="h-5 w-5 flex-none" aria-hidden="true" />
-                    <ExclamationCircleIcon v-else class="h-5 w-5 flex-none" aria-hidden="true" />
+                    <HugeiconsIcon :icon="Tick02FreeIcons" v-if="ocrTestResult.success" class="h-5 w-5 flex-none" aria-hidden="true" />
+                    <HugeiconsIcon :icon="AlertCircleFreeIcons" v-else class="h-5 w-5 flex-none" aria-hidden="true" />
                     {{ ocrTestResult.message }}
                   </p>
                 </div>
@@ -1142,7 +1130,7 @@ onUnmounted(() => {
             <template v-else>
               <div class="maintenance-card">
                 <div class="flex items-start gap-3.5">
-                  <CircleStackIcon class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
+                  <HugeiconsIcon :icon="Database01FreeIcons" class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.semanticIndex') }}</h3>
                     <p class="setting-help">{{ t('settings.semanticIndexHint') }}</p>
@@ -1178,7 +1166,7 @@ onUnmounted(() => {
 
               <div class="maintenance-card">
                 <div class="flex items-start gap-3.5">
-                  <CpuChipIcon class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
+                  <HugeiconsIcon :icon="CpuChargeFreeIcons" class="mt-1 h-6 w-6 flex-none text-[var(--color-primary)]" aria-hidden="true" />
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.ocrRepair') }}</h3>
                     <p class="setting-help">{{ t('settings.ocrRepairHint') }}</p>

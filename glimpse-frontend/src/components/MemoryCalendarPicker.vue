@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowReactive, watch } from 'vue'
-import { ChevronLeftIcon, ChevronRightIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { CalendarMinusFreeIcons, ChevronLeftFreeIcons, ChevronRightFreeIcons } from '@hugeicons/core-free-icons'
 import { languagePreference, t } from '@/utils/i18n'
 import { cloneMemoryFilters, toDateInputValue, type MemoryFilters } from '@/utils/memory-filters'
 import {
@@ -294,7 +295,7 @@ onUnmounted(() => {
           :aria-label="t(monthPickerOpen ? 'wall.prevYear' : 'wall.prevMonth')"
           @click="monthPickerOpen ? shiftPickerYear(-1) : shiftMonth(-1)"
         >
-          <ChevronLeftIcon class="h-4 w-4" aria-hidden="true" />
+          <HugeiconsIcon :icon="ChevronLeftFreeIcons" class="h-4 w-4" aria-hidden="true" />
         </button>
         <!-- 速选打开时正中改显示年份：此时用户不需要看到当前选中月份（那是日历主界面的信息） -->
         <span v-if="monthPickerOpen" class="memory-calendar__year" aria-live="polite">{{ yearLabel }}</span>
@@ -316,7 +317,7 @@ onUnmounted(() => {
             :aria-expanded="monthPickerOpen"
             @click="toggleMonthPicker"
           >
-            <Squares2X2Icon class="h-4 w-4" aria-hidden="true" />
+            <HugeiconsIcon :icon="CalendarMinusFreeIcons" class="h-4 w-4" aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -326,7 +327,7 @@ onUnmounted(() => {
             :disabled="monthPickerOpen ? pickerYear >= currentNow.getFullYear() : atCurrentMonth"
             @click="monthPickerOpen ? shiftPickerYear(1) : shiftMonth(1)"
           >
-            <ChevronRightIcon class="h-4 w-4" aria-hidden="true" />
+            <HugeiconsIcon :icon="ChevronRightFreeIcons" class="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </div>

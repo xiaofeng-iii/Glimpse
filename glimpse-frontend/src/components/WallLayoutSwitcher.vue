@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { CalendarDaysIcon, CalendarIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { BorderAll01FreeIcons, Calendar02FreeIcons, CalendarDaysFreeIcons } from '@hugeicons/core-free-icons'
 import { t, type MessageKey } from '@/utils/i18n'
 import type { WallLayoutMode } from '@/utils/memory-grouping'
 import { setWallLayoutMode, wallLayoutMode } from '@/utils/wall-layout'
@@ -11,10 +12,10 @@ const props = defineProps<{
   compact?: boolean
 }>()
 
-const options: Array<{ value: WallLayoutMode; labelKey: MessageKey; icon: typeof CalendarIcon }> = [
-  { value: 'day', labelKey: 'wall.layoutDay', icon: CalendarDaysIcon },
-  { value: 'month', labelKey: 'wall.layoutMonth', icon: CalendarIcon },
-  { value: 'all', labelKey: 'wall.layoutAll', icon: Squares2X2Icon },
+const options: Array<{ value: WallLayoutMode; labelKey: MessageKey; icon: typeof CalendarDaysFreeIcons }> = [
+  { value: 'day', labelKey: 'wall.layoutDay', icon: CalendarDaysFreeIcons },
+  { value: 'month', labelKey: 'wall.layoutMonth', icon: Calendar02FreeIcons },
+  { value: 'all', labelKey: 'wall.layoutAll', icon: BorderAll01FreeIcons },
 ]
 
 const choose = (mode: WallLayoutMode) => {
@@ -42,7 +43,7 @@ const choose = (mode: WallLayoutMode) => {
       :disabled="disabled"
       @click="choose(option.value)"
     >
-      <component :is="option.icon" class="wall-layout-switcher__icon" aria-hidden="true" />
+      <HugeiconsIcon :icon="option.icon" class="wall-layout-switcher__icon" aria-hidden="true" />
     </button>
   </div>
 </template>
