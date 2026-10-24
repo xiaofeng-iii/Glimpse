@@ -161,7 +161,10 @@ onBeforeUnmount(() => {
     </div>
     <p
       v-if="text"
-      class="max-h-64 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--shell-ink)] [overflow-wrap:anywhere]"
+      class="ocr-text__body max-h-64 whitespace-pre-wrap text-sm text-[var(--shell-ink)] [overflow-wrap:anywhere]"
+      :class="compact ? 'overflow-y-hidden' : 'overflow-y-auto'"
+      :tabindex="compact ? 0 : undefined"
+      :aria-label="compact ? t('memory.text') : undefined"
     >
       {{ text }}
     </p>
@@ -170,6 +173,16 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* 侧栏只读文字点击获得焦点后才接管滚轮；独立详情页保留默认滚动。 */
+.ocr-text--compact .ocr-text__body {
+  padding-right: 8px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.ocr-text--compact .ocr-text__body:focus {
+  overflow-y: auto;
+}
 
 /* 紧凑形态与摘要/标签块同构平铺：无底色，标题行与正文顶到侧栏内容缘，
    三块的标题、按钮、文字左缘逐边对齐 */

@@ -734,6 +734,8 @@ describe('memory components', () => {
     await flushPromises()
     expect(wrapper.get('textarea').element.readOnly).toBe(true)
     expect(wrapper.get('textarea').attributes('tabindex')).toBe('0')
+    expect(wrapper.get('textarea').classes()).toContain('overflow-y-hidden')
+    expect(wrapper.get('textarea').classes()).not.toContain('overflow-y-auto')
     expect(frame.classes()).toContain('summary-editor__compact-frame--scrollable')
     wrapper.get('textarea').element.focus()
     expect(document.activeElement).toBe(wrapper.get('textarea').element)
@@ -1133,6 +1135,33 @@ describe('窗口级关闭叉号统一规格', () => {
     expect(close).not.toBeNull()
     expect(close?.querySelector('svg[viewBox="0 0 12 12"]')).toBeNull()
     assertUnifiedCloseGlyph(document, close)
+
+    wrapper.unmount()
+  })
+
+  it('独立详情页的识别文字保留直接滚动，不套用侧栏聚焦门槛', () => {
+    const wrapper = mount(OcrText, {
+      props: { text: 'recognized text' },
+    })
+    const body = wrapper.get('.ocr-text__body')
+
+    expect(body.classes()).toContain('overflow-y-auto')
+    expect(body.classes()).not.toContain('overflow-y-hidden')
+    expect(body.attributes('tabindex')).toBeUndefined()
+    expect(body.attributes('aria-label')).toBeUndefined()
+  })
+
+  it('点击识别文字后聚焦，未聚焦时由外层处理滚动', async () => {
+    const wrapper = mount(OcrText, {
+      props: { text: 'recognized text', compact: true },
+      attachTo: document.body,
+    })
+    const body = wrapper.get('.ocr-text__body')
+
+    expect(body.classes()).toContain('overflow-y-hidden')
+    expect(body.attributes('tabindex')).toBe('0')
+    body.element.focus()
+    expect(document.activeElement).toBe(body.element)
 
     wrapper.unmount()
   })

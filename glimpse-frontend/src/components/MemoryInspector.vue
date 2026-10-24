@@ -108,7 +108,7 @@ defineExpose({ canLeave })
 
     <div class="memory-inspector__divider" aria-hidden="true"></div>
 
-    <div class="memory-inspector__body min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-clip px-3 py-4">
+    <div class="memory-inspector__body min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-clip px-4 py-4">
       <MediaGallery v-if="!textMemory" :memory="memory" compact />
 
       <div

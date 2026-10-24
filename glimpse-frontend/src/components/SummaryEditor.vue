@@ -296,7 +296,7 @@ defineExpose({
         ref="compactEditor"
         v-model="draft"
         class="summary-editor__compact-control relative z-10 block h-full w-full resize-none border-0 bg-transparent px-3 py-2 pb-7 text-sm text-[var(--shell-ink)] outline-none"
-        :class="compactOverflowing ? 'overflow-y-auto' : 'overflow-y-hidden'"
+        :class="compactOverflowing && (!compact || editing) ? 'overflow-y-auto' : 'overflow-y-hidden'"
         :readonly="!editing"
         :tabindex="editing || compactOverflowing ? 0 : -1"
         :aria-label="contentLabel"
@@ -363,6 +363,11 @@ defineExpose({
   box-shadow: none;
 }
 
+/* 侧栏编辑态始终可滚；只读态点击获得焦点后才接管滚轮，否则交回侧栏。 */
+.summary-editor--compact .summary-editor__compact-control.overflow-y-hidden:focus {
+  overflow-y: auto;
+}
+
 /* 折行阈值只照顾真正挤不下的一行标题+操作的场景；
    侧栏块化后内容宽 ~316px，标题行保持单行，不落进此查询。 */
 @container (max-width: 17.5rem) {
@@ -386,6 +391,13 @@ defineExpose({
 
 .summary-editor__compact-control {
   padding-inline: 0;
+}
+
+/* 侧栏滚动条占住正文右侧预留的间距，出现时不改变文字排版宽度。 */
+.summary-editor--compact .summary-editor__compact-control {
+  padding-right: 8px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 /* 侧栏编辑框向外扩一半正文留白，而不是把文字向内推进框里：
