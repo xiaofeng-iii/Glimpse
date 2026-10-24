@@ -335,6 +335,7 @@ onUnmounted(() => {
                 :id="calendarId"
                 ref="calendarReveal"
                 class="memory-filters__calendar-reveal"
+                :class="{ 'memory-filters__calendar-reveal--visible': calendarMounted }"
                 :style="{ height: `${calendarHeight}px` }"
               >
                 <MemoryCalendarPicker v-if="calendarMounted" v-model:range-mode="rangeMode" class="memory-filters__calendar" :filters="draft" @apply="applyCalendar" />
@@ -650,6 +651,19 @@ onUnmounted(() => {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-focus) 26%, transparent);
 }
 
+.memory-filters__range-mode .memory-filters__checkbox-indicator {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-basis: 0.75rem;
+  border-radius: 0.125rem;
+}
+
+.memory-filters__range-mode .memory-filters__checkbox-indicator::after {
+  width: 0.3125rem;
+  height: 0.1875rem;
+  border-width: 0 0 1px 1px;
+}
+
 .memory-filters__clear-period {
   display: inline-flex;
   width: 1.25rem;
@@ -746,19 +760,24 @@ onUnmounted(() => {
   transition: height 180ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+.memory-filters__calendar-reveal--visible {
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--color-surface-subtle);
+}
+
 .memory-filters__calendar-reveal > * {
   min-height: 0;
   overflow: hidden;
 }
 
 .memory-filters__calendar {
-  padding: 0.5rem 0.375rem 0.375rem;
+  padding: 0.5rem 0.375rem 0;
 }
 
 .memory-filters__calendar :deep(.memory-calendar__block) {
   padding: 0.5rem;
   border: 0;
-  background: var(--color-surface-subtle);
+  background: transparent;
 }
 
 .memory-filters__calendar :deep(.memory-calendar__nav) {

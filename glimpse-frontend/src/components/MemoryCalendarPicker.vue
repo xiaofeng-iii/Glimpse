@@ -654,7 +654,8 @@ onUnmounted(() => {
 }
 
 .memory-calendar__day--in-range {
-  background: var(--color-primary-soft);
+  color: var(--color-primary-hover);
+  background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface-subtle));
 }
 
 .memory-calendar__day--endpoint {
