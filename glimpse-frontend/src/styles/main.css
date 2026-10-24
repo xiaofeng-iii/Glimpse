@@ -406,7 +406,7 @@ button {
   gap: 0.35rem;
   padding: 0 0.45rem;
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.625rem;
   line-height: var(--line-height-12);
   white-space: nowrap;
 }
