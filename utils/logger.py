@@ -12,16 +12,47 @@ Example:
 """
 import logging
 import os
+import re
 import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
 
 # Default log format
-LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s] - %(message)s"
+LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s] [session:%(sessionId)s] - %(message)s"
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 # Global log level (can be overridden via environment variable)
 DEFAULT_LOG_LEVEL = logging.INFO
+MAX_LOG_BYTES = 2 * 1024 * 1024
+LOG_BACKUP_COUNT = 3
+
+
+def redact_text(value: str) -> str:
+    value = re.sub(r'(?i)\bBearer\s+[^\s\"\'<>]+', 'Bearer <redacted>', value)
+    value = re.sub(r'//[^\s/@]+@', '//<redacted>@', value)
+    value = re.sub(
+        r'(?i)(\b(?:api[_-]?key|secret(?:[_-]?key)?|password|authorization|access[_-]?token|auth[_-]?token|token|signature)[\"\']?\s*[=:]\s*[\"\']?)[^\s&\"\'<> ,}]+',
+        r'\1<redacted>', value,
+    )
+    return value
+
+
+class RedactingFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        return redact_text(super().format(record))
+
+
+class SessionIdFilter(logging.Filter):
+    """Attach the host-provided session id to every backend log record."""
+
+    def __init__(self, session_id: str):
+        super().__init__()
+        self.session_id = session_id or "-"
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.sessionId = self.session_id
+        return True
 
 
 def _get_log_level() -> int:
@@ -55,14 +86,21 @@ def setup_logging(
 
     # Configure root logger
     root.setLevel(log_level)
+    session_filter = SessionIdFilter(os.environ.get("GLIMPSE_SESSION_ID", ""))
 
     # A configured file is the single sink for structured Python logs. Raw
     # sidecar stdout/stderr is captured separately by the Tauri host.
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=MAX_LOG_BYTES,
+            backupCount=LOG_BACKUP_COUNT,
+            encoding="utf-8",
+        )
         file_handler.setLevel(logging.DEBUG)  # File always gets DEBUG
-        file_formatter = logging.Formatter(log_format, date_format)
+        file_handler.addFilter(session_filter)
+        file_formatter = RedactingFormatter(log_format, date_format)
         file_handler.setFormatter(file_formatter)
         root.addHandler(file_handler)
     else:
@@ -70,7 +108,8 @@ def setup_logging(
         if console_stream is not None:
             console_handler = logging.StreamHandler(console_stream)
             console_handler.setLevel(log_level)
-            console_formatter = logging.Formatter(log_format, date_format)
+            console_handler.addFilter(session_filter)
+            console_formatter = RedactingFormatter(log_format, date_format)
             console_handler.setFormatter(console_formatter)
             root.addHandler(console_handler)
 

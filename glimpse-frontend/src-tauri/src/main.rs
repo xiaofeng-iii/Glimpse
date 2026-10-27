@@ -283,9 +283,13 @@ fn redirect_backend_stdio(app: &AppHandle, command: &mut Command) -> std::io::Re
 }
 
 fn build_backend_command(app: &AppHandle, runtime: &BackendRuntime) -> Option<Command> {
+    let session_id = app
+        .state::<diagnostics::DiagnosticsState>()
+        .session_id()
+        .to_owned();
+
     #[cfg(debug_assertions)]
     {
-        let _ = app;
         let _ = runtime;
         let root = project_root()?;
         let python_executable = std::env::var("GLIMPSE_PYTHON")
@@ -296,7 +300,8 @@ fn build_backend_command(app: &AppHandle, runtime: &BackendRuntime) -> Option<Co
         command
             .arg("main_api.py")
             .current_dir(root)
-            .env(APP_VERSION_ENV, env!("CARGO_PKG_VERSION"));
+            .env(APP_VERSION_ENV, env!("CARGO_PKG_VERSION"))
+            .env(diagnostics::BACKEND_SESSION_ID_ENV, session_id);
         return Some(command);
     }
 
@@ -320,7 +325,8 @@ fn build_backend_command(app: &AppHandle, runtime: &BackendRuntime) -> Option<Co
         let mut command = Command::new(sidecar_exe);
         command
             .current_dir(&sidecar_dir)
-            .env(APP_VERSION_ENV, env!("CARGO_PKG_VERSION"));
+            .env(APP_VERSION_ENV, env!("CARGO_PKG_VERSION"))
+            .env(diagnostics::BACKEND_SESSION_ID_ENV, session_id);
         let port = api_addr(&runtime.origin)?.port().to_string();
         command.arg("--host").arg(LOOPBACK_HOST);
         command.arg("--port").arg(port);
@@ -1199,6 +1205,7 @@ fn main() {
             copy_image_files_to_clipboard,
             copy_image_file_to_clipboard,
             diagnostics::append_diagnostic_logs,
+            diagnostics::diagnostic_session_id,
             diagnostics::open_logs_directory,
             diagnostics::export_diagnostics
         ])

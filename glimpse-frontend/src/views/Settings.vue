@@ -25,7 +25,6 @@ import {
   type LanguagePreference,
 } from '@/utils/i18n'
 import { createLogger, getDebugLoggingRemainingMs, isDebugLoggingActive, startDebugLogging, stopDebugLogging } from '@/utils/logger'
-import { diagnosticsSessionId } from '@/utils/diagnostics'
 import { exportDiagnostics, openLogsDirectory } from '@/platform/diagnosticsBridge'
 import { isDesktopShell } from '@/platform/desktop'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -244,7 +243,7 @@ const handleExportDiagnostics = async () => {
   if (exportingDiagnostics.value) return
   exportingDiagnostics.value = true
   try {
-    const exportedPath = await exportDiagnostics(diagnosticsSessionId)
+    const exportedPath = await exportDiagnostics()
     if (exportedPath) notifications.show(t('settings.diagnosticsExportDone'), 'success', 2800)
     else notifications.show(t('settings.diagnosticsExportFailed'), 'error', 2800)
   } finally {

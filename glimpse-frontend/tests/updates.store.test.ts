@@ -262,44 +262,31 @@ describe('updates store', () => {
       setDiagnosticsSink(null)
     })
 
-    it('records missing_target when the target version is absent from the index', async () => {
+    it('records the manifest notes source after a successful check', async () => {
       const store = useUpdatesStore()
       store.recordCurrentVersion('0.3.2')
-      apiMocks.invoke.mockResolvedValue({ version: '9.9.9', notes: null })
+      apiMocks.invoke.mockResolvedValue({
+        version: '0.3.3',
+        notes: '**新特性**\n- manifest 正文',
+      })
 
       await store.checkForUpdate()
-      await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
+      await vi.waitFor(() => expect(store.updateNotes?.sections.features).toEqual(['manifest 正文']))
 
-      expect(store.updateNotesPartial).toBe(true)
-      const partial = events.find((event) => event.event === 'updates.notes' && event.outcome === 'partial')
-      expect(partial?.data?.reason).toBe('missing_target')
-    })
-
-    it('records unsupported_current when the running version cannot be parsed', async () => {
-      const store = useUpdatesStore()
-      store.recordCurrentVersion('0.3.2-weird')
-      apiMocks.invoke.mockResolvedValue({ version: '0.3.3', notes: null })
-
-      await store.checkForUpdate()
-      await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
-
-      expect(store.updateNotesPartial).toBe(true)
-      const partial = events.find((event) => event.event === 'updates.notes' && event.outcome === 'partial')
-      expect(partial?.data?.reason).toBe('unsupported_current')
+      const available = events.find((event) => event.event === 'updates.check' && event.outcome === 'available')
+      expect(available?.data?.target).toBe('0.3.3')
+      expect(store.updateNotesPartial ?? false).toBe(false)
     })
 
     it('records the failure kind when the notes index cannot be fetched', async () => {
       const store = useUpdatesStore()
       store.recordCurrentVersion('0.3.2')
-      apiMocks.invoke.mockResolvedValue({ version: '0.3.3', notes: null })
-      apiMocks.fetchIndex.mockRejectedValue(new TypeError('offline'))
 
-      await store.checkForUpdate()
-      await vi.waitFor(() => expect(store.updateNotesLoading).toBe(false))
+      apiMocks.fetchIndex.mockRejectedValueOnce(new TypeError('offline'))
+      await store.loadCurrentNotes()
 
-      const failed = events.find((event) => event.event === 'updates.notes' && event.outcome === 'fetch_failed')
+      const failed = events.find((event) => event.event === 'updates.current_notes' && event.outcome === 'failed')
       expect(failed?.data?.kind).toBe('network')
-      expect(store.updateNotesPartial).toBe(true)
     })
 
     it('distinguishes a missing current version from a network failure', async () => {

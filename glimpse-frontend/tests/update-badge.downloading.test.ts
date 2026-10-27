@@ -55,17 +55,16 @@ describe('UpdateBadge 下载中按钮状态', () => {
     wrapper.unmount()
   })
 
-  it('降级时：原始 Markdown 按三分类渲染，不暴露标记符号', async () => {
+  it('降级时：manifest 自带正文按三分类渲染，不暴露标记符号', async () => {
     const wrapper = await mountBadgeWith((updates) => {
       updates.availableUpdate = {
         version: '1.0.0',
         notes: '**新特性**\n- 降级单版功能\n\n**修复**\n\n**Full Changelog**: x',
       }
-      updates.updateNotesPartial = true
+      updates.refreshUpdateNotes(updates.availableUpdate.notes)
     })
 
     const bodyText = document.body.textContent ?? ''
-    expect(bodyText).toContain('部分版本说明获取失败')
     expect(bodyText).toContain('降级单版功能')
     expect(bodyText).not.toContain('**新特性**')
     expect(bodyText).not.toContain('Full Changelog')
