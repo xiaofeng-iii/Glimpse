@@ -121,6 +121,12 @@ describe('Settings update notes', () => {
     apiMocks.ocrStatus.mockResolvedValue({ task_id: 'y', status: 'idle', running: false, result: null, error: null })
     apiMocks.updateSettings.mockResolvedValue({})
     apiMocks.listen.mockResolvedValue(vi.fn())
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'get_update_install_status') {
+        return { phase: 'idle', version: null, progress: null, error: null }
+      }
+      return undefined
+    })
     apiMocks.isDesktopShell.mockReturnValue(true)
     apiMocks.getVersion.mockResolvedValue('0.3.2')
     apiMocks.fetchIndex.mockResolvedValue({
@@ -309,12 +315,16 @@ describe('Settings update notes', () => {
 
   it('turns the dialog busy in place when installing and resets after failure', async () => {
     let releaseInstall!: (value?: unknown) => void
+    let installFailed = false
     apiMocks.invoke.mockImplementation(async (command: string) => {
       if (command === 'check_for_update') {
         return { version: '0.3.3-preview.20261003', notes: null }
       }
+      if (command === 'get_update_install_status') {
+        return { phase: installFailed ? 'failed' : 'idle', version: '0.3.3-preview.20261003', progress: null, error: 'download failed' }
+      }
       if (command === 'install_checked_update') {
-        await new Promise<void>((resolve) => { releaseInstall = resolve })
+        await new Promise<void>((resolve) => { releaseInstall = () => { installFailed = true; resolve() } })
         throw new Error('download failed')
       }
       throw new Error(`unexpected command ${command}`)
@@ -326,7 +336,7 @@ describe('Settings update notes', () => {
     const dialog = wrapper.findAllComponents(ConfirmDialog).find((item) => item.vm.$attrs.id === 'update-notes')!
 
     dialog.vm.$emit('confirm')
-    await flushPromises()
+    await vi.waitFor(() => expect(apiMocks.invoke).toHaveBeenCalledWith('install_checked_update', { preferMirror: false }))
     expect(dialog.props('busy')).toBe(true)
     // 状态文案只落在弹窗动作按钮上，不再描述、正文各来一份。
     const dialogPanel = document.querySelector('[role="alertdialog"]')
@@ -336,19 +346,23 @@ describe('Settings update notes', () => {
     await flushPromises()
     expect(dialog.props('busy')).toBe(false)
     expect(wrapper.text()).toContain('安装失败，请重新检查更新后再试。')
-    // 失败后已取走待安装对象，入口回到"重新检查更新"而不是残留可重复安装的按钮。
-    expect(wrapper.find('.settings-panel__card').exists()).toBe(false)
+    // 失败必须来自宿主终态，保留更新版本供用户直接重试，不隐藏更新入口。
+    expect(wrapper.text()).toContain('发现新版本 0.3.3-preview.20261003')
     expect(checkButton(wrapper).attributes('disabled')).toBeUndefined()
   })
 
   it('installs in place from the card without opening any dialog', async () => {
     let releaseInstall!: (value?: unknown) => void
+    let installFailed = false
     apiMocks.invoke.mockImplementation(async (command: string) => {
       if (command === 'check_for_update') {
         return { version: '0.3.3-preview.20261003', notes: null }
       }
+      if (command === 'get_update_install_status') {
+        return { phase: installFailed ? 'failed' : 'idle', version: '0.3.3-preview.20261003', progress: null, error: 'download failed' }
+      }
       if (command === 'install_checked_update') {
-        await new Promise<void>((resolve) => { releaseInstall = resolve })
+        await new Promise<void>((resolve) => { releaseInstall = () => { installFailed = true; resolve() } })
         throw new Error('download failed')
       }
       throw new Error(`unexpected command ${command}`)
@@ -363,7 +377,7 @@ describe('Settings update notes', () => {
 
     const installButton = wrapper.findAll('button').find((button) => button.text() === '下载并安装')!
     await installButton.trigger('click')
-    await flushPromises()
+    await vi.waitFor(() => expect(apiMocks.invoke).toHaveBeenCalledWith('install_checked_update', { preferMirror: false }))
 
     // 点击后就地进入下载态：不再弹窗，按钮自身变为共享的「正在下载」状态。
     expect(dialog.props('open')).toBe(false)
@@ -377,12 +391,19 @@ describe('Settings update notes', () => {
 
   it('exposes cancellation from the settings card and keeps the update after cancelling', async () => {
     let releaseInstall!: (value: 'cancelled') => void
+    let cancelled = false
     apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'get_update_install_status') {
+        return { phase: cancelled ? 'cancelled' : 'idle', version: '0.3.3-preview.20261003', progress: null, error: null }
+      }
       if (command === 'check_for_update') {
         return { version: '0.3.3-preview.20261003', notes: null }
       }
+      if (command === 'get_update_install_status') {
+        return { phase: installFailed ? 'failed' : 'idle', version: '0.3.3-preview.20261003', progress: null, error: 'download failed' }
+      }
       if (command === 'install_checked_update') {
-        return new Promise((resolve) => { releaseInstall = resolve })
+        return new Promise((resolve) => { releaseInstall = (value) => { cancelled = true; resolve(value) } })
       }
       if (command === 'cancel_update_download') return null
       throw new Error(`unexpected command ${command}`)
@@ -420,6 +441,12 @@ describe('Settings update notes', () => {
       store.recordCurrentVersion('0.3.2')
       await store.checkForUpdate()
       store.installing = true
+      apiMocks.invoke.mockImplementation(async (command: string) => {
+        if (command === 'get_update_install_status') {
+          return { phase: 'downloading', version: '0.3.3-preview.20261003', progress: null, error: null }
+        }
+        return { version: '0.3.3-preview.20261003', notes: null }
+      })
     })
 
     await openUpdates(wrapper)
@@ -435,7 +462,10 @@ describe('Settings update notes', () => {
 
   it('does not auto-check on normal entry; detection waits for the manual button', async () => {
     // 普通进入设置页不发起检测，更新卡片不出现，直到用户点「检查更新」。
-    apiMocks.invoke.mockResolvedValue({ version: '0.3.3-preview.20261003', notes: null })
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'check_for_update') return { version: '0.3.3-preview.20261003', notes: null }
+      return { phase: 'idle', version: null, progress: null, error: null }
+    })
     const wrapper = await openUpdates(await mountSettings())
     await flushPromises()
 

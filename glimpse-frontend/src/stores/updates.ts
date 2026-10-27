@@ -44,7 +44,16 @@ export interface UpdateDownloadProgress {
   total: number | null
 }
 
-export type UpdateInstallResult = 'installed' | 'cancelled'
+export type UpdatePhase = 'idle' | 'downloading' | 'cancelling' | 'installing' | 'installed' | 'cancelled' | 'failed'
+
+export interface UpdateOperation {
+  phase: UpdatePhase
+  version: string | null
+  progress: UpdateDownloadProgress | null
+  error: string | null
+}
+
+export type UpdateInstallResult = 'installed' | 'cancelled' | 'running'
 
 export interface InstallUpdateOptions {
   mirrorMode?: UpdateMirrorMode
@@ -94,10 +103,13 @@ export const useUpdatesStore = defineStore('updates', () => {
   let currentNotesRequested = false
   let currentNotesVersion = ''
   let pendingCheck: Promise<AvailableUpdate | null> | null = null
+  let operationListenerReady: Promise<void> | null = null
+  let installPending = false
 
   const showAvailableBadge = computed(() => Boolean(availableUpdate.value))
 
   const devChannel = ref(readDevChannelEnabled())
+  const activePhase = ref<UpdatePhase>('idle')
 
   const channel = computed<'stable' | 'preview' | 'dev-test'>(() => {
     if (import.meta.env.DEV && devChannel.value) return DEV_UPDATE_CHANNEL
@@ -173,53 +185,118 @@ export const useUpdatesStore = defineStore('updates', () => {
     return pendingCheck
   }
 
+  const applyOperation = (operation: UpdateOperation) => {
+    // 安装启动前的旧 idle 快照不能覆盖本次调用的下载中状态。
+    if (installPending && operation.phase === 'idle') return
+    activePhase.value = operation.phase
+    const running = ['downloading', 'cancelling', 'installing'].includes(operation.phase)
+    installing.value = running
+    cancelling.value = operation.phase === 'cancelling'
+    downloadProgress.value = operation.progress
+    if (operation.phase === 'failed') {
+      installFailed.value = true
+    }
+    if (operation.phase === 'cancelled') {
+      installFailed.value = false
+    }
+    if (operation.version && !availableUpdate.value) {
+      availableUpdate.value = { version: operation.version, notes: null }
+    }
+    if (operation.phase === 'idle') {
+      cancelling.value = false
+    }
+  }
+
+  const syncUpdateOperation = async () => {
+    if (!isDesktopShell()) return
+    if (!operationListenerReady) {
+      operationListenerReady = (async () => {
+        const [{ listen }, { invoke }] = await Promise.all([
+          import('@tauri-apps/api/event'),
+          import('@tauri-apps/api/core'),
+        ])
+        await listen<UpdateOperation>(
+          'glimpse://update-operation',
+          (event) => applyOperation(event.payload),
+        )
+        applyOperation(await invoke<UpdateOperation>('get_update_install_status'))
+      })().catch((error) => {
+        operationListenerReady = null
+        throw error
+      })
+    }
+    await operationListenerReady
+  }
+
   const installUpdate = async (options: InstallUpdateOptions = {}): Promise<boolean> => {
     if (!availableUpdate.value || installing.value || checking.value) return false
-    installing.value = true
-    cancelling.value = false
-    downloadProgress.value = null
-
     const op = logger.child({ event: 'updates.install' })
-    let unlistenProgress: (() => void) | null = null
+    installing.value = true
+    installPending = true
+    cancelling.value = false
+    installFailed.value = false
+    downloadProgress.value = null
+    let localTerminal = false
     try {
       if (import.meta.env.DEV && channel.value === DEV_UPDATE_CHANNEL) {
         const { devInstallUpdate } = await import('@/dev/fakeUpdateChannel')
         await devInstallUpdate()
       } else {
+        await syncUpdateOperation()
+        if (activePhase.value !== 'idle' && installing.value) return true
         const [{ listen }, { invoke }] = await Promise.all([
           import('@tauri-apps/api/event'),
           import('@tauri-apps/api/core'),
         ])
-        unlistenProgress = await listen<UpdateDownloadProgress>(
+        const unlistenProgress = await listen<UpdateDownloadProgress>(
           'glimpse://update-download-progress',
           (event) => {
-            downloadProgress.value = event.payload
+            if (installing.value && !cancelling.value) downloadProgress.value = event.payload
           },
         )
-        const mirrorMode = options.mirrorMode
-          ?? settingsStore.settings?.ui?.update_mirror_mode
-          ?? 'auto'
-        const result = await invoke<UpdateInstallResult>('install_checked_update', {
-          preferMirror: resolvePreferMirror(mirrorMode),
-        })
-        if (result === 'cancelled') {
-          op.child({ outcome: 'cancelled' }).info('update download cancelled')
-          installFailed.value = false
-          return true
+        try {
+          const mirrorMode = options.mirrorMode
+            ?? settingsStore.settings?.ui?.update_mirror_mode
+            ?? 'auto'
+          const result = await invoke<UpdateInstallResult>('install_checked_update', {
+            preferMirror: resolvePreferMirror(mirrorMode),
+          })
+          applyOperation(await invoke<UpdateOperation>('get_update_install_status'))
+          if (result === 'running') return true
+          if (result === 'cancelled') {
+            op.child({ outcome: 'cancelled' }).info('update download cancelled')
+            installFailed.value = false
+            return true
+          }
+        } finally {
+          unlistenProgress()
         }
       }
       op.child({ outcome: 'success' }).info('update install finished')
+      localTerminal = true
       return true
     } catch (error) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const operation = await invoke<UpdateOperation>('get_update_install_status')
+        applyOperation(operation)
+        if (installing.value || operation.phase === 'cancelled') {
+          if (!(import.meta.env.DEV && channel.value === DEV_UPDATE_CHANNEL)) return true
+        }
+      } catch {
+        if (installing.value && activePhase.value !== 'idle') return true
+      }
       op.child({ outcome: 'failed' }).error('Failed to install update: %s', error)
-      availableUpdate.value = null
       installFailed.value = true
+      localTerminal = true
       return false
     } finally {
-      unlistenProgress?.()
-      downloadProgress.value = null
-      cancelling.value = false
-      installing.value = false
+      installPending = false
+      if (localTerminal || activePhase.value === 'idle') {
+        installing.value = false
+        cancelling.value = false
+        downloadProgress.value = null
+      }
     }
   }
 
@@ -229,6 +306,7 @@ export const useUpdatesStore = defineStore('updates', () => {
     try {
       const { invoke } = await import('@tauri-apps/api/core')
       await invoke('cancel_update_download')
+      applyOperation(await invoke<UpdateOperation>('get_update_install_status'))
     } catch (error) {
       cancelling.value = false
       logger.child({ event: 'updates.install', outcome: 'cancel_failed' }).error('Failed to cancel update download: %s', error)
@@ -297,5 +375,6 @@ export const useUpdatesStore = defineStore('updates', () => {
     cancelUpdateDownload,
     loadCurrentNotes,
     refreshUpdateNotes,
+    syncUpdateOperation,
   }
 })

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { AlertCircleFreeIcons, Cancel01FreeIcons, ChevronLeftFreeIcons, Copy01FreeIcons, MinusFreeIcons, Refresh01FreeIcons, Settings02FreeIcons, StopFreeIcons, Tick02FreeIcons } from '@hugeicons/core-free-icons'
 import CloseActionDialog from '@/components/CloseActionDialog.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import UpdateBadge from '@/components/UpdateBadge.vue'
 import glimpseLogo from '@/assets/glimpse.svg'
 import { settingsApi } from '@/api/client'
@@ -68,6 +69,8 @@ const statusLabel = computed(() =>
 const isWindowMaximized = ref(false)
 const closeAction = ref<CloseAction>('ask')
 const closeDialogOpen = ref(false)
+const updateExitDialogOpen = ref(false)
+const updateExiting = ref(false)
 let removeDesktopCloseListener: (() => void) | null = null
 let removeBackendCorruptionListener: (() => void) | null = null
 let removeNavigationGuard: (() => void) | null = null
@@ -106,8 +109,21 @@ const performCloseAction = async (action: Exclude<CloseAction, 'ask'>) => {
   await closeDesktopWindow()
 }
 
+const confirmUpdateExit = async () => {
+  updateExitDialogOpen.value = false
+  updateExiting.value = true
+  try {
+    await updatesStore.cancelUpdateDownload()
+    await closeDesktopWindow()
+  } catch (error) {
+    updateExiting.value = false
+    logger.error('Cancelling update before exit failed: %s', error)
+    notificationStore.show(t('message.exitFailed'), 'error', 3200)
+  }
+}
+
 const requestWindowClose = async () => {
-  if (closeDialogOpen.value) {
+  if (closeDialogOpen.value || updateExitDialogOpen.value || updateExiting.value) {
     return
   }
 
@@ -117,6 +133,10 @@ const requestWindowClose = async () => {
 
   if (closeAction.value === 'ask') {
     closeDialogOpen.value = true
+    return
+  }
+  if (closeAction.value === 'exit' && updatesStore.installing) {
+    updateExitDialogOpen.value = true
     return
   }
 
@@ -156,6 +176,10 @@ const handleCloseDialogChoice = async (payload: {
       }
     }
 
+    if (payload.action === 'exit' && updatesStore.installing) {
+      updateExitDialogOpen.value = true
+      return
+    }
     await performCloseAction(payload.action)
   } catch (error) {
     logger.error('Applying close action failed: %s', error)
@@ -179,6 +203,7 @@ const navigateSettings = async () => {
 // 失败完全静默，用户仍可在设置页手动检查。
 const checkUpdatesAtStartup = async () => {
   if (!isDesktop) return
+  await updatesStore.syncUpdateOperation().catch(() => undefined)
   try {
     const { getVersion } = await import('@tauri-apps/api/app')
     updatesStore.recordCurrentVersion(await getVersion())
@@ -370,6 +395,18 @@ onUnmounted(() => {
       <slot></slot>
     </div>
 
+    <ConfirmDialog
+      id="update-exit"
+      :open="updateExitDialogOpen || updateExiting"
+      :title="t('settings.updateExitConfirm')"
+      :description="updateExiting ? t('settings.updateExiting') : ''"
+      :confirm-label="t('close.exit')"
+      :cancel-label="t('action.cancel')"
+      :busy="updateExiting"
+      hide-icon
+      @cancel="updateExitDialogOpen = false"
+      @confirm="confirmUpdateExit"
+    />
     <CloseActionDialog
       :open="closeDialogOpen"
       @close="closeDialogOpen = false"

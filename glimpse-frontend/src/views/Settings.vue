@@ -114,13 +114,13 @@ const updateChannel = ref<'stable' | 'preview' | 'dev-test'>('stable')
 const updateMirrorMode = ref<'auto' | 'direct' | 'mirror'>('auto')
 const lastRealChannel = ref<'stable' | 'preview'>('stable')
 const currentVersion = ref('')
-const availableUpdate = ref<{ version: string; notes: string | null } | null>(null)
+const availableUpdate = computed(() => updatesStore.availableUpdate)
 const checkingUpdate = computed(() => updatesStore.checking)
 const updateDialogOpen = ref(false)
 const currentNotesOpen = ref(false)
 const targetNotesOpen = ref(false)
 const updateNotes = computed(() => updatesStore.updateNotes)
-const installFailed = ref(false)
+const installFailed = computed(() => updatesStore.installFailed)
 let updateGeneration = 0
 let disposed = false
 // 加载/回填设置触发的 updateChannel 变化是程序化的，不代表用户切换通道：
@@ -139,11 +139,10 @@ watch(updateChannel, (value) => {
   }
   if (populatingSettings) return
   updateGeneration++
-  availableUpdate.value = null
   updatesStore.availableUpdate = null
+  updatesStore.installFailed = false
   updateDialogOpen.value = false
   targetNotesOpen.value = false
-  installFailed.value = false
 }, { flush: 'sync' })
 watch(activeSection, () => { currentNotesOpen.value = false; targetNotesOpen.value = false })
 
@@ -392,7 +391,6 @@ const populateForm = () => {
       ? DEV_UPDATE_CHANNEL
       : lastRealChannel.value
     updateMirrorMode.value = settings.ui?.update_mirror_mode ?? 'auto'
-    availableUpdate.value = null
     savedSnapshot.value = formSnapshot.value
     savedAiSnapshot.value = aiSnapshot.value
     savedOcrSnapshot.value = ocrSnapshot.value
@@ -552,14 +550,12 @@ const testOcr = async () => {
 // notify/silent 控制反馈：手动点击要给"已是最新/失败"提示并弹窗，自动检测静默、只把卡片摆上。
 const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
   if (!isDesktopShell() || checkingUpdate.value || updatesStore.installing) return
-  availableUpdate.value = null
-  installFailed.value = false
+  updatesStore.installFailed = false
   targetNotesOpen.value = false
   const generation = ++updateGeneration
   try {
     const target = await updatesStore.checkForUpdate()
     if (disposed || generation !== updateGeneration) return
-    availableUpdate.value = target
     updatesStore.availableUpdate = target
     if (target) updatesStore.refreshUpdateNotes(target.notes)
     if (!target) {
@@ -583,13 +579,14 @@ const runUpdateCheck = async ({ silent }: { silent: boolean }) => {
 // 把共享 store 已发现的更新同步到本地展示：不重新检测，任何进入路径都执行，
 // 这样顶栏发起的下载在进行中时，设置页也能读到同一份 installing 状态。
 const adoptStoreUpdate = () => {
-  if (!updatesStore.availableUpdate) return
-  availableUpdate.value = updatesStore.availableUpdate
+  if (import.meta.env.DEV && updateChannel.value === DEV_UPDATE_CHANNEL) return
+  void updatesStore.syncUpdateOperation().catch(() => undefined)
 }
 
 const checkForUpdate = () => runUpdateCheck({ silent: false })
 
 const updateInstallingLabel = computed(() => {
+  if (updatesStore.cancelling) return t('settings.updateCancelling')
   const progress = updatesStore.downloadProgress
   if (!progress) return t('settings.updateInstalling')
   if (progress.total) {
@@ -602,6 +599,7 @@ const updateInstallingLabel = computed(() => {
 
 const handleUpdateDialogCancel = () => {
   if (updatesStore.installing) {
+    updateDialogOpen.value = false
     void updatesStore.cancelUpdateDownload()
     return
   }
@@ -617,9 +615,7 @@ const installUpdate = async () => {
   const ok = await updatesStore.installUpdate({ mirrorMode: updateMirrorMode.value })
   if (!ok) {
     updateDialogOpen.value = false
-    notifications.show(t('settings.updateInstallFailed'), 'error')
-    availableUpdate.value = null
-    installFailed.value = true
+    if (updatesStore.installFailed) notifications.show(t('settings.updateInstallFailed'), 'error')
   }
 }
 

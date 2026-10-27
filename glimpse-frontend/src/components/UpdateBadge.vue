@@ -15,6 +15,7 @@ const notifications = useNotificationStore()
 
 const updatePopoverOpen = ref(false)
 const installingLabel = computed(() => {
+  if (updates.cancelling) return t('settings.updateCancelling')
   const progress = updates.downloadProgress
   if (!progress) return t('settings.updateInstalling')
   if (progress.total) {
@@ -34,7 +35,7 @@ const installNow = async () => {
   const ok = await updates.installUpdate()
   if (!ok) {
     updatePopoverOpen.value = false
-    notifications.show(t('settings.updateInstallFailed'), 'error')
+    if (updates.installFailed) notifications.show(t('settings.updateInstallFailed'), 'error')
   }
 }
 </script>

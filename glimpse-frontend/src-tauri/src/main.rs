@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Mutex,
+    Mutex, RwLock,
 };
 use std::time::{Duration, Instant};
 use tauri::image::Image;
@@ -72,11 +72,58 @@ struct AppState {
     backend_child: Mutex<Option<Child>>,
     backend_runtime: Mutex<BackendRuntime>,
     quitting: AtomicBool,
+    exit_waiting: AtomicBool,
     pending_update: Mutex<Option<(Update, Vec<String>)>>,
     update_installing: AtomicBool,
     update_cancel_requested: AtomicBool,
+    update_operation: RwLock<UpdateOperation>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum UpdatePhase {
+    Idle,
+    Downloading,
+    Cancelling,
+    Installing,
+    Installed,
+    Cancelled,
+    Failed,
+}
+
+#[derive(Clone, Serialize)]
+struct UpdateOperation {
+    phase: UpdatePhase,
+    version: Option<String>,
+    progress: Option<UpdateDownloadProgress>,
+    error: Option<String>,
+}
+
+impl Default for UpdateOperation {
+    fn default() -> Self {
+        Self {
+            phase: UpdatePhase::Idle,
+            version: None,
+            progress: None,
+            error: None,
+        }
+    }
+}
+
+impl UpdateOperation {
+    fn is_running(&self) -> bool {
+        matches!(
+            self.phase,
+            UpdatePhase::Downloading | UpdatePhase::Cancelling | UpdatePhase::Installing
+        )
+    }
+
+    fn finish(&mut self, phase: UpdatePhase, error: Option<String>) {
+        self.phase = phase;
+        self.progress = None;
+        self.error = error;
+    }
+}
 #[derive(Clone, Serialize)]
 struct BackendRuntime {
     origin: String,
@@ -99,9 +146,11 @@ impl Default for AppState {
             backend_child: Mutex::new(None),
             backend_runtime: Mutex::new(BackendRuntime::default()),
             quitting: AtomicBool::new(false),
+            exit_waiting: AtomicBool::new(false),
             pending_update: Mutex::new(None),
             update_installing: AtomicBool::new(false),
             update_cancel_requested: AtomicBool::new(false),
+            update_operation: RwLock::new(UpdateOperation::default()),
         }
     }
 }
@@ -550,6 +599,28 @@ fn store_backend_child(app: &AppHandle, child: Child) {
 
 fn quit_application(app: &AppHandle) {
     let state = app.state::<AppState>();
+    if state.update_installing.load(Ordering::SeqCst) {
+        if state.exit_waiting.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        state.update_cancel_requested.store(true, Ordering::SeqCst);
+        let app_handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            for _ in 0..200 {
+                if !app_handle
+                    .state::<AppState>()
+                    .update_installing
+                    .load(Ordering::SeqCst)
+                {
+                    quit_application(&app_handle);
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+            eprintln!("Update cancellation did not finish before application exit");
+        });
+        return;
+    }
     state.quitting.store(true, Ordering::SeqCst);
     stop_backend_process(app, &state);
     app.exit(0);
@@ -572,6 +643,7 @@ struct UpdateDownloadProgress {
 enum UpdateInstallStatus {
     Installed,
     Cancelled,
+    Running,
 }
 
 struct DownloadedInstaller {
@@ -638,13 +710,34 @@ fn update_installer_file_name(update: &Update) -> Result<&str, String> {
         })
 }
 
+fn emit_update_operation(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let Ok(operation) = state.update_operation.read() else {
+        return;
+    };
+    let _ = app.emit("glimpse://update-operation", operation.clone());
+}
+
 fn emit_update_progress(app: &AppHandle, progress: &UpdateDownloadProgress) {
+    set_update_operation(app, |operation| {
+        if operation.phase == UpdatePhase::Downloading {
+            operation.progress = Some(progress.clone());
+        }
+    });
     if app
         .emit("glimpse://update-download-progress", progress)
         .is_err()
     {
         eprintln!("Failed to emit update download progress");
     }
+}
+
+fn set_update_operation(app: &AppHandle, update: impl FnOnce(&mut UpdateOperation)) {
+    let state = app.state::<AppState>();
+    if let Ok(mut operation) = state.update_operation.write() {
+        update(&mut operation);
+    }
+    emit_update_operation(app);
 }
 
 fn update_download_cancelled(cancel_requested: &AtomicBool) -> bool {
@@ -858,15 +951,16 @@ async fn download_update_with_mirrors(
     Err(UpdateDownloadError::Sources(errors))
 }
 
-struct UpdateInstallGuard<'a> {
-    installing: &'a AtomicBool,
-    cancel_requested: &'a AtomicBool,
+#[derive(Clone)]
+struct UpdateInstallGuard {
+    installing: AppHandle,
 }
 
-impl Drop for UpdateInstallGuard<'_> {
+impl Drop for UpdateInstallGuard {
     fn drop(&mut self) {
-        self.cancel_requested.store(false, Ordering::SeqCst);
-        self.installing.store(false, Ordering::SeqCst);
+        let state = self.installing.state::<AppState>();
+        state.update_cancel_requested.store(false, Ordering::SeqCst);
+        state.update_installing.store(false, Ordering::SeqCst);
     }
 }
 
@@ -875,6 +969,12 @@ async fn cancel_update_download(app: AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
     if state.update_installing.load(Ordering::SeqCst) {
         state.update_cancel_requested.store(true, Ordering::SeqCst);
+        set_update_operation(&app, |operation| {
+            if operation.is_running() {
+                operation.phase = UpdatePhase::Cancelling;
+                operation.progress = None;
+            }
+        });
     }
     Ok(())
 }
@@ -927,21 +1027,31 @@ async fn check_for_update(
 }
 
 #[tauri::command]
-async fn install_checked_update(
+fn get_update_install_status(app: AppHandle) -> UpdateOperation {
+    app.state::<AppState>()
+        .update_operation
+        .read()
+        .map(|operation| operation.clone())
+        .unwrap_or_default()
+}
+
+async fn run_checked_update_install(
     app: AppHandle,
     prefer_mirror: bool,
 ) -> Result<UpdateInstallStatus, String> {
     let state = app.state::<AppState>();
+    if state.quitting.load(Ordering::SeqCst) || state.exit_waiting.load(Ordering::SeqCst) {
+        return Err("The application is exiting".to_string());
+    }
     if state
         .update_installing
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_err()
     {
-        return Err("An update installation is already in progress".to_string());
+        return Ok(UpdateInstallStatus::Running);
     }
     let _install_guard = UpdateInstallGuard {
-        installing: &state.update_installing,
-        cancel_requested: &state.update_cancel_requested,
+        installing: app.clone(),
     };
 
     let (update, mirrors) = state
@@ -951,6 +1061,12 @@ async fn install_checked_update(
         .as_ref()
         .cloned()
         .ok_or("No checked update available")?;
+    set_update_operation(&app, |operation| {
+        operation.phase = UpdatePhase::Downloading;
+        operation.version = Some(update.version.clone());
+        operation.progress = None;
+        operation.error = None;
+    });
     let expected_file_name = update_installer_file_name(&update)?.to_owned();
 
     let installer = match download_update_with_mirrors(
@@ -966,18 +1082,55 @@ async fn install_checked_update(
     .await
     {
         Ok(installer) => installer,
-        Err(UpdateDownloadError::Cancelled) => return Ok(UpdateInstallStatus::Cancelled),
-        Err(error) => return Err(error.message()),
+        Err(UpdateDownloadError::Cancelled) => {
+            set_update_operation(&app, |operation| {
+                operation.finish(UpdatePhase::Cancelled, None);
+            });
+            return Ok(UpdateInstallStatus::Cancelled);
+        }
+        Err(error) => {
+            let message = error.message();
+            set_update_operation(&app, |operation| {
+                operation.finish(UpdatePhase::Failed, Some(message.clone()));
+            });
+            return Err(message);
+        }
     };
 
     if update_download_cancelled(&state.update_cancel_requested) {
+        set_update_operation(&app, |operation| {
+            operation.finish(UpdatePhase::Cancelled, None);
+        });
         return Ok(UpdateInstallStatus::Cancelled);
     }
 
-    update
-        .install(&installer.bytes)
-        .map_err(|error| error.to_string())?;
+    set_update_operation(&app, |operation| {
+        operation.phase = UpdatePhase::Installing;
+        operation.progress = None;
+    });
+    if let Err(error) = update.install(&installer.bytes) {
+        let message = error.to_string();
+        set_update_operation(&app, |operation| {
+            operation.finish(UpdatePhase::Failed, Some(message.clone()));
+        });
+        return Err(message);
+    }
+    set_update_operation(&app, |operation| {
+        operation.finish(UpdatePhase::Installed, None);
+    });
     Ok(UpdateInstallStatus::Installed)
+}
+
+#[tauri::command]
+async fn install_checked_update(
+    app: AppHandle,
+    prefer_mirror: bool,
+) -> Result<UpdateInstallStatus, String> {
+    let task_app = app.clone();
+    let task = tauri::async_runtime::spawn(async move {
+        run_checked_update_install(task_app, prefer_mirror).await
+    });
+    task.await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -1194,6 +1347,7 @@ fn main() {
             check_for_update,
             install_checked_update,
             cancel_update_download,
+            get_update_install_status,
             quit_app,
             get_backend_runtime,
             hide_window,
@@ -1287,10 +1441,29 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::redirect_command_stdio;
-    use super::{update_download_candidates, UpdateDownloadError};
+    use super::{update_download_candidates, UpdateDownloadError, UpdateOperation, UpdatePhase};
     use std::path::Path;
     use std::process::Command;
     use tauri::Url;
+
+    #[test]
+    fn update_operation_terminal_states_clear_progress_and_stop_running() {
+        let mut operation = UpdateOperation {
+            phase: UpdatePhase::Downloading,
+            version: Some("1.0.0".to_string()),
+            progress: Some(super::UpdateDownloadProgress {
+                downloaded: 10,
+                total: Some(100),
+            }),
+            error: None,
+        };
+        assert!(operation.is_running());
+        operation.finish(UpdatePhase::Failed, Some("offline".to_string()));
+        assert!(!operation.is_running());
+        assert_eq!(operation.phase, UpdatePhase::Failed);
+        assert!(operation.progress.is_none());
+        assert_eq!(operation.error.as_deref(), Some("offline"));
+    }
 
     fn output_command(label: &str) -> Command {
         #[cfg(target_os = "windows")]

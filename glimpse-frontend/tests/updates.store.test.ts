@@ -38,6 +38,12 @@ describe('updates store', () => {
     setActivePinia(createPinia())
     apiMocks.isDesktopShell.mockReturnValue(true)
     apiMocks.listen.mockResolvedValue(vi.fn())
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'get_update_install_status') {
+        return { phase: 'idle', version: null, progress: null, error: null }
+      }
+      return undefined
+    })
     apiMocks.fetchIndex.mockResolvedValue({
       json: async () => ({ schemaVersion: 1, releases: indexEntries }),
       ok: true,
@@ -92,6 +98,9 @@ describe('updates store', () => {
     store.recordCurrentVersion('0.3.2')
     apiMocks.invoke.mockImplementation(async (command: string) => {
       if (command === 'check_for_update') return { version: '0.3.3', notes: null }
+      if (command === 'get_update_install_status') {
+        return { phase: 'idle', version: null, progress: null, error: null }
+      }
       if (command === 'install_checked_update') return 'installed'
       throw new Error(`unexpected command ${command}`)
     })
@@ -117,6 +126,9 @@ describe('updates store', () => {
     store.recordCurrentVersion('0.3.2')
     apiMocks.invoke.mockImplementation(async (command: string) => {
       if (command === 'check_for_update') return { version: '0.3.3', notes: null }
+      if (command === 'get_update_install_status') {
+        return { phase: 'idle', version: null, progress: null, error: null }
+      }
       if (command === 'install_checked_update') return 'installed'
       throw new Error(`unexpected command ${command}`)
     })
@@ -137,10 +149,14 @@ describe('updates store', () => {
       return vi.fn()
     })
     let releaseInstall!: (value: 'installed') => void
+    let installed = false
     apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'get_update_install_status') {
+        return { phase: installed ? 'installed' : 'idle', version: '0.3.3', progress: null, error: null }
+      }
       if (command === 'check_for_update') return { version: '0.3.3', notes: null }
       if (command === 'install_checked_update') {
-        return new Promise((resolve) => { releaseInstall = resolve })
+        return new Promise((resolve) => { releaseInstall = (value) => { installed = true; resolve(value) } })
       }
       throw new Error(`unexpected command ${command}`)
     })
@@ -156,14 +172,57 @@ describe('updates store', () => {
     expect(store.downloadProgress).toBeNull()
   })
 
+  it('keeps the download state when the install request fails but the host is still downloading', async () => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.3.2')
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'check_for_update') return { version: '0.3.3', notes: null }
+      if (command === 'install_checked_update') throw new Error('request interrupted')
+      if (command === 'get_update_install_status') {
+        return { phase: 'downloading', version: '0.3.3', progress: { downloaded: 10, total: 100 }, error: null }
+      }
+      return null
+    })
+
+    await store.checkForUpdate()
+    expect(await store.installUpdate()).toBe(true)
+    expect(store.installing).toBe(true)
+    expect(store.installFailed).toBe(false)
+    expect(store.downloadProgress).toEqual({ downloaded: 10, total: 100 })
+    expect(store.availableUpdate?.version).toBe('0.3.3')
+  })
+
+  it('reports failure only after the host reaches a failed terminal state', async () => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.3.2')
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'check_for_update') return { version: '0.3.3', notes: null }
+      if (command === 'install_checked_update') throw new Error('all sources failed')
+      if (command === 'get_update_install_status') {
+        return { phase: 'failed', version: '0.3.3', progress: null, error: 'all sources failed' }
+      }
+      return null
+    })
+
+    await store.checkForUpdate()
+    expect(await store.installUpdate()).toBe(false)
+    expect(store.installing).toBe(false)
+    expect(store.installFailed).toBe(true)
+    expect(store.availableUpdate?.version).toBe('0.3.3')
+  })
+
   it('cancels without presenting cancellation as an installation failure', async () => {
     const store = useUpdatesStore()
     store.recordCurrentVersion('0.3.2')
     let releaseInstall!: (value: 'cancelled') => void
+    let cancelled = false
     apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'get_update_install_status') {
+        return { phase: cancelled ? 'cancelled' : 'idle', version: '0.3.3', progress: null, error: null }
+      }
       if (command === 'check_for_update') return { version: '0.3.3', notes: null }
       if (command === 'install_checked_update') {
-        return new Promise((resolve) => { releaseInstall = resolve })
+        return new Promise((resolve) => { releaseInstall = (value) => { cancelled = true; resolve(value) } })
       }
       if (command === 'cancel_update_download') return null
       throw new Error(`unexpected command ${command}`)
@@ -171,7 +230,7 @@ describe('updates store', () => {
 
     await store.checkForUpdate()
     const install = store.installUpdate({ mirrorMode: 'mirror' })
-    await vi.waitFor(() => expect(store.installing).toBe(true))
+    await vi.waitFor(() => expect(apiMocks.invoke).toHaveBeenCalledWith('install_checked_update', { preferMirror: true }))
     await store.cancelUpdateDownload()
     releaseInstall('cancelled')
     expect(await install).toBe(true)
@@ -226,9 +285,8 @@ describe('updates store', () => {
     const installed = await store.installUpdate()
 
     expect(installed).toBe(false)
-    expect(apiMocks.invoke).not.toHaveBeenCalled()
-    expect(store.installFailed).toBe(true)
-    expect(store.availableUpdate).toBeNull()
+    expect(store.availableUpdate).not.toBeNull()
+    expect(store.availableUpdate?.version).toBe('1.0.0-beta.1')
   })
 
   it('recovers current notes when a failed load is retried', async () => {
