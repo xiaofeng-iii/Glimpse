@@ -73,6 +73,14 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: build_release.bat
 
+      - name: Verify packaged main executable
+        shell: pwsh
+        run: |
+          $mainExecutable = "glimpse-frontend/src-tauri/target/release/glimpse.exe"
+          if (-not (Test-Path -LiteralPath $mainExecutable -PathType Leaf)) {
+            throw "Packaged main executable is missing: $mainExecutable"
+          }
+
       - name: Verify updater signatures
         shell: pwsh
         run: |

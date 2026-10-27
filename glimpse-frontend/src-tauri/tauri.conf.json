@@ -1,6 +1,7 @@
 {
   "productName": "Glimpse",
   "identifier": "com.glimpse.app",
+  "mainBinaryName": "glimpse",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",

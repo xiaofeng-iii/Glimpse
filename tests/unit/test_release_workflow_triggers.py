@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS_DIR = PROJECT_ROOT / ".github" / "workflows"
@@ -33,6 +35,21 @@ def test_dev_release_is_manual_only():
     assert "push:" not in trigger
     assert "workflow_dispatch:" in trigger
 
+
+def test_release_build_selects_the_desktop_executable():
+    package = (PROJECT_ROOT / "glimpse-frontend" / "package.json").read_text(encoding="utf-8")
+    manifest = (PROJECT_ROOT / "glimpse-frontend" / "src-tauri" / "Cargo.toml").read_text(encoding="utf-8")
+    assert '"tauri:build": "npm run build:backend && tauri build"' in package
+    assert 'default-run = "glimpse"' in manifest
+    config = (PROJECT_ROOT / "glimpse-frontend" / "src-tauri" / "tauri.conf.json").read_text(encoding="utf-8")
+    assert '"mainBinaryName": "glimpse"' in config
+
+
+@pytest.mark.parametrize("workflow_name", ["release.yml", "preview-release.yml"])
+def test_release_checks_packaged_main_executable(workflow_name):
+    text = (WORKFLOWS_DIR / workflow_name).read_text(encoding="utf-8")
+    assert "Verify packaged main executable" in text
+    assert "target/release/glimpse.exe" in text
 
 def test_updater_pages_rebuilds_when_a_release_is_edited():
     trigger = _trigger_block("updater-pages.yml")
