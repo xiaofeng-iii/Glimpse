@@ -10,6 +10,7 @@ const FLUSH_INTERVAL_MS = 2000
 let queue: DiagnosticsSinkEvent[] = []
 let flushTimer: ReturnType<typeof window.setTimeout> | null = null
 let inFlight: Promise<boolean> | null = null
+let inFlightSize = 0
 let droppedCount = 0
 
 // 会话标识由宿主进程生成并共享给 Python sidecar（manifest 里也用它）；
@@ -40,21 +41,23 @@ const flush = (): Promise<boolean> => {
   if (inFlight) return inFlight
   if (queue.length === 0) return Promise.resolve(true)
   const batch = queue.splice(0, FLUSH_BATCH)
+  inFlightSize = batch.length
   inFlight = (async () => {
     try {
       if (!(await appendDiagnosticLogs(batch))) throw new Error('Diagnostic batch was not fully persisted')
       return true
     } catch {
-      // 优先保留失败批次供下次重试；并发新增事件仍受同一队列上限约束。
+      // 待写与在途合计最多 500 条，恢复失败批次不再淘汰任何保留事件。
       queue = batch.concat(queue)
-      if (queue.length > MAX_QUEUE) {
-        droppedCount += queue.length - MAX_QUEUE
-        queue.length = MAX_QUEUE
-      }
       return false
     } finally {
       inFlight = null
-      if (queue.length > 0) scheduleFlush()
+      inFlightSize = 0
+      if (queue.length > 0) {
+        if (flushTimer !== null) window.clearTimeout(flushTimer)
+        flushTimer = null
+        scheduleFlush()
+      }
     }
   })()
   return inFlight
@@ -99,7 +102,7 @@ setDiagnosticsSink((event) => {
   const enriched: DiagnosticsSinkEvent = sessionId
     ? { ...event, sessionId }
     : event
-  if (queue.length >= MAX_QUEUE) {
+  if (queue.length + inFlightSize >= MAX_QUEUE && queue.length > 0) {
     queue.shift()
     droppedCount += 1
   }
@@ -109,16 +112,26 @@ setDiagnosticsSink((event) => {
       window.clearTimeout(flushTimer)
       flushTimer = null
     }
-    void flush()
+    void flushAll()
     return
   }
   scheduleFlush()
 })
 
-// 页面隐藏/退出前尽力冲刷一次；失败批次有界保留，后续可重试。
-window.addEventListener('pagehide', () => { void flush() })
+// 页面隐藏/退出前连续发送全部待写批次；成功前仍保留失败批次供后续重试。
+let drainPromise: Promise<void> | null = null
+async function flushAll(): Promise<void> {
+  if (drainPromise) return drainPromise
+  drainPromise = (async () => {
+    while (queue.length > 0) {
+      if (!(await flush())) return
+    }
+  })().finally(() => { drainPromise = null })
+  return drainPromise
+}
+window.addEventListener('pagehide', () => { void flushAll() })
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') void flush()
+  if (document.visibilityState === 'hidden') void flushAll()
 })
 
 // 只统计不可恢复的队列溢出；导出前用健康 warning 写入累计数量。

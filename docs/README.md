@@ -215,13 +215,23 @@ SQLite 是事实来源，保存 UUID、时间、图片路径、AI 摘要、来�
 - 主题、语言和窗口关闭行为
 
 诊断日志：前端结构化事件经 Tauri 宿主写入 `logs/glimpse-frontend.jsonl`
-（单条上限 16KB，2MiB × 3 备份滚动），不依赖 Python 后端存活；与后端
-`logs/glimpse.log`、sidecar 原始输出 `logs/glimpse-sidecar.out.log` 并存。
-事件在写入前脱敏（密钥、签名参数、本机用户路径），只存本地、不自动上传。
-设置页「维护 → 诊断日志」可临时开启 30 分钟详细日志、打开日志文件夹、导出
-zip 诊断包（固定文件集合 + manifest，缺失项如实标注）。更新说明链路
-（检测、索引获取、聚合降级）是首个接入点，事件带 sessionId/operationId
-与失败分类（timeout/network/http/json/schema/聚合 reason）。
+（单条上限 16KiB，活动文件上限 2MiB，最多 3 份滚动备份），不依赖 Python
+后端存活。Python 结构化日志单独写入 `logs/glimpse.log`（2MiB、3 份备份），
+不再同时输出到 sidecar；`logs/glimpse-sidecar.out.log` 保留原始 stdout/stderr。
+宿主每次启动生成 sessionId，强制用于新写入的前端事件，并传给 Python 与
+诊断包 manifest；导出历史日志时保留原 sessionId。操作事件另带 operationId。
+前端全字段、Python 格式化参数及 traceback 在输出前脱敏；ZIP 导出对所有文本
+再次脱敏（含历史后端和 sidecar 的 URL 凭据、敏感查询参数及 Bearer），JSONL
+逐行解析后序列化，尾部截断的不完整首行及无效行跳过。日志只存本地、不自动上传。
+设置页「维护 → 诊断日志」持续记录关键操作与错误，可打开日志文件夹或一键导出
+ZIP；按钮在冲刷、脱敏和压缩期间显示正在导出。导出前等待所有前端待写批次与进行中的写入；写失败立即中止本次导出，
+失败批次优先保留在最多 500 条的队列中，后续导出可重试，不永久阻断。队列溢出
+造成的不可恢复丢失不会阻止导出，但导出前必须写入含累计 dropCount 的健康 warning。
+部分写入重试可能产生重复事件。ZIP 只包含前后端日志及各 3 份备份、sidecar 原始输出和 manifest（每份日志
+最多尾部 2MiB，缺失/截断/读取失败如实标注），不收集 settings、env、截图或数据库。
+前端写入与导出共用宿主 I/O 锁，Python 轮转的短暂打开失败有限重试。
+完整 ZIP 以唯一文件名原子发布，连续导出不覆盖旧包。更新检测、更新说明索引获取
+与选择当前版本记录的链路带失败分类（timeout/network/http/json/schema）。
 
 ## 7. 当前边界
 

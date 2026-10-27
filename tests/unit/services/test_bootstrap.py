@@ -1,7 +1,10 @@
 """
 Bootstrap 配置解析测试
 """
-from services.bootstrap import resolve_ai_configuration
+import logging
+from unittest.mock import Mock
+
+from services.bootstrap import configure_ai_client, resolve_ai_configuration
 
 
 class _SettingsManagerStub:
@@ -89,3 +92,17 @@ def test_resolve_ai_configuration_prefers_full_saved_config(monkeypatch):
     assert resolved["model"] == "saved-model"
     assert resolved["timeout"] == 45
     assert resolved["api_key_source"] == "settings"
+
+
+def test_configure_logs_redacted_url_without_changing_client_configuration(caplog):
+    url = "https://alice:password-secret@host/v1?api_key=query-secret&token=token-secret&model=demo"
+    settings = _SettingsManagerStub({"ai": {"api_key": "client-secret", "base_url": url}})
+    client = Mock(_base_url=url, _model="demo")
+    with caplog.at_level(logging.INFO, logger="services.bootstrap"):
+        assert configure_ai_client(client, settings)
+    assert client.configure.call_args.kwargs["base_url"] == url
+    assert client.configure.call_args.kwargs["api_key"] == "client-secret"
+    for secret in ["alice", "password-secret", "query-secret", "token-secret", "client-secret"]:
+        assert secret not in caplog.text
+    assert "host/v1" in caplog.text
+    assert "model=demo" in caplog.text

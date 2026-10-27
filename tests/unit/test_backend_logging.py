@@ -12,11 +12,15 @@ def reset_logging():
     """Isolate each test from the auto-configured root logger."""
     root = logging.getLogger()
     handlers = root.handlers[:]
+    level = root.level
     yield root
     for handler in root.handlers[:]:
+        if handler not in handlers:
+            handler.close()
         root.removeHandler(handler)
     for handler in handlers:
         root.addHandler(handler)
+    root.setLevel(level)
 
 
 def _write_probe(log_path: Path, monkeypatch) -> None:
@@ -27,7 +31,8 @@ def _write_probe(log_path: Path, monkeypatch) -> None:
 
     for index in range(200):
         probe.info("rotation-probe-%03d %s", index, "x" * 64)
-    logging.shutdown()
+    for handler in logging.getLogger().handlers:
+        handler.flush()
 
 
 def test_rotates_glimpse_log_by_size(tmp_path, reset_logging, monkeypatch):
@@ -63,6 +68,21 @@ def test_formatted_parameters_and_tracebacks_are_redacted(tmp_path, reset_loggin
     assert 'host/v1' in output
     assert 'model=demo' in output
     assert 'RuntimeError' in output
+
+
+def test_environment_credentials_and_sas_signatures_are_redacted():
+    output = logger_module.redact_text(
+        'OPENAI_API_KEY=env-secret BAIDU_SECRET_KEY=ocr-secret '
+        'https://x.io/a?sig=sas-secret&sp=r monkey=ordinary'
+    )
+    for secret in ['env-secret', 'ocr-secret', 'sas-secret']:
+        assert secret not in output
+    assert 'sp=r' in output
+    assert 'monkey=ordinary' in output
+
+
+def test_credentials_at_start_of_a_log_message_are_redacted():
+    assert logger_module.redact_text('token=start-secret') == '<redacted-credential>'
 
 
 def test_session_id_defaults_to_placeholder(tmp_path, reset_logging, monkeypatch):

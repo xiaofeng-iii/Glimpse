@@ -4,7 +4,7 @@ Bootstrap - 应用启动时的配置编排
 """
 import os
 
-from utils.logger import get_logger
+from utils.logger import get_logger, redact_text
 
 logger = get_logger(__name__)
 
@@ -81,7 +81,7 @@ def configure_ai_client(ai_client, settings_manager) -> bool:
         )
         logger.info(
             "AI client configured via %s: model=%s, base_url=%s",
-            resolved['api_key_source'], ai_client._model, ai_client._base_url,
+            resolved['api_key_source'], ai_client._model, redact_text(ai_client._base_url),
         )
         return True
     else:

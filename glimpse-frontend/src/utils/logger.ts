@@ -35,9 +35,6 @@ const ENV_LOG_LEVEL = isLogLevel(import.meta.env.VITE_LOG_LEVEL)
   ? (import.meta.env.VITE_LOG_LEVEL as LogLevel)
   : 'info'
 
-export const DEBUG_LOG_STORAGE_KEY = 'glimpse.debugUntil'
-const DEBUG_WINDOW_DEFAULT_MS = 30 * 60 * 1000
-
 const MESSAGE_CAP = 2000
 const ARG_COUNT_CAP = 6
 const ARG_CAP = 500
@@ -53,53 +50,15 @@ export function setDiagnosticsSink(sink: DiagnosticsSink | null): void {
   diagnosticsSink = sink
 }
 
-function readDebugUntil(): number {
-  try {
-    const raw = window.localStorage.getItem(DEBUG_LOG_STORAGE_KEY)
-    const value = raw === null ? NaN : Number(raw)
-    return Number.isFinite(value) ? value : 0
-  } catch {
-    return 0
-  }
-}
-
-export function isDebugLoggingActive(): boolean {
-  return Date.now() < readDebugUntil()
-}
-
-export function getDebugLoggingRemainingMs(): number {
-  return Math.max(0, readDebugUntil() - Date.now())
-}
-
-export function startDebugLogging(durationMs = DEBUG_WINDOW_DEFAULT_MS): void {
-  try {
-    window.localStorage.setItem(DEBUG_LOG_STORAGE_KEY, String(Date.now() + durationMs))
-  } catch {
-    // localStorage 不可用时本次会话无法持久开启，忽略。
-  }
-}
-
-export function stopDebugLogging(): void {
-  try {
-    window.localStorage.removeItem(DEBUG_LOG_STORAGE_KEY)
-  } catch {
-    // 同上。
-  }
-}
-
-function minLevel(): LogLevel {
-  return isDebugLoggingActive() ? 'debug' : ENV_LOG_LEVEL
-}
-
 function shouldLog(level: LogLevel): boolean {
-  return LOG_LEVELS[level] >= LOG_LEVELS[minLevel()]
+  return LOG_LEVELS[level] >= LOG_LEVELS[ENV_LOG_LEVEL]
 }
 
 // 逐条打码：认证头、键值对形式的密钥、URL 里的签名参数、URL userinfo、本机用户目录。
 const REDACTION_PATTERNS: { pattern: RegExp; replacement: string }[] = [
   { pattern: /Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, replacement: 'Bearer <redacted>' },
-  { pattern: /\b(?:api[_-]?key|apikey|secret(?:[_-]?key)?|password|authorization|access[_-]?token|auth[_-]?token|token)\s*[=:]\s*["']?[A-Za-z0-9\-._/~+=]{4,}/gi, replacement: '<redacted-credential>' },
-  { pattern: /([?&](?:access_token|auth_token|token|api_key|apikey|signature|secret)=)[^&\s"']+/gi, replacement: '$1<redacted>' },
+  { pattern: /(^|[^A-Za-z0-9])(?:api[_-]?key|apikey|secret(?:[_-]?key)?|password|authorization|access[_-]?token|auth[_-]?token|token|sig)\s*[=:]\s*["']?[A-Za-z0-9\-._/~+=]{4,}/gi, replacement: '$1<redacted-credential>' },
+  { pattern: /([?&](?:access_token|auth_token|token|api_key|apikey|signature|secret|sig)=)[^&\s"']+/gi, replacement: '$1<redacted>' },
   { pattern: /\/\/[^\s/:@"']+:[^\s@]+@/g, replacement: '//<redacted>@' },
   { pattern: /([A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/])[^\s"']+/g, replacement: '$1<user>' },
 ]
@@ -116,6 +75,24 @@ function truncate(value: string, cap: number): string {
   return value.length <= cap ? value : `${value.slice(0, cap)}…<truncated>`
 }
 
+function redactValue(value: unknown, depth = 0): unknown {
+  if (typeof value === 'string') return redactText(value)
+  if (typeof value === 'symbol') return redactText(String(value))
+  if (typeof value === 'bigint') return `${value}n`
+  if (typeof value === 'function') return '[function]'
+  if (value === null || typeof value !== 'object') return value
+  if (depth >= DATA_DEPTH_CAP) return '[depth-limit]'
+  try {
+    if (value instanceof Error) return serializeError(value)
+    if (Array.isArray(value)) return value.slice(0, DATA_BREADTH_CAP).map((item) => redactValue(item, depth + 1))
+    return Object.fromEntries(Object.entries(value).slice(0, DATA_BREADTH_CAP).map(([key, item]) => [
+      redactText(key), /token|secret|key|password|authorization/i.test(key) ? '<redacted>' : redactValue(item, depth + 1),
+    ]))
+  } catch {
+    return '[unserializable]'
+  }
+}
+
 function safeStringify(value: unknown, depth: number): string {
   if (value === null) return 'null'
   if (value === undefined) return 'undefined'
@@ -130,7 +107,7 @@ function safeStringify(value: unknown, depth: number): string {
     if (Array.isArray(value)) {
       return `[${value.slice(0, DATA_BREADTH_CAP).map((item) => safeStringify(item, depth + 1)).join(', ')}${value.length > DATA_BREADTH_CAP ? ', …' : ''}]`
     }
-    if (value instanceof Error) return `${value.name}: ${value.message}`
+    if (value instanceof Error) return safeStringify(serializeError(value), depth + 1)
     const entries = Object.entries(value as Record<string, unknown>).slice(0, DATA_BREADTH_CAP)
       .map(([key, item]) => `${redactText(key)}: ${/token|secret|key|password|authorization/i.test(key) ? '<redacted>' : safeStringify(item, depth + 1)}`)
     return `{${entries.join(', ')}}`
@@ -161,9 +138,7 @@ function interpolate(message: string, args: string[]): string {
 }
 
 function serializeArgs(args: unknown[]): string[] {
-  return args.slice(0, ARG_COUNT_CAP).map((arg) => (
-    arg instanceof Error ? `${arg.name}: ${arg.message}` : safeStringify(arg, 0)
-  ))
+  return args.slice(0, ARG_COUNT_CAP).map((arg) => safeStringify(redactValue(arg), 0))
 }
 
 function printToConsole(level: LogLevel, line: string): void {
@@ -185,7 +160,7 @@ function emit(level: LogLevel, context: string, baseFields: LogFields, message: 
   if (!shouldLog(level)) return
   const argTexts = serializeArgs(args)
   const timestamp = new Date().toISOString().replace(/\.000Z$/, '')
-  printToConsole(level, `[${timestamp}] [${level.toUpperCase()}] [${context}] - ${interpolate(message, argTexts)}`)
+  printToConsole(level, redactText(`[${timestamp}] [${level.toUpperCase()}] [${context}] - ${interpolate(redactText(message), argTexts)}`))
 
   if (!diagnosticsSink) return
   try {
@@ -194,9 +169,9 @@ function emit(level: LogLevel, context: string, baseFields: LogFields, message: 
       v: 1,
       ts: new Date().toISOString(),
       level,
-      context: truncate(context, 200),
+      context: truncate(redactText(context), 200),
       message: truncate(redactText(message), MESSAGE_CAP),
-      ...baseFields,
+      ...(redactValue(baseFields) as LogFields),
     }
     if (argTexts.length > 0) event.args = argTexts
     if (firstError) event.error = serializeError(firstError)

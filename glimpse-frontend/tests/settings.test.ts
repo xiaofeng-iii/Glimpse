@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 const appStyles = readFileSync(resolve(process.cwd(), 'src/styles/main.css'), 'utf8')
 
 const apiMocks = vi.hoisted(() => ({
+  exportDiagnostics: vi.fn(),
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
   resetSettings: vi.fn(),
@@ -17,6 +18,11 @@ const apiMocks = vi.hoisted(() => ({
   ocrRepairStatus: vi.fn(),
   ocrRepairStart: vi.fn(),
   testOcrCloud: vi.fn(),
+}))
+
+vi.mock('@/platform/diagnosticsBridge', () => ({
+  exportDiagnostics: apiMocks.exportDiagnostics,
+  openLogsDirectory: vi.fn(),
 }))
 
 const mountedHosts: Array<{ unmount: () => void }> = []
@@ -79,6 +85,7 @@ describe('Settings', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     window.localStorage.clear()
+    apiMocks.exportDiagnostics.mockResolvedValue('bundle.zip')
     apiMocks.resetSettings.mockResolvedValue({})
     apiMocks.getSettings.mockResolvedValue({
       hotkeys: { screenshot: '<ctrl>+<shift>+g' },
@@ -365,27 +372,38 @@ describe('Settings', () => {
     expect(wrapper.get('[data-testid=save-ai]').attributes('disabled')).toBeDefined()
   })
 
-  it('manages the diagnostics debug window without writing settings or desktop-only actions', async () => {
+  it('exports existing diagnostics without a debug logging switch', async () => {
     const wrapper = await mountSettings()
     await selectSection(wrapper, '维护')
 
     expect(wrapper.text()).toContain('诊断日志')
+    expect(wrapper.text()).not.toContain('30 分钟')
     // 浏览器环境：依赖桌面宿主的目录/导出按钮不出现。
     const buttonTexts = () => wrapper.findAll('button').map((button) => button.text())
     expect(buttonTexts()).not.toContain('打开日志文件夹')
-    expect(buttonTexts()).not.toContain('导出诊断包')
-
-    const start = wrapper.findAll('button').find((button) => button.text() === '开启 30 分钟详细日志')!
-    await start.trigger('click')
-    expect(window.localStorage.getItem('glimpse.debugUntil')).toBeTruthy()
-    expect(wrapper.text()).toContain('分钟后自动关闭')
-    // 诊断开关是会话级状态，不得触发设置自动保存。
+    expect(buttonTexts()).not.toContain('导出诊断日志')
     expect(apiMocks.updateSettings).not.toHaveBeenCalled()
+  })
 
-    const stop = wrapper.findAll('button').find((button) => button.text() === '提前关闭详细日志')!
-    await stop.trigger('click')
-    expect(window.localStorage.getItem('glimpse.debugUntil')).toBeNull()
-    expect(wrapper.text()).toContain('详细日志默认关闭')
+  it('shows exporting and disables duplicate clicks until the bundle is ready', async () => {
+    vi.stubGlobal('__TAURI_INTERNALS__', {})
+    const wrapper = await mountSettings()
+    await selectSection(wrapper, '维护')
+    let resolveExport!: (path: string) => void
+    apiMocks.exportDiagnostics.mockReturnValue(new Promise<string>((resolve) => { resolveExport = resolve }))
+    const button = wrapper.findAll('button').find((item) => item.text() === '导出诊断日志')!
+
+    await button.trigger('click')
+    expect(button.text()).toBe('正在导出...')
+    expect(button.attributes('disabled')).toBeDefined()
+    await button.trigger('click')
+    expect(apiMocks.exportDiagnostics).toHaveBeenCalledTimes(1)
+
+    resolveExport('bundle.zip')
+    await flushPromises()
+    expect(button.text()).toBe('导出诊断日志')
+    expect(button.attributes('disabled')).toBeUndefined()
+    expect(apiMocks.exportDiagnostics).toHaveBeenCalledTimes(1)
   })
 
 })

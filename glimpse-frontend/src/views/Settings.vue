@@ -24,7 +24,7 @@ import {
   t,
   type LanguagePreference,
 } from '@/utils/i18n'
-import { createLogger, getDebugLoggingRemainingMs, isDebugLoggingActive, startDebugLogging, stopDebugLogging } from '@/utils/logger'
+import { createLogger } from '@/utils/logger'
 import { exportDiagnostics, openLogsDirectory } from '@/platform/diagnosticsBridge'
 import { isDesktopShell } from '@/platform/desktop'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -200,34 +200,9 @@ let pendingDiscardPromise: Promise<boolean> | null = null
 let unregisterGuard: (() => boolean) | null = null
 let maintenanceTimer: ReturnType<typeof window.setTimeout> | null = null
 
-// 诊断日志：详细日志窗口是会话级状态（localStorage 到期时间戳），设置页只做
-// 展示与开关；打开目录/导出诊断包都由桌面宿主完成，不依赖后端存活。
-const diagnosticsDebugActive = ref(false)
-const diagnosticsRemainingMs = ref(0)
+// 日常日志持续轮转；导出只负责冲刷、脱敏和打包已有日志，不依赖后端存活。
 const openingLogs = ref(false)
 const exportingDiagnostics = ref(false)
-let diagnosticsTimer: ReturnType<typeof window.setInterval> | null = null
-
-const refreshDiagnosticsState = () => {
-  diagnosticsDebugActive.value = isDebugLoggingActive()
-  diagnosticsRemainingMs.value = getDebugLoggingRemainingMs()
-  if (!diagnosticsDebugActive.value && diagnosticsTimer !== null) {
-    window.clearInterval(diagnosticsTimer)
-    diagnosticsTimer = null
-  } else if (diagnosticsDebugActive.value && diagnosticsTimer === null) {
-    diagnosticsTimer = window.setInterval(refreshDiagnosticsState, 15_000)
-  }
-}
-
-const toggleDiagnosticsDebug = () => {
-  if (isDebugLoggingActive()) stopDebugLogging()
-  else startDebugLogging()
-  refreshDiagnosticsState()
-}
-
-const diagnosticsStatusText = computed(() => diagnosticsDebugActive.value
-  ? t('settings.diagnosticsDebugUntil', { minutes: Math.max(1, Math.ceil(diagnosticsRemainingMs.value / 60_000)) })
-  : t('settings.diagnosticsIdle'))
 
 const handleOpenLogs = async () => {
   if (openingLogs.value) return
@@ -805,14 +780,12 @@ onMounted(async () => {
   adoptStoreUpdate()
   scheduleMaintenancePoll()
   void ocrRepair.ensurePolling()
-  refreshDiagnosticsState()
 })
 
 onUnmounted(() => {
   disposed = true
   updateGeneration++
   if (maintenanceTimer) window.clearTimeout(maintenanceTimer)
-  if (diagnosticsTimer !== null) window.clearInterval(diagnosticsTimer)
   unregisterGuard?.()
   discardResolver?.(false)
 })
@@ -1299,16 +1272,12 @@ onUnmounted(() => {
                   <div class="min-w-0 flex-1">
                     <h3 class="setting-label">{{ t('settings.diagnostics') }}</h3>
                     <p class="setting-help">{{ t('settings.diagnosticsHint') }}</p>
-                    <p class="mt-3 text-xs text-[var(--shell-muted)]">{{ diagnosticsStatusText }}</p>
                     <div class="mt-3 flex flex-wrap gap-2">
-                      <button type="button" class="btn-secondary" @click="toggleDiagnosticsDebug">
-                        {{ diagnosticsDebugActive ? t('settings.diagnosticsDebugStop') : t('settings.diagnosticsDebugStart') }}
-                      </button>
-                      <button v-if="isDesktop" type="button" class="btn-secondary" :disabled="openingLogs" @click="handleOpenLogs">
+                      <button v-if="isDesktop" type="button" class="btn-secondary" :disabled="openingLogs || exportingDiagnostics" @click="handleOpenLogs">
                         {{ t('settings.diagnosticsOpenLogs') }}
                       </button>
                       <button v-if="isDesktop" type="button" class="btn-secondary" :disabled="exportingDiagnostics" @click="handleExportDiagnostics">
-                        {{ t('settings.diagnosticsExport') }}
+                        {{ exportingDiagnostics ? t('settings.diagnosticsExporting') : t('settings.diagnosticsExport') }}
                       </button>
                     </div>
                   </div>

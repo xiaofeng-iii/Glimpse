@@ -1,13 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createLogger,
-  getDebugLoggingRemainingMs,
-  isDebugLoggingActive,
   redactText,
   setDiagnosticsSink,
-  startDebugLogging,
-  stopDebugLogging,
-  DEBUG_LOG_STORAGE_KEY,
   type DiagnosticsSinkEvent,
 } from '@/utils/logger'
 
@@ -24,8 +19,6 @@ describe('logger', () => {
   let events: Captured
 
   beforeEach(() => {
-    window.localStorage.clear()
-    stopDebugLogging()
     events = captureSink()
     consoleSpy = [
       vi.spyOn(console, 'info').mockImplementation(() => {}),
@@ -98,27 +91,32 @@ describe('logger', () => {
     expect(serialized).toContain('ok')
   })
 
-  it('emits debug events only while the debug window is active', () => {
-    const logger = createLogger('tests/logger')
-    logger.debug('before window')
-    expect(events).toHaveLength(0)
+  it('redacts every event field and console output including nested errors and child data', () => {
+    const error = new Error('Bearer error-secret')
+    error.stack = 'token=stack-secret'
+    const logger = createLogger('token=context-secret').child({
+      event: 'api_key=event-secret',
+      operationId: 'token=operation-secret',
+      data: { api_key: 'child-secret', nested: { password: 'nested-secret', error }, ok: 42 },
+    })
+    logger.error('token=message-secret %s', error, { nested: error })
 
-    startDebugLogging(60_000)
-    expect(isDebugLoggingActive()).toBe(true)
-    logger.debug('during window')
-    expect(events).toHaveLength(1)
-
-    stopDebugLogging()
-    logger.debug('after window')
-    expect(events).toHaveLength(1)
+    const output = JSON.stringify([events, consoleSpy.map((spy) => spy.mock.calls)])
+    for (const secret of ['error-secret', 'stack-secret', 'context-secret', 'event-secret', 'operation-secret', 'child-secret', 'nested-secret', 'message-secret']) {
+      expect(output).not.toContain(secret)
+    }
+    expect(events[0].data?.ok).toBe(42)
   })
 
-  it('expires the debug window based on the stored deadline, not a timer', () => {
-    startDebugLogging(60_000)
-    window.localStorage.setItem(DEBUG_LOG_STORAGE_KEY, String(Date.now() - 1))
-    expect(isDebugLoggingActive()).toBe(false)
-    expect(getDebugLoggingRemainingMs()).toBe(0)
+  it('redacts environment credentials and SAS signatures without hiding ordinary prefixes', () => {
+    const text = redactText('OPENAI_API_KEY=env-secret BAIDU_SECRET_KEY=ocr-secret https://x.io/a?sig=sas-secret&sp=r monkey=ordinary')
+    expect(text).not.toContain('env-secret')
+    expect(text).not.toContain('ocr-secret')
+    expect(text).not.toContain('sas-secret')
+    expect(text).toContain('sp=r')
+    expect(text).toContain('monkey=ordinary')
   })
+
 
   it('keeps info level always on and merges child fields into events', () => {
     const logger = createLogger('tests/updates')

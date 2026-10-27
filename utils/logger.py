@@ -32,7 +32,11 @@ def redact_text(value: str) -> str:
     value = re.sub(r'(?i)\bBearer\s+[^\s\"\'<>]+', 'Bearer <redacted>', value)
     value = re.sub(r'//[^\s/@]+@', '//<redacted>@', value)
     value = re.sub(
-        r'(?i)(\b(?:api[_-]?key|secret(?:[_-]?key)?|password|authorization|access[_-]?token|auth[_-]?token|token|signature)[\"\']?\s*[=:]\s*[\"\']?)[^\s&\"\'<> ,}]+',
+        r'(?i)^(?:api[_-]?key|secret(?:[_-]?key)?|password|authorization|access[_-]?token|auth[_-]?token|token|signature|sig)[\"\']?\s*[=:]\s*[\"\']?[^\s&\"\'<> ,}]+',
+        '<redacted-credential>', value,
+    )
+    value = re.sub(
+        r'(?i)([^A-Za-z0-9](?:api[_-]?key|secret(?:[_-]?key)?|password|authorization|access[_-]?token|auth[_-]?token|token|signature|sig)[\"\']?\s*[=:]\s*[\"\']?)[^\s&\"\'<> ,}]+',
         r'\1<redacted>', value,
     )
     return value

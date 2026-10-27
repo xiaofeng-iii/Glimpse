@@ -94,7 +94,8 @@ fn redact_text(text: &str) -> String {
         [
             (r#"(?i)\bBearer\s+[^\s"'<>]+"#, "Bearer <redacted>"),
             (r#"//[^\s/@]+@"#, "//<redacted>@"),
-            (r#"(?i)(\b(?:api[_-]?key|secret(?:[_-]?key)?|password|authorization|access[_-]?token|auth[_-]?token|token|signature)["']?\s*[=:]\s*["']?)[^\s&"'<> ,}]+"#, "${1}<redacted>"),
+            (r#"(?i)([^A-Za-z0-9](?:api[_-]?key|secret(?:[_-]?key)?|password|authorization|access[_-]?token|auth[_-]?token|token|signature|sig)["']?\s*[=:]\s*["']?)[^\s&"'<> ,}]+"#, "${1}<redacted>"),
+            (r#"(?i)^(?:api[_-]?key|secret(?:[_-]?key)?|password|authorization|access[_-]?token|auth[_-]?token|token|signature|sig)["']?\s*[=:]\s*["']?[^\s&"'<> ,}]+"#, "<redacted-credential>"),
         ].into_iter().map(|(pattern, replacement)| (regex::Regex::new(pattern).expect("valid redaction pattern"), replacement)).collect()
     });
     patterns
@@ -121,6 +122,7 @@ fn redact_value(value: &mut Value) {
                     "authtoken",
                     "token",
                     "signature",
+                    "sig",
                 ]
                 .contains(&normalized.as_str())
                 {
@@ -374,8 +376,32 @@ fn format_stamp(secs: u64) -> (String, String) {
     (stamp, iso)
 }
 
-/// 打包诊断快照：前端诊断日志（含备份）+ 后端结构化日志 + sidecar 原始输出（各限尾部 2MiB）
-/// + manifest。只读固定文件集合，收集不到的条目在 manifest 里如实标注 missing。
+fn read_export_source(path: &Path, cap: u64) -> std::io::Result<(Vec<u8>, bool)> {
+    read_export_source_with(path, cap, read_tail)
+}
+
+fn read_export_source_with(
+    path: &Path,
+    cap: u64,
+    read: impl Fn(&Path, u64) -> std::io::Result<(Vec<u8>, bool)>,
+) -> std::io::Result<(Vec<u8>, bool)> {
+    // Python 独立轮转日志；Windows 重命名窗口可能暂时拒绝打开，短暂重试即可。
+    for attempt in 0..4 {
+        match read(path, cap) {
+            Err(error)
+                if (error.kind() == std::io::ErrorKind::PermissionDenied
+                    || error.kind() == std::io::ErrorKind::NotFound
+                    || matches!(error.raw_os_error(), Some(32 | 33)))
+                    && attempt < 3 =>
+            {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            result => return result,
+        }
+    }
+    unreachable!()
+}
+
 pub(crate) fn build_export_bundle(
     logs_dir: &Path,
     session_id: Option<&str>,
@@ -404,7 +430,7 @@ pub(crate) fn build_export_bundle(
     let mut manifest_files = Vec::new();
     for name in &sources {
         let source = logs_dir.join(name);
-        let status = match read_tail(&source, EXPORT_TAIL_CAP_BYTES) {
+        let status = match read_export_source(&source, EXPORT_TAIL_CAP_BYTES) {
             Ok((bytes, truncated)) => {
                 zip.start_file(name.as_str(), options)?;
                 zip.write_all(export_text(name, &bytes, truncated).as_bytes())?;
@@ -414,7 +440,8 @@ pub(crate) fn build_export_bundle(
                     "included"
                 }
             }
-            Err(_) => "missing",
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => "missing",
+            Err(_) => "error",
         };
         manifest_files.push(json!({ "name": name, "status": status }));
     }
@@ -485,6 +512,7 @@ pub fn export_diagnostics(
 ) -> Result<String, String> {
     use tauri_plugin_opener::OpenerExt;
     let logs_dir = diagnostics_logs_dir(&app).ok_or("unable to resolve logs directory")?;
+    let _guard = state.io_lock.lock().map_err(|error| error.to_string())?;
     let zip_path = build_export_bundle(
         &logs_dir,
         Some(state.session_id()),
@@ -666,6 +694,63 @@ mod tests {
         assert_eq!(status_of("glimpse-sidecar.out.log"), "missing");
 
         fs::remove_dir_all(dir).expect("cleanup");
+    }
+
+    #[test]
+    fn redaction_covers_environment_credentials_and_sas_signatures() {
+        let text = redact_text("OPENAI_API_KEY=env-secret BAIDU_SECRET_KEY=ocr-secret https://x.io/a?sig=sas-secret&sp=r monkey=ordinary");
+        for secret in ["env-secret", "ocr-secret", "sas-secret"] {
+            assert!(!text.contains(secret), "leaked {secret}");
+        }
+        assert!(text.contains("sp=r"));
+        assert!(text.contains("monkey=ordinary"));
+    }
+
+    #[test]
+    fn export_read_retries_a_transient_sharing_violation() {
+        let dir = temp_logs_dir("sharing-violation");
+        let path = dir.join(BACKEND_LOG_FILE);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(&path, "ready").unwrap();
+        let attempts = std::cell::Cell::new(0);
+        let read = |path: &Path, cap: u64| {
+            if attempts.replace(attempts.get() + 1) == 0 {
+                Err(std::io::Error::from_raw_os_error(32))
+            } else {
+                read_tail(path, cap)
+            }
+        };
+        let (bytes, truncated) =
+            read_export_source_with(&path, EXPORT_TAIL_CAP_BYTES, read).unwrap();
+        assert_eq!(attempts.get(), 2);
+        assert_eq!(bytes, b"ready");
+        assert!(!truncated);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn missing_and_read_error_have_distinct_manifest_statuses() {
+        let dir = temp_logs_dir("read-errors");
+        fs::create_dir_all(&dir).unwrap();
+        fs::create_dir(dir.join(BACKEND_LOG_FILE)).unwrap();
+        let path = build_export_bundle(&dir, Some("session"), "test").unwrap();
+        let mut archive = zip::ZipArchive::new(File::open(path).unwrap()).unwrap();
+        let mut text = String::new();
+        archive
+            .by_name("manifest.json")
+            .unwrap()
+            .read_to_string(&mut text)
+            .unwrap();
+        let manifest: Value = serde_json::from_str(&text).unwrap();
+        let files = manifest["files"].as_array().unwrap();
+        let status = |name: &str| {
+            files.iter().find(|entry| entry["name"] == name).unwrap()["status"]
+                .as_str()
+                .unwrap()
+        };
+        assert_eq!(status(BACKEND_LOG_FILE), "error");
+        assert_eq!(status("glimpse-sidecar.out.log"), "missing");
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

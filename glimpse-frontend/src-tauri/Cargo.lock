@@ -1540,6 +1540,7 @@ dependencies = [
  "getrandom 0.3.4",
  "memmap2",
  "minisign-verify",
+ "regex",
  "reqwest",
  "semver",
  "serde",
