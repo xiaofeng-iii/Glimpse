@@ -50,6 +50,8 @@ screenshots/
 # OCR models are fetched at build time and verified by scripts/fetch_ocr_models.py
 assets/ocr/*.onnx
 !assets/ocr/.gitkeep
+assets/embedding/*
+!assets/embedding/.gitkeep
 *.jpg
 *.jpeg
 *.png

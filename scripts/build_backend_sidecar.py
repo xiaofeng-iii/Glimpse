@@ -18,9 +18,11 @@ from pathlib import Path
 
 if __package__:
     from .set_version import VersionSyncError, validate_version
+    from .fetch_embedding_model import ensure_embedding_models
     from .fetch_ocr_models import ensure_ocr_models
 else:
     from set_version import VersionSyncError, validate_version
+    from fetch_embedding_model import ensure_embedding_models
     from fetch_ocr_models import ensure_ocr_models
 
 
@@ -55,7 +57,9 @@ HASH_INPUTS = [
     "requirements*.txt",
     "assets/icons/glimpse.ico",
     "assets/ocr",
+    "assets/embedding",
     "scripts/fetch_ocr_models.py",
+    "scripts/fetch_embedding_model.py",
     "glimpse-frontend/src-tauri/Cargo.toml",
     "scripts/build_backend_sidecar.py",
 ]
@@ -91,10 +95,7 @@ PYINSTALLER_DYNAMIC_PACKAGES = (
     "chromadb",
     "onnxruntime",
     "rapidocr",
-    "sentence_transformers",
-    "transformers",
     "tokenizers",
-    "huggingface_hub",
 )
 
 PYINSTALLER_DATA_PACKAGES = (
@@ -102,18 +103,12 @@ PYINSTALLER_DATA_PACKAGES = (
     "chromadb",
     "onnxruntime",
     "rapidocr",
-    "sentence_transformers",
-    "transformers",
     "tokenizers",
-    "huggingface_hub",
 )
 
 PYINSTALLER_METADATA_PACKAGES = (
     "chromadb",
-    "sentence-transformers",
-    "transformers",
     "tokenizers",
-    "huggingface-hub",
     "openai",
     "fastapi",
     "uvicorn",
@@ -456,6 +451,11 @@ def collect_pyinstaller_resources() -> tuple[list[str], list[tuple[str, str]], l
     for model_path in sorted(ocr_model_dir.glob("*.onnx")):
         datas.append((str(model_path), "assets/ocr"))
 
+    embedding_model_dir = PROJECT_ROOT / "assets" / "embedding"
+    for model_path in sorted(embedding_model_dir.iterdir()):
+        if model_path.is_file():
+            datas.append((str(model_path), "assets/embedding"))
+
     return dedupe(hiddenimports), filter_legacy_ocr_models(datas), binaries
 
 
@@ -532,6 +532,7 @@ def build_pyinstaller_args(
 
 
 def build_backend_sidecar(build_name: str, build_hash: str) -> int:
+    ensure_embedding_models(PROJECT_ROOT / "assets" / "embedding")
     ensure_ocr_models(PROJECT_ROOT / "assets" / "ocr")
 
     try:
@@ -588,6 +589,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     build_name = BUILD_NAME
+    ensure_embedding_models(PROJECT_ROOT / "assets" / "embedding")
     ensure_ocr_models(PROJECT_ROOT / "assets" / "ocr")
     build_hash = compute_backend_hash()
 

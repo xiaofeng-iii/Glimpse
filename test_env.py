@@ -26,9 +26,6 @@ def test_dependencies():
 
     package_import_map = {
         'chromadb': 'chromadb',
-        'sentence-transformers': 'sentence_transformers',
-        'transformers': 'transformers',
-        'huggingface-hub': 'huggingface_hub',
         'tokenizers': 'tokenizers',
         'numpy': 'numpy',
         'mss': 'mss',
