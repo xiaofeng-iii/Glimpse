@@ -741,57 +741,86 @@ kbd {
   color: var(--color-text-secondary);
 }
 
-/* v-hint-tooltip 指令挂到 body 下的悬浮说明：浮起浅色气泡 + 可选快捷键键帽，无箭头。 */
+/* v-hint-tooltip 共享气泡（WarmTooltip 本地化）：外层只负责位移/尺寸，由弹簧驱动；
+   pop 层负责出场（缩放/上浮/模糊/微倾侧），两层的 transform 互不覆盖。 */
 .hint-tooltip {
   position: fixed;
+  top: 0;
+  left: 0;
   z-index: var(--z-tooltip);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.1875rem 0.5rem;
+  user-select: none;
+  pointer-events: none;
+}
+
+.hint-tooltip__pop {
+  position: absolute;
+  inset: 0;
+  display: block;
+  /* 宽度弹簧动画期间盒子尺寸与内容宽度瞬时不一致，居中让溢出对称（原版 WarmTooltip 行为）。 */
+  text-align: center;
+  padding: 0.25rem 0.5rem;
   border: 1px solid var(--shell-line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--color-surface-raised);
   color: var(--color-text);
   font-size: 0.75rem;
   line-height: var(--line-height-12);
   box-shadow: var(--shadow-card);
-  white-space: nowrap;
-  user-select: none;
-  pointer-events: none;
-  /* 出场走轻盈利落路线：出发点仅偏向触发元素 3px、95% 大小、半透明，
-     140ms easeOutCubic 起快收柔，位移、放大、变不透明同帧进行。 */
-  --hint-shift: 3px;
   transform-origin: bottom center;
-  animation: hint-tooltip-in 140ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 
-.hint-tooltip--below {
-  --hint-shift: -3px;
+.hint-tooltip--below .hint-tooltip__pop {
   transform-origin: top center;
 }
 
+/* 内容容器按文本自然撑开（含 padding/border），测量直接读它的渲染尺寸；
+   外层弹簧写死宽度时文本不受影响，永远不会被 flex 压缩省略。 */
+.hint-tooltip__content {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* warm 切换时克隆的旧文字幽灵层：绝对定位精确叠加在原文位上向移动方向滑出。 */
+.hint-tooltip__content-ghost {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hint-tooltip__label {
+  display: inline;
+  white-space: nowrap;
+}
+
 .hint-tooltip__kbd {
+  display: inline-block;
+  margin-left: 0.375rem;
   border-radius: 0.25rem;
   padding: 0 0.25rem;
   line-height: 1rem;
+  vertical-align: baseline;
 }
 
-@keyframes hint-tooltip-in {
-  from {
-    opacity: 0.5;
-    transform: translateY(var(--hint-shift)) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+/* 同色小三角：气泡底/顶缘中央指向触发元素，随气泡缩放同步。 */
+.hint-tooltip__arrow {
+  position: absolute;
+  bottom: -3px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  background: var(--color-surface-raised);
+  border-right: 1px solid var(--shell-line);
+  border-bottom: 1px solid var(--shell-line);
+  transform: rotate(45deg);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .hint-tooltip {
-    animation: none;
-  }
+.hint-tooltip--below .hint-tooltip__arrow {
+  top: -3px;
+  bottom: auto;
+  border: 0;
+  border-left: 1px solid var(--shell-line);
+  border-top: 1px solid var(--shell-line);
 }
 
 /* 弹窗/浮层里的动作按钮是低频操作，用苗条档：28px 高、14px 常规字重、无投影，

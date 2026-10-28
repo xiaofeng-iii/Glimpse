@@ -14,7 +14,9 @@
 - 使用方式：本仓库按"本地化改造"方式采用其交互设计——仅参考组件行为与
   结构，视觉与实现全部改写为项目自有设计系统与代码；不直接分发其源码。
 - 已采用组件：micro/swipe-toast（通知浮层的拖拽关闭、悬停暂停与堆叠交互
-  参考），落地于 `glimpse-frontend/src/components/toast/`。
+  参考），落地于 `glimpse-frontend/src/components/toast/`；micro/warm-tooltip
+  （悬浮说明的 warm 连续体验：共享气泡、位置/宽高弹簧滑动、速度倾侧与
+  模糊出场机制参考），落地于 `glimpse-frontend/src/directives/hint-tooltip.ts`。
 
 ## motion-v（https://motion.dev）
 

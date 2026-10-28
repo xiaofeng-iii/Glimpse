@@ -15,6 +15,15 @@ const NoShortcutHarness = defineComponent({
   `,
 })
 
+const PairHarness = defineComponent({
+  template: `
+    <div>
+      <button id="first" v-hint-tooltip="'第一个'" type="button">一</button>
+      <button id="second" v-hint-tooltip="'第二个'" type="button">二</button>
+    </div>
+  `,
+})
+
 const mountHarness = (component: ReturnType<typeof defineComponent>) =>
   mount(component, {
     attachTo: document.body,
@@ -58,7 +67,7 @@ describe('v-hint-tooltip', () => {
     wrapper.unmount()
   })
 
-  it('延迟内移出不显示，移出后已显示的提示被移除', async () => {
+  it('延迟内移出不显示，移出经过关闭宽限后移除气泡', async () => {
     vi.useFakeTimers()
     const wrapper = mountHarness(Harness)
     const button = wrapper.get('button')
@@ -73,6 +82,9 @@ describe('v-hint-tooltip', () => {
     vi.advanceTimersByTime(600)
     expect(document.querySelector('.hint-tooltip')).not.toBeNull()
     await button.trigger('pointerleave')
+    // 80ms 关闭宽限内气泡仍在（warm 连续体验的窗口），退场结束后移除。
+    expect(document.querySelector('.hint-tooltip')).not.toBeNull()
+    vi.advanceTimersByTime(400)
     expect(document.querySelector('.hint-tooltip')).toBeNull()
 
     wrapper.unmount()
@@ -116,6 +128,61 @@ describe('v-hint-tooltip', () => {
     expect(tooltip).not.toBeNull()
     // jsdom 的 getBoundingClientRect 全为 0，上方必无空间，稳定走下方落位。
     expect(tooltip?.classList.contains('hint-tooltip--below')).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('warm 窗口内移向相邻按钮：不重新等待，同一气泡直接换内容', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountHarness(PairHarness)
+
+    await wrapper.get('#first').trigger('pointerenter')
+    vi.advanceTimersByTime(400)
+    const tooltip = document.querySelector('.hint-tooltip')
+    expect(tooltip?.textContent).toContain('第一个')
+
+    await wrapper.get('#first').trigger('pointerleave')
+    await wrapper.get('#second').trigger('pointerenter')
+    // 没有再次等待 300ms：气泡立刻换到第二个按钮的内容。
+    expect(document.querySelectorAll('.hint-tooltip')).toHaveLength(1)
+    expect(tooltip?.textContent).toContain('第二个')
+    expect(tooltip?.textContent).not.toContain('第一个')
+
+    wrapper.unmount()
+  })
+
+  it('冷启动之间没有 warm 残留：超出 warm 窗口后重新走延迟', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountHarness(PairHarness)
+
+    await wrapper.get('#first').trigger('pointerenter')
+    vi.advanceTimersByTime(400)
+    await wrapper.get('#first').trigger('pointerleave')
+    vi.advanceTimersByTime(1000)
+
+    await wrapper.get('#second').trigger('pointerenter')
+    expect(document.querySelector('.hint-tooltip')).toBeNull()
+    vi.advanceTimersByTime(400)
+    expect(document.querySelector('.hint-tooltip')?.textContent).toContain('第二个')
+
+    wrapper.unmount()
+  })
+
+  it('气泡销毁后的 warm 窗口内再进入：立即全量重现，不重走冷启动延迟', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountHarness(PairHarness)
+
+    await wrapper.get('#first').trigger('pointerenter')
+    vi.advanceTimersByTime(400)
+    await wrapper.get('#first').trigger('pointerleave')
+    // 80ms 关闭宽限 + 112ms 退场 → 气泡已销毁，但 300ms warm 窗口（自 beginClose 起算）未过。
+    vi.advanceTimersByTime(300)
+    expect(document.querySelector('.hint-tooltip')).toBeNull()
+
+    await wrapper.get('#second').trigger('pointerenter')
+    // 窗口内复活：不等待 300ms 冷启动延迟，立即出现。
+    expect(document.querySelector('.hint-tooltip')).not.toBeNull()
+    expect(document.querySelector('.hint-tooltip')?.textContent).toContain('第二个')
 
     wrapper.unmount()
   })
