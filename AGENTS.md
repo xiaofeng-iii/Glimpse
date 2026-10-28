@@ -152,6 +152,15 @@ When touching Qt UI, also run the app manually in the `glimpse` environment and 
 - Do not rewrite or discard user changes unless explicitly asked.
 - If removing tracked AI artifacts, use `git rm --cached` so local scratch files are not deleted.
 
+## 原样拷贝区（upstream/）
+
+`upstream/` 存放参考的第三方组件**原样副本**：字节级不动一个字符
+（`.gitattributes` 对该目录关闭行尾规范化），用于上游更新 `git diff` 对照与
+本地化回退溯源；来源与上游 commit 记录在 `upstream/README.md`。纪律：新参考
+组件先原样入库（提交「原样入库」），再在 `glimpse-frontend/src/` 落地本地化
+（提交「本地化适配」，适配文件头部写来源注释）；原样区文件永不手改，代码
+不得 import 该目录。
+
 ## Release Completion
 
 - A formal release is not complete when the tag, Workflow, or installer build merely succeeds.
