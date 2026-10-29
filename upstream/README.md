@@ -30,3 +30,6 @@
   - `src/content/Micro/SwipeToast/SwipeToast.vue` →
     `glimpse-frontend/src/components/toast/`（通知浮层交互参考，弹簧参数
     为本地自定，校准手感时对照此原件）。
+  - `src/content/TextAnimations/StrokeText/StrokeText.vue` →
+    `glimpse-frontend/src/components/StrokeText.vue`（新手引导欢迎卡的
+    逐字描边书写效果参考；动画实现本地改写为纯 CSS，无 gsap 依赖）。
