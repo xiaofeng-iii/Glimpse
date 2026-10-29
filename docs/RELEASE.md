@@ -56,6 +56,27 @@ Tauri CLI 同 minor 校验。依赖缺失或版本错位不应到发布时才首
 可达、后续开发不进 tag 也不丢失。v0.4.2 曾因「动态导入未声明」与「npm 包
 版本高于 crate」连续两次构建失败，即以该流程修复并沉淀出本节规则。
 
+### 撤包与同名重发的资产清理
+
+撤回有问题的安装包时，不能只把 Release 转为草稿：旧资产仍可通过已有链接下载。
+**撤包后、同名重发前，必须删除该版本 Release 下旧的安装包、签名和校验文件**，
+确保新包构建与验收期间用户不会下载到有问题的旧包。新包发布时再上传本次产物，
+不以“新旧资产会同时保留”为目的；需要保留旧包作离线取证时，只能存到本地
+受控目录，不得继续留在公开 Release。
+
+标准顺序：
+
+1. `gh release edit <tag> --draft`，先阻断正常更新发现。
+2. 用 `gh release view <tag> --json assets` 核对并记录待删除资产。
+3. 逐个执行 `gh release delete-asset <tag> <文件名> -y`，删除旧安装包、`.sig` 和
+   `SHA256SUMS.txt`；保留 Release 正文与同名发布入口。
+4. 修复并重指 tag，等新构建、验签和主程序验收全部通过后，只上传本次新资产。
+5. 回读资产名称、数量、摘要与正文，再 `gh release edit <tag> --draft=false`
+   恢复预发布；重建并回读 Pages 更新索引。
+
+撤包或删资产后，必须运行 `gh workflow run updater-pages.yml` 并回读
+`updates/preview.json` / `updates/stable.json`，确认旧版本不再被自动更新选中。
+
 ## 安装器的进程等待与后端目录清理
 
 `glimpse-frontend/src-tauri/installer-hooks.nsh` 的 PREINSTALL 钩子负责更新时
