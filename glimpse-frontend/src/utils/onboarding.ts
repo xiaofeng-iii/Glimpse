@@ -1,4 +1,4 @@
-export const CURRENT_ONBOARDING_VERSION = 1
+export const CURRENT_ONBOARDING_VERSION = 2
 export const ONBOARDING_VERSION_STORAGE_KEY = 'glimpse.onboardingVersion'
 export const ONBOARDING_REQUEST_EVENT = 'glimpse:show-onboarding'
 

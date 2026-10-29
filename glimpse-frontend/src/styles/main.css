@@ -66,6 +66,9 @@
   --z-dropdown: 200;
   --z-popover: 300;
   --z-backdrop: 500;
+  /* 引导聚光灯：压过 backdrop 与其下各级，低于 dialog/tooltip/toast——
+     引导期间真实弹窗（未保存守卫等）与提示仍浮在引导之上 */
+  --z-tour: 550;
   --z-dialog: 600;
   --z-tooltip: 700;
   --z-toast: 900;

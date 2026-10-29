@@ -49,7 +49,9 @@ z-index:
   dropdown: 200
   popover: 300
   backdrop: 500
+  tour: 550
   dialog: 600
+  tooltip: 700
   toast: 900
 ---
 

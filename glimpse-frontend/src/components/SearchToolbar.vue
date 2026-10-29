@@ -276,7 +276,7 @@ defineExpose({ focus, clear })
   <section class="search-toolbar">
     <div class="search-toolbar__surface">
       <div class="search-toolbar__layout">
-        <div class="search-toolbar__input relative min-w-0">
+        <div class="search-toolbar__input relative min-w-0" data-tour="search-input">
           <!-- 图标库对照实验（hugeicons 免费集 vs heroicons）：仅本组件替换，供目检对比 -->
           <HugeiconsIcon
             :icon="SearchFreeIcons"
@@ -312,6 +312,7 @@ defineExpose({ focus, clear })
         <div
           class="search-toolbar__control search-toolbar__source-switcher inline-grid h-8 grid-flow-col auto-cols-fr items-center"
           role="group"
+          data-tour="search-source"
           :aria-label="t('search.sourceLabel')"
           :style="{ '--segment-slide-duration': `${slideDurationMs}ms` }"
         >
@@ -504,6 +505,7 @@ defineExpose({ focus, clear })
 
         <CaptureButton
           class="search-toolbar__capture"
+          data-tour="capture-button"
           :capturing="capturing"
           :disabled="captureDisabled"
           :shortcut-label="captureShortcutLabel"
@@ -512,6 +514,7 @@ defineExpose({ focus, clear })
         />
         <AddMemoryButton
           class="search-toolbar__add-memory"
+          data-tour="add-memory-button"
           :busy="addingMemory"
           :disabled="addMemoryDisabled"
           density="toolbar"

@@ -70,6 +70,10 @@ onMounted(() => {
   // 「查看详情」等入口通过 ?section= 直达目标分区；缺省显示导航首项「界面」。
   if (isSectionId(route.query.section)) activeSection.value = route.query.section
 })
+// 已挂载时 ?section= 变化同样生效：新手引导在设置页内跨分区前进依赖它。
+watch(() => route.query.section, (section) => {
+  if (isSectionId(section)) activeSection.value = section
+})
 const loading = ref(true)
 const saving = ref(false)
 const savingOcr = ref(false)
@@ -899,28 +903,30 @@ onUnmounted(() => {
             </template>
 
             <template v-else-if="activeSection === 'ai'">
-              <div class="setting-row">
-                <div>
-                  <label for="ai-api-key" class="setting-label">API Key</label>
-                  <p class="setting-help">{{ t('settings.localOnly') }}</p>
+              <div class="settings-field-group" data-tour="settings-ai-fields">
+                <div class="setting-row">
+                  <div>
+                    <label for="ai-api-key" class="setting-label">API Key</label>
+                    <p class="setting-help">{{ t('settings.localOnly') }}</p>
+                  </div>
+                  <SecretInput
+                    id="ai-api-key"
+                    v-model="aiApiKey"
+                    :show-label="t('settings.showApiKey')"
+                    :hide-label="t('settings.hideApiKey')"
+                  />
                 </div>
-                <SecretInput
-                  id="ai-api-key"
-                  v-model="aiApiKey"
-                  :show-label="t('settings.showApiKey')"
-                  :hide-label="t('settings.hideApiKey')"
-                />
-              </div>
-              <label class="setting-row">
-                <span class="setting-label">Base URL</span>
-                <input v-model="aiBaseUrl" class="setting-input" type="url" />
-              </label>
-              <div class="setting-row">
-                <div>
-                  <label id="settings-ai-model-label" for="settings-ai-model" class="setting-label">{{ t('settings.visualModel') }}</label>
-                  <p class="setting-help">{{ t('settings.visualModelHint') }}</p>
+                <label class="setting-row">
+                  <span class="setting-label">Base URL</span>
+                  <input v-model="aiBaseUrl" class="setting-input" type="url" />
+                </label>
+                <div class="setting-row">
+                  <div>
+                    <label id="settings-ai-model-label" for="settings-ai-model" class="setting-label">{{ t('settings.visualModel') }}</label>
+                    <p class="setting-help">{{ t('settings.visualModelHint') }}</p>
+                  </div>
+                  <input id="settings-ai-model" v-model="aiModel" class="setting-input" type="text" aria-labelledby="settings-ai-model-label" />
                 </div>
-                <input id="settings-ai-model" v-model="aiModel" class="setting-input" type="text" aria-labelledby="settings-ai-model-label" />
               </div>
               <div class="setting-row">
                 <div>
@@ -1528,6 +1534,19 @@ onUnmounted(() => {
   border-top: 0;
   border-radius: var(--radius-lg);
   padding: .875rem 1rem;
+}
+
+/* AI 三项输入的引导高亮组：分组本身不带行距，内部行距与分隔线复刻面板直接子项的节奏 */
+.settings-panel > .settings-field-group {
+  padding-block: 0;
+}
+
+.settings-field-group > * {
+  padding-block: .75rem;
+}
+
+.settings-field-group > * + * {
+  border-top: 1px solid var(--settings-panel-line);
 }
 
 .setting-label {

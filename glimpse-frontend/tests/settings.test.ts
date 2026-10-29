@@ -406,4 +406,31 @@ describe('Settings', () => {
     expect(apiMocks.exportDiagnostics).toHaveBeenCalledTimes(1)
   })
 
+  it('switches to the requested section when ?section= changes after mount', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: { template: '<div />' } },
+        { path: '/settings', component: Settings },
+      ],
+    })
+    await router.push('/settings')
+    await router.isReady()
+
+    const host = mount({ template: '<router-view />' }, {
+      global: {
+        plugins: [createPinia(), router],
+      },
+    })
+    mountedHosts.push(host)
+    await flushPromises()
+
+    const settings = host.getComponent(Settings)
+    expect(settings.find('[data-tour="settings-ai-fields"]').exists()).toBe(false)
+
+    await router.push({ path: '/settings', query: { section: 'ai' } })
+    await flushPromises()
+    expect(settings.find('[data-tour="settings-ai-fields"]').exists()).toBe(true)
+  })
+
 })

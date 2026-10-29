@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from '@/App.vue'
-import FirstRunGuide from '@/components/FirstRunGuide.vue'
+import GuidedTour from '@/components/GuidedTour.vue'
 import { setLanguagePreference } from '@/utils/i18n'
 import {
   completeOnboarding,
@@ -19,6 +19,13 @@ const appMocks = vi.hoisted(() => ({
   applyThemePreference: vi.fn(),
   watchSystemTheme: vi.fn(),
   showNotification: vi.fn(),
+  routePush: vi.fn(),
+}))
+
+vi.mock('vue-router', () => ({
+  RouterView: { template: '<div />' },
+  useRoute: () => ({ name: 'home', fullPath: '/', query: {} }),
+  useRouter: () => ({ push: appMocks.routePush }),
 }))
 
 vi.mock('@/api/websocket', () => ({
@@ -63,6 +70,12 @@ vi.mock('@/utils/theme', () => ({
   watchSystemTheme: appMocks.watchSystemTheme,
 }))
 
+vi.mock('@/utils/tour-samples', () => ({
+  injectTourSamples: vi.fn().mockResolvedValue(undefined),
+  removeTourSamples: vi.fn().mockResolvedValue(undefined),
+  sweepTourSamples: vi.fn().mockResolvedValue(undefined),
+}))
+
 const mountApp = () => mount(App, {
   global: {
     stubs: {
@@ -75,7 +88,7 @@ const mountApp = () => mount(App, {
   },
 })
 
-describe('first-run onboarding', () => {
+describe('first-run guided tour', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     window.localStorage.clear()
@@ -83,6 +96,7 @@ describe('first-run onboarding', () => {
     appMocks.loadSettings.mockResolvedValue(undefined)
     appMocks.whenBackendRuntimeReady.mockResolvedValue(undefined)
     appMocks.watchSystemTheme.mockReturnValue(vi.fn())
+    appMocks.routePush.mockResolvedValue(undefined)
   })
 
   it('uses a versioned completion marker', () => {
@@ -104,20 +118,21 @@ describe('first-run onboarding', () => {
     expect(shouldShowOnboarding()).toBe(false)
   })
 
-  it('shows immediately on first entry, persists completion, and stays hidden next time', async () => {
+  it('shows the tour immediately on first entry, persists completion, and stays hidden next time', async () => {
     const firstMount = mountApp()
     await flushPromises()
 
     const dialog = firstMount.get('[role="dialog"]')
     expect(dialog.attributes('aria-modal')).toBe('true')
-    expect(dialog.text()).toContain('三步开始使用 Glimpse')
-    expect(dialog.text()).toContain('Ctrl + Shift + G')
-    expect(dialog.text()).toContain('Ctrl + F')
+    expect(dialog.text()).toContain('欢迎使用 Glimpse')
+    expect(dialog.text()).toContain('开始引导')
 
-    await firstMount.get('[data-testid="first-run-complete"]').trigger('click')
+    await firstMount.get('[data-testid="tour-later"]').trigger('click')
     await flushPromises()
     expect(firstMount.find('[role="dialog"]').exists()).toBe(false)
-    expect(window.localStorage.getItem(ONBOARDING_VERSION_STORAGE_KEY)).toBe('1')
+    expect(window.localStorage.getItem(ONBOARDING_VERSION_STORAGE_KEY)).toBe(
+      String(CURRENT_ONBOARDING_VERSION),
+    )
 
     firstMount.unmount()
     const secondMount = mountApp()
@@ -125,7 +140,7 @@ describe('first-run onboarding', () => {
     expect(secondMount.find('[role="dialog"]').exists()).toBe(false)
   })
 
-  it('does not wait for backend readiness before showing the guide', async () => {
+  it('does not wait for backend readiness before showing the tour', async () => {
     appMocks.whenBackendRuntimeReady.mockReturnValueOnce(new Promise(() => {}))
     const wrapper = mountApp()
     await flushPromises()
@@ -133,7 +148,7 @@ describe('first-run onboarding', () => {
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
   })
 
-  it('reopens the guide when the development UI requests it', async () => {
+  it('reopens the tour when the toolbar requests it', async () => {
     completeOnboarding()
     const wrapper = mountApp()
     await flushPromises()
@@ -143,19 +158,20 @@ describe('first-run onboarding', () => {
     await flushPromises()
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
-    expect(window.localStorage.getItem(ONBOARDING_VERSION_STORAGE_KEY)).toBe('1')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('欢迎使用 Glimpse')
   })
 
   it('focuses the primary action and supports Escape dismissal', async () => {
-    const wrapper = mount(FirstRunGuide, {
+    const wrapper = mount(GuidedTour, {
       props: { open: true },
       attachTo: document.body,
       global: { stubs: { Teleport: true } },
     })
     await flushPromises()
 
-    expect(document.activeElement).toBe(wrapper.get('[data-testid="first-run-complete"]').element)
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="tour-next"]').element)
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
     expect(wrapper.emitted('complete')).toHaveLength(1)
   })
 })

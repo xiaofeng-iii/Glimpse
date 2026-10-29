@@ -47,7 +47,7 @@
 
 - 控件高度：`--control-h-sm` 28px / `--control-h-md` 32px / `--control-h-lg` 40px，**只此三档**。
 - 圆角刻度：`--radius-sm` 6 / `--radius-md` 8 / `--radius-lg` 10 / `--radius-xl` 12。同心规则见 `DESIGN.md`"形状的同心规则"。
-- z 层级：`--z-sticky` 100 → `--z-dropdown` 200 → `--z-popover` 300 → `--z-backdrop` 500 → `--z-dialog` 600 → `--z-toast` 900。
+- z 层级：`--z-sticky` 100 → `--z-dropdown` 200 → `--z-popover` 300 → `--z-backdrop` 500 → `--z-tour` 550（新手引导聚光灯，低于 dialog/tooltip/toast）→ `--z-dialog` 600 → `--z-toast` 900。
 - 阴影只给真正浮起的表面：卡片 `--shadow-card`、模态 `--shadow-modal`；不拿阴影替代边框或选中态。
 
 ## 排版

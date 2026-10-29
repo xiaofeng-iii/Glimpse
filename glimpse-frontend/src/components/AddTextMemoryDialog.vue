@@ -210,6 +210,7 @@ const preventOutsideDismiss = (event: Event) => {
       <DialogOverlay class="text-memory-dialog__overlay" />
       <DialogContent
         class="text-memory-dialog__content"
+        data-tour="add-memory-dialog"
         :aria-busy="busy"
         @open-auto-focus="focusEditor"
         @escape-key-down="preventDismissWhileBusy"

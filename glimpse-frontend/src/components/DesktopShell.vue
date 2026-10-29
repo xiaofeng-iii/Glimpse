@@ -300,6 +300,7 @@ onUnmounted(() => {
             v-hint-tooltip="t('action.settings')"
             type="button"
             class="shell-icon-button desktop-shell__settings-button"
+            data-tour="settings-entry"
             :aria-label="t('action.settings')"
             @click="navigateSettings"
           >

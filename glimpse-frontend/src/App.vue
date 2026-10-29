@@ -14,9 +14,10 @@ import {
   ONBOARDING_REQUEST_EVENT,
   shouldShowOnboarding,
 } from '@/utils/onboarding'
+import { sweepTourSamples } from '@/utils/tour-samples'
 import DesktopShell from '@/components/DesktopShell.vue'
 import EditTextContextMenu from '@/components/EditTextContextMenu.vue'
-import FirstRunGuide from '@/components/FirstRunGuide.vue'
+import GuidedTour from '@/components/GuidedTour.vue'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 import SwipeToastHost from '@/components/toast/SwipeToastHost.vue'
 
@@ -24,7 +25,7 @@ const websocket = useWebSocket()
 const settingsStore = useSettingsStore()
 const hotkeyRegistration = useHotkeyRegistrationStore()
 const notifications = useNotificationStore()
-const firstRunGuideOpen = ref(shouldShowOnboarding())
+const guidedTourOpen = ref(shouldShowOnboarding())
 let stopWatchingSystemTheme: (() => void) | null = null
 const editTextMenu = ref<{
   x: number
@@ -34,11 +35,11 @@ const editTextMenu = ref<{
 
 const finishOnboarding = () => {
   completeOnboarding()
-  firstRunGuideOpen.value = false
+  guidedTourOpen.value = false
 }
 
 const showOnboarding = () => {
-  firstRunGuideOpen.value = true
+  guidedTourOpen.value = true
 }
 
 const applySavedTheme = async () => {
@@ -98,6 +99,7 @@ onMounted(async () => {
   document.addEventListener('contextmenu', handleDocumentContextMenu, true)
   window.addEventListener(ONBOARDING_REQUEST_EVENT, showOnboarding)
   await whenBackendRuntimeReady()
+  void sweepTourSamples()
   await applySavedTheme()
   stopWatchingSystemTheme = watchSystemTheme(() => {
     applyThemePreference(settingsStore.settings?.ui?.theme)
@@ -119,7 +121,7 @@ onUnmounted(() => {
     <DesktopShell>
       <RouterView />
     </DesktopShell>
-    <FirstRunGuide :open="firstRunGuideOpen" @complete="finishOnboarding" />
+    <GuidedTour :open="guidedTourOpen" @complete="finishOnboarding" />
     <EditTextContextMenu
       :x="editTextMenu.x"
       :y="editTextMenu.y"
