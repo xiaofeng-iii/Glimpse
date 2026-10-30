@@ -637,9 +637,10 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* 挖孔本体透明，巨大的 spread 阴罩负责遮暗其余一切；2px 主色环贴孔缘 */
-/* 整个引导浮层只在打开时淡入一次；遮罩/挖孔/说明卡换步时不再有任何
-   透明度动画——遮罩层切换元素也不闪"变亮又变暗" */
-.guided-tour {
+/* 淡入只给说明卡；遮罩（压暗+模糊）即时全量出现——淡入若挂在遮罩的
+   祖先上，透明度隔离组会让 backdrop-filter 采样不到背后内容，
+   模糊要等动画结束才上线（"弹窗先出、背景后模糊"的根因） */
+.guided-tour__card {
   animation: guided-tour-in 160ms ease-out;
 }
 
@@ -707,7 +708,7 @@ onBeforeUnmount(() => {
 }
 
 .guided-tour__card--anchored {
-  animation: guided-tour-in 160ms ease-out;
+  animation: none;
 }
 
 /* 换步滑动：孔位、拦截片与说明卡同步从旧位置平滑移动到新位置 */
@@ -831,8 +832,7 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .guided-tour,
-  .guided-tour__card--anchored,
+  .guided-tour__card,
   .guided-tour__body {
     animation-duration: 1ms;
   }
