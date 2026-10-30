@@ -322,7 +322,7 @@ describe('memory components', () => {
 
     expect(layout.exists()).toBe(true)
     expect(group.attributes('aria-label')).toBe('搜索模式')
-    expect(labels).toEqual(['综合', '精确', '语义'])
+    expect(labels).toEqual(['全部', '精确', '语义'])
     expect(actions.element.previousElementSibling).toBe(group.element)
     expect(actions.get('.capture-button').element.nextElementSibling)
       .toBe(actions.get('.add-memory-button').element)
