@@ -255,7 +255,7 @@ onUnmounted(() => {
       :disabled="loading"
       @click="toggle"
     >
-      <FunnelOutlineIcon class="memory-filters__trigger-icon" aria-hidden="true" />
+      <HugeiconsIcon :icon="FunnelOutlineIcon" class="memory-filters__trigger-icon" aria-hidden="true" />
       <span class="memory-filters__trigger-label">{{ t('filter.open') }}</span>
       <span v-if="active" class="sr-only">{{ t('filter.active') }}</span>
     </button>
