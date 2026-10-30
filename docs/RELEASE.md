@@ -74,8 +74,10 @@ Tauri CLI 同 minor 校验。依赖缺失或版本错位不应到发布时才首
 5. 回读资产名称、数量、摘要与正文，再 `gh release edit <tag> --draft=false`
    恢复预发布；重建并回读 Pages 更新索引。
 
-撤包或删资产后，必须运行 `gh workflow run updater-pages.yml` 并回读
-`updates/preview.json` / `updates/stable.json`，确认旧版本不再被自动更新选中。
+撤包或删资产后，`updater-pages` 会随 release 事件自动重建索引；回读
+`updates/preview.json` / `updates/stable.json`（注意 Pages 有约 10 分钟 CDN
+缓存，验证时 URL 加穿透参数）确认旧版本不再被自动更新选中。需要立即生效
+核验时，可再手动 `gh workflow run updater-pages.yml`。
 
 ## 安装器的进程等待与后端目录清理
 
@@ -211,17 +213,29 @@ Release 标题统一为 `Glimpse <标签名>`（如 `Glimpse v0.3.2`、
    gh release edit $CurrentTag --notes-file $NotesFile
    ```
 
-推荐流程：推送标签后立即用说明文件预创建 Release，Workflow 检测到已有 Release，
-只上传安装包和 `SHA256SUMS.txt`，不会覆盖正文：
+推荐流程（预创建先行）：版本提交推送后，用说明文件预创建 Release——标签尚不存在
+也可以，`--target` 指向已推送的版本提交，创建动作会生成标签并触发构建工作流；
+Release 从第一秒就是人工正文，构建器检测到已有 Release 后只上传安装包与
+`SHA256SUMS.txt`，全程不存在自动生成的兜底正文：
 
 ```powershell
-gh release create $CurrentTag --verify-tag --title "Glimpse $CurrentTag" --notes-file $NotesFile
+gh release create $CurrentTag --target <版本提交SHA> --title "Glimpse $CurrentTag" --notes-file $NotesFile
 # 公开预览版追加 --prerelease：
-gh release create $CurrentTag --verify-tag --prerelease --title "Glimpse $CurrentTag" --notes-file $NotesFile
+gh release create $CurrentTag --target <版本提交SHA> --prerelease --title "Glimpse $CurrentTag" --notes-file $NotesFile
 ```
 
-若 Release 已由 Workflow 兜底创建，则改用上面的 `gh release edit` 覆盖正文。无论
-采用哪种写入方式，都必须在最后回读正文、发布状态和资产。
+创建后一分钟内用 `gh run list` 核验构建工作流已被触发（标签经 Releases API 创建
+按机制会触发 push 类工作流，gh 个人令牌不受令牌事件限制；此处核验是发布链路的
+确定性闸门）。若未触发：`gh release delete $CurrentTag --yes` 删除预创建的
+Release，`git push origin :refs/tags/$CurrentTag` 删远端标签，退回本地
+`git tag` + 推送标签的流程，再按上文 `gh release edit` 写入正文。
+
+预创建的 Release 在构建完成前约十余分钟内公开可见但没有安装包，这与旧流程
+"推送标签后立即预创建"的窗口一致；更新索引只收录带签名的资产，更新器用户
+不受影响。若因故错过预创建、Release 已被工作流以自动正文兜底创建，则改用
+`gh release edit --notes-file` 覆盖正文——改正文会自动触发更新索引重建
+（见下文"应用内更新"），无需再手动运行 Pages 工作流。无论采用哪种写入
+方式，都必须在最后回读正文、发布状态和资产。
 
 4. 重新读取 GitHub Release，确认正文、正式发布状态和链接都正确：
 
@@ -261,9 +275,12 @@ gh release create $CurrentTag --verify-tag --prerelease --title "Glimpse $Curren
    上传 Release。仅 `SHA256SUMS.txt` 不足以让 Tauri Updater 验证更新。
 4. 任一发布工作流成功完成后，`updater-pages.yml` 会重新扫描已发布且具备签名的
    GitHub Releases，按版本号生成 `updates/stable.json` 和 `updates/preview.json`，
-   部署至 Pages；工作流也支持手动触发以重建索引。检查 Pages 工作流已成功，
-   并回读 JSON 的版本、安装包 URL 和签名，再将更新视为可用。未签名的旧版
-   Release 不会进入索引；第一个签名发布版之前对应 JSON 可能尚不存在。
+   部署至 Pages；Release 正文被编辑（含 `gh release edit`）与资产增删同样会自动
+   触发重建，工作流也支持手动触发以重建索引。检查 Pages 工作流已成功，
+   并回读 JSON 的版本、安装包 URL 和签名，再将更新视为可用；Pages JSON 有约
+   10 分钟 CDN 缓存，验证时在 URL 上加穿透参数（如 `?t=<时间戳>`）避免读到
+   旧边缘副本。未签名的旧版 Release 不会进入索引；第一个签名发布版之前对应
+   JSON 可能尚不存在。
 5. 使用已安装的上一版本测试「检查更新 → 下载并安装 → 重启」，并检查后台
    `GlimpseRuntime.exe` 是否正常退出与重启、`GlimpseData` 是否保留。只在
    GitHub Pages 已启用、安装包已签名及测试通过之后对用户公布应用内更新。
