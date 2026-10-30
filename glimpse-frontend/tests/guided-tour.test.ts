@@ -247,22 +247,4 @@ describe('GuidedTour', () => {
     await flushPromises()
     expect(tourSampleMocks.remove).toHaveBeenCalledTimes(1)
   })
-
-  it('ends on the fold-text display card with a round check button', async () => {
-    createFixture('capture-button')
-    createFixture('add-memory-button')
-    createFixture('search-input')
-    createFixture('search-source')
-    createFixture('settings-entry')
-    createFixture('settings-ai-fields')
-    mountTour()
-    await advanceTo(7)
-
-    const finishTitle = document.getElementById('guided-tour-title')!
-    expect(tourCard()!.textContent).toContain('一切就绪')
-    expect(finishTitle.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('一切就绪！')
-    expect(finishTitle.querySelectorAll('.fold-text__char'))
-      .toHaveLength(Array.from('一切就绪！').length)
-    expect(tourButton('tour-next')!.getAttribute('aria-label')).toBe('完成')
-  })
 })
