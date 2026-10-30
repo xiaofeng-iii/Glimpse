@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ArrowRight01FreeIcons, Tick02FreeIcons } from '@hugeicons/core-free-icons'
 import { useSettingsStore } from '@/stores/settings'
 import { t } from '@/utils/i18n'
 import { injectTourSamples, removeTourSamples } from '@/utils/tour-samples'
+import StrokeText from '@/components/StrokeText.vue'
+import FoldText from '@/components/FoldText.vue'
 
 type TourRoute = { name: 'home' } | { name: 'settings'; query: { section: string } }
 
@@ -22,7 +26,6 @@ type TourStep = {
 const tourSteps: readonly TourStep[] = [
   {
     titleKey: 'onboarding.tour.welcomeTitle',
-    descriptionKey: 'onboarding.tour.welcomeDescription',
     target: null,
   },
   {
@@ -77,6 +80,8 @@ const CARD_WIDTH_FALLBACK_PX = 300
 const CARD_HEIGHT_FALLBACK_PX = 168
 const TARGET_POLL_INTERVAL_MS = 100
 const TARGET_POLL_TIMEOUT_MS = 5000
+// 孔位换步滑动时长；与滑动窗计时共用同一数值（easeOutCubic，与分段器同族）
+const HOLE_SLIDE_MS = 240
 // 门控满足后延迟一小步再前进，让用户先看到自己操作的结果
 const GATE_ADVANCE_DELAY_MS = 600
 
@@ -93,9 +98,11 @@ const router = useRouter()
 const settingsStore = useSettingsStore()
 
 const stepIndex = ref(0)
-const targetResolved = ref(false)
 const centeredFallback = ref(false)
 const positioned = ref(false)
+// 换步定位时为孔位/拦截片/说明卡开启位移动画；滚动与缩放跟随必须瞬时精确，
+// 不走 transition（否则高亮会拖在内容后面）
+const holeSliding = ref(false)
 const holeRect = ref<{ left: number; top: number; width: number; height: number } | null>(null)
 const cardPosition = ref<{ left: string; top: string } | null>(null)
 const cardElement = ref<HTMLElement | null>(null)
@@ -108,6 +115,7 @@ let gateTimer: number | null = null
 let gateObserver: MutationObserver | null = null
 let gateDialogSeen = false
 let updateRaf = 0
+let holeSlideTimer: number | null = null
 let originElement: HTMLElement | null = null
 let finishing = false
 
@@ -178,13 +186,7 @@ const captureHotkeyLabel = computed(() =>
   formatHotkeyLabel(settingsStore.settings?.hotkeys?.screenshot),
 )
 
-const primaryLabel = computed(() => t(
-  isWelcome.value
-    ? 'onboarding.tour.start'
-    : isFinish.value
-      ? 'onboarding.tour.done'
-      : 'onboarding.tour.next',
-))
+const isDisplayStep = computed(() => isWelcome.value || isFinish.value)
 
 const queryTarget = (name: string) =>
   document.querySelector<HTMLElement>(`[data-tour="${name}"]`)
@@ -262,7 +264,20 @@ const scheduleUpdate = () => {
   })
 }
 
-const positionCard = (rect: DOMRect) => {
+const positionCard = (rect: DOMRect, slide = false) => {
+  // 换步定位开启滑动窗；窗口结束后或出现滚动/缩放跟随（slide=false）即关闭，
+  // 滑动中被滚动打断会从当前插值位置直接改道，不产生跳变积累
+  if (holeSlideTimer !== null) {
+    window.clearTimeout(holeSlideTimer)
+    holeSlideTimer = null
+  }
+  holeSliding.value = slide
+  if (slide) {
+    holeSlideTimer = window.setTimeout(() => {
+      holeSlideTimer = null
+      holeSliding.value = false
+    }, HOLE_SLIDE_MS)
+  }
   const cardWidth = cardElement.value?.offsetWidth || CARD_WIDTH_FALLBACK_PX
   const cardHeight = cardElement.value?.offsetHeight || CARD_HEIGHT_FALLBACK_PX
   const viewportWidth = window.innerWidth
@@ -331,12 +346,10 @@ const setupGate = () => {
 const activateStep = async () => {
   const token = ++activationToken
   cancelGate()
+  // 换步期间保留上一孔位与卡片位置：遮罩不卸载就不会闪"变亮又变暗"，
+  // 新目标定位完成后孔位与卡片一次性跳到新位置
   currentTarget = null
-  targetResolved.value = false
   centeredFallback.value = false
-  positioned.value = false
-  holeRect.value = null
-  cardPosition.value = null
 
   await nextTick()
   if (token !== activationToken) return
@@ -360,11 +373,10 @@ const activateStep = async () => {
   }
 
   currentTarget = target
-  targetResolved.value = true
   target.scrollIntoView({ block: 'center', inline: 'nearest' })
   await nextTick()
   if (token !== activationToken) return
-  positionCard(target.getBoundingClientRect())
+  positionCard(target.getBoundingClientRect(), true)
   setupGate()
 }
 
@@ -450,6 +462,11 @@ const preventBlockedScroll = (event: Event) => {
 const teardownOverlay = () => {
   cancelGate()
   activationToken += 1
+  if (holeSlideTimer !== null) {
+    window.clearTimeout(holeSlideTimer)
+    holeSlideTimer = null
+  }
+  holeSliding.value = false
   if (updateRaf) {
     window.cancelAnimationFrame(updateRaf)
     updateRaf = 0
@@ -470,6 +487,10 @@ watch(
         : null
       finishing = false
       stepIndex.value = 0
+      // 重新打开时清掉上一轮残留的孔位，从干净的全屏遮罩起步
+      holeRect.value = null
+      positioned.value = false
+      cardPosition.value = null
       document.addEventListener('keydown', handleKeydown, true)
       document.addEventListener('wheel', preventBlockedScroll, { capture: true, passive: false })
       document.addEventListener('touchmove', preventBlockedScroll, { capture: true, passive: false })
@@ -503,6 +524,7 @@ onBeforeUnmount(() => {
       <template v-if="isAnchoredMode && positioned && holeStyle">
         <div
           class="guided-tour__hole"
+          :class="{ 'guided-tour__hole--slide': holeSliding }"
           :style="holeStyle"
           aria-hidden="true"
         ></div>
@@ -510,18 +532,28 @@ onBeforeUnmount(() => {
           v-for="(blockerStyle, index) in blockerStyles"
           :key="index"
           class="guided-tour__blocker"
+          :class="{ 'guided-tour__blocker--slide': holeSliding }"
           :style="blockerStyle"
           aria-hidden="true"
         ></div>
       </template>
-      <div v-else class="guided-tour__dim" aria-hidden="true"></div>
+      <div
+        v-else
+        class="guided-tour__dim"
+        :class="{ 'guided-tour__dim--blurred': isDisplayStep }"
+        aria-hidden="true"
+      ></div>
 
       <section
         ref="cardElement"
         class="guided-tour__card"
         :class="[
           isAnchoredMode ? 'guided-tour__card--anchored' : 'guided-tour__card--centered',
-          { 'guided-tour__card--hidden': !cardVisible },
+          {
+            'guided-tour__card--hidden': !cardVisible,
+            'guided-tour__card--display': isDisplayStep,
+            'guided-tour__card--slide': holeSliding,
+          },
         ]"
         :style="isAnchoredMode && cardPosition ? cardPosition : undefined"
         role="dialog"
@@ -531,31 +563,51 @@ onBeforeUnmount(() => {
         tabindex="-1"
         data-testid="tour-card"
       >
-        <div :key="step.titleKey" class="guided-tour__body">
+        <div :key="step.titleKey" class="guided-tour__body" :class="isDisplayStep ? 'guided-tour__body--display' : ''">
           <p v-if="showCounter" class="guided-tour__counter">{{ counterLabel }}</p>
-          <h2 id="guided-tour-title" class="guided-tour__title">{{ t(step.titleKey) }}</h2>
+          <h2
+            v-if="isFinish"
+            id="guided-tour-title"
+            class="guided-tour__title guided-tour__title--display"
+          >
+            <FoldText :text="t(step.titleKey)" :font-size="72" />
+          </h2>
+          <h2
+            v-else-if="isWelcome"
+            id="guided-tour-title"
+            class="guided-tour__title guided-tour__title--display"
+          >
+            <StrokeText :text="t(step.titleKey)" :font-size="72" />
+          </h2>
+          <h2 v-else id="guided-tour-title" class="guided-tour__title">{{ t(step.titleKey) }}</h2>
           <p v-if="descriptionText" id="guided-tour-description" class="guided-tour__description">
             {{ descriptionText }}
           </p>
           <p v-if="gateHintText" class="guided-tour__gate-hint">{{ gateHintText }}</p>
-          <footer class="guided-tour__footer">
+          <footer v-if="isDisplayStep" class="guided-tour__round-cta">
             <button
-              v-if="!isWelcome && !isFinish"
+              ref="nextButton"
+              type="button"
+              class="guided-tour__round-button"
+              data-testid="tour-next"
+              :aria-label="isWelcome ? t('onboarding.tour.start') : t('onboarding.tour.done')"
+              @click="handlePrimary"
+            >
+              <HugeiconsIcon
+                :icon="isWelcome ? ArrowRight01FreeIcons : Tick02FreeIcons"
+                class="h-5 w-5"
+                aria-hidden="true"
+              />
+            </button>
+          </footer>
+          <footer v-else class="guided-tour__footer">
+            <button
               type="button"
               class="guided-tour__skip"
               data-testid="tour-skip"
               @click="finish"
             >
               {{ t('onboarding.tour.skip') }}
-            </button>
-            <button
-              v-else-if="isWelcome"
-              type="button"
-              class="btn-secondary btn-sm"
-              data-testid="tour-later"
-              @click="finish"
-            >
-              {{ t('onboarding.tour.later') }}
             </button>
             <span class="guided-tour__footer-spacer"></span>
             <button
@@ -574,7 +626,7 @@ onBeforeUnmount(() => {
               data-testid="tour-next"
               @click="handlePrimary"
             >
-              {{ primaryLabel }}
+              {{ t('onboarding.tour.next') }}
             </button>
           </footer>
         </div>
@@ -585,6 +637,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* 挖孔本体透明，巨大的 spread 阴罩负责遮暗其余一切；2px 主色环贴孔缘 */
+/* 整个引导浮层只在打开时淡入一次；遮罩/挖孔/说明卡换步时不再有任何
+   透明度动画——遮罩层切换元素也不闪"变亮又变暗" */
+.guided-tour {
+  animation: guided-tour-in 160ms ease-out;
+}
+
 .guided-tour__hole {
   position: fixed;
   z-index: var(--z-tour);
@@ -593,7 +651,6 @@ onBeforeUnmount(() => {
   box-shadow:
     0 0 0 2px var(--color-primary),
     0 0 0 200vmax var(--color-overlay);
-  animation: guided-tour-in 160ms ease-out;
 }
 
 /* 居中模式（欢迎/完成/降级）：全屏遮罩本身拦截点击，只留说明卡可操作 */
@@ -603,7 +660,13 @@ onBeforeUnmount(() => {
   inset: 0;
   pointer-events: auto;
   background: var(--color-overlay);
-  animation: guided-tour-in 160ms ease-out;
+}
+
+/* 欢迎卡背景模糊：全屏遮罩下的磨砂观感需要足够大的半径才可见（3px 压在
+   深色遮罩下几乎不可辨） */
+.guided-tour__dim--blurred {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 /* 锚定模式：透明拦截片盖住挖孔以外区域（视觉仍由挖孔的巨幅阴影承担） */
@@ -634,12 +697,33 @@ onBeforeUnmount(() => {
 .guided-tour__card--centered {
   top: 50%;
   left: 50%;
-  width: 340px;
+  width: 360px;
   transform: translate(-50%, -50%);
+}
+
+/* 展示卡（欢迎/完成）独占大画幅：降级居中卡维持常规宽度 */
+.guided-tour__card--display {
+  width: 720px;
 }
 
 .guided-tour__card--anchored {
   animation: guided-tour-in 160ms ease-out;
+}
+
+/* 换步滑动：孔位、拦截片与说明卡同步从旧位置平滑移动到新位置 */
+.guided-tour__hole--slide,
+.guided-tour__blocker--slide {
+  transition:
+    left 240ms cubic-bezier(0.33, 1, 0.68, 1),
+    top 240ms cubic-bezier(0.33, 1, 0.68, 1),
+    width 240ms cubic-bezier(0.33, 1, 0.68, 1),
+    height 240ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.guided-tour__card--slide {
+  transition:
+    left 240ms cubic-bezier(0.33, 1, 0.68, 1),
+    top 240ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 .guided-tour__body {
@@ -657,6 +741,44 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: 600;
   color: var(--shell-ink);
+}
+
+.guided-tour__title--display {
+  margin-top: 1.25rem;
+}
+
+/* 展示卡（欢迎/完成）：标题居中悬于上方，圆形按钮靠下居中，中间留白即"给用户空间" */
+.guided-tour__body--display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 13rem;
+}
+
+.guided-tour__round-cta {
+  margin-top: auto;
+  padding-bottom: 0.25rem;
+}
+
+.guided-tour__round-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h-lg);
+  height: var(--control-h-lg);
+  border-radius: 9999px;
+  background: var(--color-display-blue);
+  color: var(--color-on-primary);
+  transition: background 160ms ease;
+}
+
+.guided-tour__round-button:hover {
+  background: var(--color-display-blue-hover);
+}
+
+.guided-tour__round-button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .guided-tour__description {
@@ -709,11 +831,16 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .guided-tour__hole,
-  .guided-tour__dim,
+  .guided-tour,
   .guided-tour__card--anchored,
   .guided-tour__body {
     animation-duration: 1ms;
+  }
+
+  .guided-tour__hole--slide,
+  .guided-tour__blocker--slide,
+  .guided-tour__card--slide {
+    transition: none;
   }
 }
 </style>

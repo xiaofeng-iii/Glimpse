@@ -41,6 +41,11 @@
   --color-primary-hover: #4376d6;
   --color-primary-soft: #edf0fa;
   --color-on-primary: #ffffff;
+  /* 引导展示大字专用（StrokeText/FoldText）：莫兰迪雾蓝，与主色同色相但
+     降饱和；仅限 72px 大文本与展示卡圆钮场景，不作全站主色 */
+  --color-display-blue: #6e93d8;
+  --color-display-blue-deep: #5579c0;
+  --color-display-blue-hover: #5d84cd;
   --color-accent: #d9601c;
   --color-accent-hover: #c25414;
   --color-success: #1f9d62;
@@ -120,6 +125,10 @@
   --color-primary: #8494ff;
   --color-primary-hover: #9aa8ff;
   --color-primary-soft: #252e5a;
+  /* 暗色下展示雾蓝提亮一档，保持与浅色同等的观感与可读性 */
+  --color-display-blue: #9cb6e8;
+  --color-display-blue-deep: #7f9cd2;
+  --color-display-blue-hover: #b3c8ee;
   --color-accent: #e07b3d;
   --color-accent-hover: #ee9055;
   --color-success: #58d59a;

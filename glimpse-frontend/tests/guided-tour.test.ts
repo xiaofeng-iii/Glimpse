@@ -88,6 +88,13 @@ describe('GuidedTour', () => {
 
     expect(tourCard()!.textContent).toContain('欢迎使用 Glimpse')
     expect(tourCard()!.textContent).not.toContain('/ 7')
+
+    // 欢迎标题为逐字描边书写动画：SVG 双层文字、逐字 tspan、可访问名完整
+    const welcomeTitle = document.getElementById('guided-tour-title')!
+    expect(welcomeTitle.querySelector('[role="img"]')?.getAttribute('aria-label'))
+      .toBe('欢迎使用 Glimpse')
+    expect(welcomeTitle.querySelectorAll('.stroke-text__stroke-char'))
+      .toHaveLength(Array.from('欢迎使用 Glimpse').length)
     expect(tourButton('tour-prev')).toBeNull()
     expect(tourButton('tour-skip')).toBeNull()
 
@@ -236,7 +243,26 @@ describe('GuidedTour', () => {
     await flushPromises()
     expect(tourSampleMocks.inject).toHaveBeenCalledTimes(1)
 
-    await clickTour('tour-later')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
     expect(tourSampleMocks.remove).toHaveBeenCalledTimes(1)
+  })
+
+  it('ends on the fold-text display card with a round check button', async () => {
+    createFixture('capture-button')
+    createFixture('add-memory-button')
+    createFixture('search-input')
+    createFixture('search-source')
+    createFixture('settings-entry')
+    createFixture('settings-ai-fields')
+    mountTour()
+    await advanceTo(7)
+
+    const finishTitle = document.getElementById('guided-tour-title')!
+    expect(tourCard()!.textContent).toContain('一切就绪')
+    expect(finishTitle.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('一切就绪！')
+    expect(finishTitle.querySelectorAll('.fold-text__char'))
+      .toHaveLength(Array.from('一切就绪！').length)
+    expect(tourButton('tour-next')!.getAttribute('aria-label')).toBe('完成')
   })
 })

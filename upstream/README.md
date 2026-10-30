@@ -33,3 +33,6 @@
   - `src/content/TextAnimations/StrokeText/StrokeText.vue` →
     `glimpse-frontend/src/components/StrokeText.vue`（新手引导欢迎卡的
     逐字描边书写效果参考；动画实现本地改写为纯 CSS，无 gsap 依赖）。
+  - `src/content/TextAnimations/FoldText/FoldText.vue` →
+    `glimpse-frontend/src/components/FoldText.vue`（新手引导完成卡的
+    逐字折叠展开效果参考；动画实现本地改写为纯 CSS，无 gsap 依赖）。

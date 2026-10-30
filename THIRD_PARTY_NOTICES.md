@@ -16,7 +16,11 @@
 - 已采用组件：micro/swipe-toast（通知浮层的拖拽关闭、悬停暂停与堆叠交互
   参考），落地于 `glimpse-frontend/src/components/toast/`；micro/warm-tooltip
   （悬浮说明的 warm 连续体验：共享气泡、位置/宽高弹簧滑动、速度倾侧与
-  模糊出场机制参考），落地于 `glimpse-frontend/src/directives/hint-tooltip.ts`。
+  模糊出场机制参考），落地于 `glimpse-frontend/src/directives/hint-tooltip.ts`；
+  text-animations/stroke-text（新手引导欢迎卡的逐字描边书写效果参考，
+  动画本地改写为纯 CSS），落地于 `glimpse-frontend/src/components/StrokeText.vue`；
+  text-animations/fold-text（新手引导完成卡的逐字折叠展开效果参考，
+  动画本地改写为纯 CSS），落地于 `glimpse-frontend/src/components/FoldText.vue`。
 
 ## motion-v（https://motion.dev）
 

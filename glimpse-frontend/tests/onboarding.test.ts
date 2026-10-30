@@ -125,9 +125,9 @@ describe('first-run guided tour', () => {
     const dialog = firstMount.get('[role="dialog"]')
     expect(dialog.attributes('aria-modal')).toBe('true')
     expect(dialog.text()).toContain('欢迎使用 Glimpse')
-    expect(dialog.text()).toContain('开始引导')
+    expect(firstMount.get('[data-testid="tour-next"]').attributes('aria-label')).toBe('开始引导')
 
-    await firstMount.get('[data-testid="tour-later"]').trigger('click')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     await flushPromises()
     expect(firstMount.find('[role="dialog"]').exists()).toBe(false)
     expect(window.localStorage.getItem(ONBOARDING_VERSION_STORAGE_KEY)).toBe(
