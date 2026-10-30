@@ -227,9 +227,14 @@ a:focus-visible,
 [tabindex]:not(input):not(select):not(textarea):focus-visible {
   outline: 2px solid transparent;
   outline-offset: -2px;
-  box-shadow:
-    inset 0 0 0 2px var(--color-surface),
-    inset 0 0 0 4px var(--color-focus);
+  box-shadow: inset 0 0 0 2px var(--color-focus);
+}
+
+/* 实底主色按钮（确认/保存主按钮、引导圆钮）上纯蓝环与底色同色不可见，
+   改用白色内环保住键盘焦点指示 */
+.btn-primary:focus-visible,
+.guided-tour__round-button:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--color-on-primary);
 }
 
 input:focus,
@@ -527,10 +532,6 @@ button {
   background: #a92317;
 }
 
-.window-control:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: -2px;
-}
 
 .shell-frame {
   background: var(--shell-frame-bg);

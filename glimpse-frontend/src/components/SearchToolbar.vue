@@ -685,10 +685,6 @@ defineExpose({ focus, clear })
   transition: color 160ms ease;
 }
 
-.search-toolbar__source-button:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .search-toolbar__source-thumb,

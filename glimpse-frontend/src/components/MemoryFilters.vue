@@ -578,10 +578,6 @@ onUnmounted(() => {
   background: var(--color-surface-hover);
 }
 
-.memory-filters__close:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
 
 .memory-filters__body {
   min-height: 0;
@@ -685,10 +681,6 @@ onUnmounted(() => {
   background: var(--color-surface-hover);
 }
 
-.memory-filters__clear-period:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
 
 .memory-filters__date-block {
   border-radius: var(--radius-lg);
@@ -746,10 +738,6 @@ onUnmounted(() => {
   background: var(--color-surface-deep);
 }
 
-.memory-filters__date-toggle:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
 
 .memory-filters__date-chevron--open {
   transform: rotate(180deg);

@@ -524,10 +524,6 @@ defineExpose({
   background: var(--color-surface-deep);
 }
 
-.tags-editor__add:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
 
 .tags-editor__suggestions-list {
   display: flex;

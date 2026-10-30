@@ -777,10 +777,6 @@ onBeforeUnmount(() => {
   background: var(--color-primary-hover);
 }
 
-.guided-tour__round-button:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
 
 .guided-tour__description {
   margin-top: 4px;

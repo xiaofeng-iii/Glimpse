@@ -114,10 +114,6 @@ function restoreFocus(event: Event) {
   background: var(--color-surface-hover);
 }
 
-.notes-popover__close:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
 
 .notes-popover__close:active {
   background: var(--color-surface-active, var(--color-surface-hover));

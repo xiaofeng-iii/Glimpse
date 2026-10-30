@@ -1622,10 +1622,6 @@ onUnmounted(() => {
   transition: color 160ms ease;
 }
 
-.theme-switcher__button:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
 
 /* 遮罩窗：与滑块同几何同平移，窗口内是选中文字副本；
    反向平移保持与底层文字完全对齐，滑动中文字随滑块边缘即时切变颜色。 */

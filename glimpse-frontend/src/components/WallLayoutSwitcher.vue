@@ -129,10 +129,6 @@ const choose = (mode: WallLayoutMode) => {
   box-shadow: 0 0 4px rgba(0, 0, 0, .4);
 }
 
-.wall-layout-switcher__option:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
 
 .wall-layout-switcher__option:disabled {
   cursor: not-allowed;

@@ -493,10 +493,6 @@ onUnmounted(() => {
   background: var(--color-surface-deep);
 }
 
-.memory-calendar__month-cell:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
 
 .memory-calendar__month-cell:disabled {
   cursor: default;
@@ -529,10 +525,6 @@ onUnmounted(() => {
   background: var(--color-surface-deep);
 }
 
-.memory-calendar__nav-btn:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
 
 .memory-calendar__nav-btn:disabled {
   cursor: default;
@@ -556,10 +548,6 @@ onUnmounted(() => {
   background: var(--color-primary-soft);
 }
 
-.memory-calendar__month:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
 
 .memory-calendar__grid {
   display: grid;
@@ -639,10 +627,6 @@ onUnmounted(() => {
   background: var(--color-primary-hover);
 }
 
-.memory-calendar__day:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
 
 .memory-calendar__day--outside {
   opacity: 0.35;
