@@ -243,7 +243,13 @@ export const useUpdatesStore = defineStore('updates', () => {
         await devInstallUpdate()
       } else {
         await syncUpdateOperation()
-        if (activePhase.value !== 'idle' && installing.value) return true
+        // 只有"运行中"三态才代表已有任务在跑（双击/多入口触发）；cancelled/
+        // failed/installed 是终态——Rust 侧终结后不会回到 idle，若按
+        // "非 idle 即拦截"，取消后重新下载会被误判为已在下载而直接短路，
+        // 表现为无进度且取消秒回。
+        const phase = activePhase.value
+        const alreadyRunning = phase === 'downloading' || phase === 'cancelling' || phase === 'installing'
+        if (alreadyRunning && installing.value) return true
         const [{ listen }, { invoke }] = await Promise.all([
           import('@tauri-apps/api/event'),
           import('@tauri-apps/api/core'),

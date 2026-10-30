@@ -240,6 +240,49 @@ describe('updates store', () => {
     expect(apiMocks.invoke).toHaveBeenCalledWith('cancel_update_download')
   })
 
+  it('restarts the download after a cancelled install and keeps reporting progress', async () => {
+    const store = useUpdatesStore()
+    store.recordCurrentVersion('0.3.2')
+    let hostPhase = 'idle'
+    let installs = 0
+    let releaseSecondInstall!: (value: 'installed') => void
+    apiMocks.invoke.mockImplementation(async (command: string) => {
+      if (command === 'check_for_update') return { version: '0.3.3', notes: null }
+      if (command === 'get_update_install_status') {
+        return { phase: hostPhase, version: hostPhase === 'idle' ? null : '0.3.3', progress: null, error: null }
+      }
+      if (command === 'install_checked_update') {
+        installs += 1
+        if (installs === 1) {
+          hostPhase = 'cancelled'
+          return 'cancelled'
+        }
+        return new Promise((resolve) => { releaseSecondInstall = resolve })
+      }
+      throw new Error(`unexpected command ${command}`)
+    })
+
+    await store.checkForUpdate()
+    await store.installUpdate({ mirrorMode: 'direct' })
+    expect(store.installing).toBe(false)
+
+    // 取消是终态（Rust 侧不回 idle）：重新下载必须真正再次发起，
+    // 旧守卫把"非 idle"当"运行中"会在这里短路——无进度、取消秒回
+    const second = store.installUpdate({ mirrorMode: 'direct' })
+    await vi.waitFor(() => expect(installs).toBe(2))
+
+    const progressHandler = apiMocks.listen.mock.calls
+      .findLast(([event]) => event === 'glimpse://update-download-progress')?.[1] as
+      (event: { payload: { downloaded: number; total: number | null } }) => void
+    progressHandler({ payload: { downloaded: 5, total: 10 } })
+    expect(store.downloadProgress).toEqual({ downloaded: 5, total: 10 })
+
+    hostPhase = 'installed'
+    releaseSecondInstall('installed')
+    expect(await second).toBe(true)
+    expect(store.installing).toBe(false)
+  })
+
   it('stays silent when the startup check fails', async () => {
     const store = useUpdatesStore()
     apiMocks.invoke.mockRejectedValue(new Error('offline'))
