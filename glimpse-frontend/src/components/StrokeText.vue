@@ -108,7 +108,7 @@ watch(() => [props.text, props.fontSize], () => measure(), { flush: 'post' })
         x="0"
         y="0"
         fill="none"
-        :stroke="'var(--color-display-blue)'"
+        :stroke="'var(--color-primary)'"
         stroke-width="1.4"
         stroke-linejoin="round"
         stroke-linecap="round"
@@ -130,7 +130,7 @@ watch(() => [props.text, props.fontSize], () => measure(), { flush: 'post' })
         class="stroke-text__layer stroke-text__fill select-none"
         x="0"
         y="0"
-        :fill="'var(--color-display-blue)'"
+        :fill="'var(--color-primary)'"
         stroke="none"
         :clip-path="box ? `url(#${wipeId})` : undefined"
         :style="{

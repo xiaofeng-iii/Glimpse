@@ -767,13 +767,13 @@ onBeforeUnmount(() => {
   width: var(--control-h-lg);
   height: var(--control-h-lg);
   border-radius: 9999px;
-  background: var(--color-display-blue);
+  background: var(--color-primary);
   color: var(--color-on-primary);
   transition: background 160ms ease;
 }
 
 .guided-tour__round-button:hover {
-  background: var(--color-display-blue-hover);
+  background: var(--color-primary-hover);
 }
 
 .guided-tour__round-button:focus-visible {

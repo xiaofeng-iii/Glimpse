@@ -17,14 +17,14 @@ colors:
   text-muted: "#66738a"
   border: "#d5dbe7"
   border-strong: "#b7c1d4"
-  primary: "#5287ea"
-  primary-hover: "#4376d6"
+  primary: "#5d86e0"
+  primary-hover: "#4d79d6"
   primary-soft: "#edf0fa"
   accent: "#d9601c"
   success: "#1f9d62"
   warning: "#d97706"
   danger: "#d92d20"
-  focus: "#5287ea"
+  focus: "#5d86e0"
   on-primary: "#ffffff"
 typography:
   sans:
@@ -270,7 +270,7 @@ Glimpse 是一只整理得很好的桌面索引盒：打开后先看到记忆，
 
 ### 颜色（亮色 / 暗色）
 
-画布 `#e9edf4` / `#121b2d`；表面 `#f7f9fd` / `#1c2740`；浮起表面 `#fafbfe` / `#25314d`；内嵌面 `#eef2f8` / `#182236`；悬停面 `#e1e7f1` / `#2c3a56`；控件实底（画布次级按钮静息）`#dae0ed` / `#2c3a56`；最深档 `#d2dae9` / `#374666`（`--color-surface-deep`，其悬停为 `--color-surface-deep-hover`）；主色 `#5287ea` / `#8494ff`（聚焦与主色同值）；截图橙 `#d9601c` / `#e07b3d`。标题栏并入画布色。完整令牌见 main.css `:root` 与 `[data-theme='dark']`。
+画布 `#e9edf4` / `#121b2d`；表面 `#f7f9fd` / `#1c2740`；浮起表面 `#fafbfe` / `#25314d`；内嵌面 `#eef2f8` / `#182236`；悬停面 `#e1e7f1` / `#2c3a56`；控件实底（画布次级按钮静息）`#dae0ed` / `#2c3a56`；最深档 `#d2dae9` / `#374666`（`--color-surface-deep`，其悬停为 `--color-surface-deep-hover`）；主色 `#5d86e0` / `#8ba3f0`（聚焦与主色同值）；截图橙 `#d9601c` / `#e07b3d`。标题栏并入画布色。完整令牌见 main.css `:root` 与 `[data-theme='dark']`。
 
 ### 排版
 
