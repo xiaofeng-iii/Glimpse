@@ -207,7 +207,10 @@ onBeforeUnmount(() => {
 }
 
 .ocr-text__actions--filled .ocr-text__copy--text {
-  padding-inline: 0.9rem;
+  /* 右侧拼着下拉钮（w-7+分隔线）：右内衬压到 0.5rem（同图标-文字间距档），
+     避免整组比无下拉的「复制摘要」在数值同 padding 下视觉更宽 */
+  padding-left: 0.9rem;
+  padding-right: 0.5rem;
 }
 
 .ocr-text__actions--filled .ocr-text__copy:hover {
