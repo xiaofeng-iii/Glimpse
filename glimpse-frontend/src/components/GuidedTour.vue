@@ -2,11 +2,12 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ArrowRight01FreeIcons } from '@hugeicons/core-free-icons'
+import { ArrowRight01FreeIcons, Tick02FreeIcons } from '@hugeicons/core-free-icons'
 import { useSettingsStore } from '@/stores/settings'
 import { t } from '@/utils/i18n'
 import { injectTourSamples, removeTourSamples } from '@/utils/tour-samples'
 import StrokeText from '@/components/StrokeText.vue'
+import FoldText from '@/components/FoldText.vue'
 
 type TourRoute = { name: 'home' } | { name: 'settings'; query: { section: string } }
 
@@ -185,9 +186,7 @@ const captureHotkeyLabel = computed(() =>
   formatHotkeyLabel(settingsStore.settings?.hotkeys?.screenshot),
 )
 
-const primaryLabel = computed(() => t(
-  isFinish.value ? 'onboarding.tour.done' : 'onboarding.tour.next',
-))
+const isDisplayStep = computed(() => isWelcome.value || isFinish.value)
 
 const queryTarget = (name: string) =>
   document.querySelector<HTMLElement>(`[data-tour="${name}"]`)
@@ -541,7 +540,7 @@ onBeforeUnmount(() => {
       <div
         v-else
         class="guided-tour__dim"
-        :class="{ 'guided-tour__dim--blurred': isWelcome }"
+        :class="{ 'guided-tour__dim--blurred': isDisplayStep }"
         aria-hidden="true"
       ></div>
 
@@ -552,7 +551,7 @@ onBeforeUnmount(() => {
           isAnchoredMode ? 'guided-tour__card--anchored' : 'guided-tour__card--centered',
           {
             'guided-tour__card--hidden': !cardVisible,
-            'guided-tour__card--welcome': isWelcome,
+            'guided-tour__card--display': isDisplayStep,
             'guided-tour__card--slide': holeSliding,
           },
         ]"
@@ -564,12 +563,19 @@ onBeforeUnmount(() => {
         tabindex="-1"
         data-testid="tour-card"
       >
-        <div :key="step.titleKey" class="guided-tour__body" :class="isWelcome ? 'guided-tour__body--welcome' : ''">
+        <div :key="step.titleKey" class="guided-tour__body" :class="isDisplayStep ? 'guided-tour__body--display' : ''">
           <p v-if="showCounter" class="guided-tour__counter">{{ counterLabel }}</p>
           <h2
-            v-if="isWelcome"
+            v-if="isFinish"
             id="guided-tour-title"
-            class="guided-tour__title guided-tour__title--welcome"
+            class="guided-tour__title guided-tour__title--display"
+          >
+            <FoldText :text="t(step.titleKey)" :font-size="72" />
+          </h2>
+          <h2
+            v-else-if="isWelcome"
+            id="guided-tour-title"
+            class="guided-tour__title guided-tour__title--display"
           >
             <StrokeText :text="t(step.titleKey)" :font-size="72" />
           </h2>
@@ -578,21 +584,24 @@ onBeforeUnmount(() => {
             {{ descriptionText }}
           </p>
           <p v-if="gateHintText" class="guided-tour__gate-hint">{{ gateHintText }}</p>
-          <footer v-if="isWelcome" class="guided-tour__welcome-cta">
+          <footer v-if="isDisplayStep" class="guided-tour__round-cta">
             <button
               ref="nextButton"
               type="button"
-              class="guided-tour__start-button"
+              class="guided-tour__round-button"
               data-testid="tour-next"
-              :aria-label="t('onboarding.tour.start')"
+              :aria-label="isWelcome ? t('onboarding.tour.start') : t('onboarding.tour.done')"
               @click="handlePrimary"
             >
-              <HugeiconsIcon :icon="ArrowRight01FreeIcons" class="h-5 w-5" aria-hidden="true" />
+              <HugeiconsIcon
+                :icon="isWelcome ? ArrowRight01FreeIcons : Tick02FreeIcons"
+                class="h-5 w-5"
+                aria-hidden="true"
+              />
             </button>
           </footer>
           <footer v-else class="guided-tour__footer">
             <button
-              v-if="!isFinish"
               type="button"
               class="guided-tour__skip"
               data-testid="tour-skip"
@@ -617,7 +626,7 @@ onBeforeUnmount(() => {
               data-testid="tour-next"
               @click="handlePrimary"
             >
-              {{ primaryLabel }}
+              {{ t('onboarding.tour.next') }}
             </button>
           </footer>
         </div>
@@ -692,8 +701,8 @@ onBeforeUnmount(() => {
   transform: translate(-50%, -50%);
 }
 
-/* 欢迎卡独占大画幅：其余居中卡（完成/降级）维持常规宽度 */
-.guided-tour__card--welcome {
+/* 展示卡（欢迎/完成）独占大画幅：降级居中卡维持常规宽度 */
+.guided-tour__card--display {
   width: 720px;
 }
 
@@ -734,40 +743,40 @@ onBeforeUnmount(() => {
   color: var(--shell-ink);
 }
 
-.guided-tour__title--welcome {
+.guided-tour__title--display {
   margin-top: 1.25rem;
 }
 
-/* 欢迎卡：标题居中悬于上方，圆形开始按钮靠下居中，中间留白即"给用户空间" */
-.guided-tour__body--welcome {
+/* 展示卡（欢迎/完成）：标题居中悬于上方，圆形按钮靠下居中，中间留白即"给用户空间" */
+.guided-tour__body--display {
   display: flex;
   flex-direction: column;
   align-items: center;
   min-height: 13rem;
 }
 
-.guided-tour__welcome-cta {
+.guided-tour__round-cta {
   margin-top: auto;
   padding-bottom: 0.25rem;
 }
 
-.guided-tour__start-button {
+.guided-tour__round-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--control-h-lg);
   height: var(--control-h-lg);
   border-radius: 9999px;
-  background: var(--color-primary);
+  background: var(--color-display-blue);
   color: var(--color-on-primary);
   transition: background 160ms ease;
 }
 
-.guided-tour__start-button:hover {
-  background: var(--color-primary-hover);
+.guided-tour__round-button:hover {
+  background: var(--color-display-blue-hover);
 }
 
-.guided-tour__start-button:focus-visible {
+.guided-tour__round-button:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }

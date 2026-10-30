@@ -8,6 +8,7 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { DISPLAY_FONT_STACK } from '@/utils/display-font'
 
 const props = withDefaults(defineProps<{
   text: string
@@ -26,11 +27,6 @@ let disposed = false
 
 const uid = Math.random().toString(36).slice(2, 10)
 const wipeId = `stroke-text-wipe-${uid}`
-
-// 成字加粗走真实粗体字面：全局栈的 'YaHei UI Adjusted' 度量覆盖面只有
-// 400 档（700 会退化为合成加粗），此处绕开它让中文落到有真实 Bold 的
-// 'Microsoft YaHei'。两层同栈同字重 → 描边沿成字外缘画、与填充逐字重合。
-const BOLD_FONT_STACK = "'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif"
 
 const characters = computed(() => Array.from(props.text))
 // 描边总时长 = 首字画线 + 逐字错峰；填充在描边收尾后再擦入
@@ -112,14 +108,14 @@ watch(() => [props.text, props.fontSize], () => measure(), { flush: 'post' })
         x="0"
         y="0"
         fill="none"
-        :stroke="'var(--color-primary)'"
+        :stroke="'var(--color-display-blue)'"
         stroke-width="1.4"
         stroke-linejoin="round"
         stroke-linecap="round"
         :style="{
           fontSize: `${props.fontSize}px`,
           fontWeight: 700,
-          fontFamily: BOLD_FONT_STACK,
+          fontFamily: DISPLAY_FONT_STACK,
         }"
       >
         <tspan
@@ -134,13 +130,13 @@ watch(() => [props.text, props.fontSize], () => measure(), { flush: 'post' })
         class="stroke-text__layer stroke-text__fill select-none"
         x="0"
         y="0"
-        :fill="'var(--color-primary)'"
+        :fill="'var(--color-display-blue)'"
         stroke="none"
         :clip-path="box ? `url(#${wipeId})` : undefined"
         :style="{
           fontSize: `${props.fontSize}px`,
           fontWeight: 700,
-          fontFamily: BOLD_FONT_STACK,
+          fontFamily: DISPLAY_FONT_STACK,
         }"
       >
         <tspan v-for="(char, index) in characters" :key="`f-${index}`">{{ char }}</tspan>
