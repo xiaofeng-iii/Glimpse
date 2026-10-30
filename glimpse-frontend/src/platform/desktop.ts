@@ -164,6 +164,28 @@ export const listenForBackendCorruption = async (
   }
 }
 
+/** 窗口移动/缩放（含标题栏拖动）的几何变化通知；非桌面壳返回空退订。 */
+export const listenForWindowGeometryChange = async (
+  handler: () => void,
+) => {
+  const currentWindow = await getWindowApi()
+  if (!currentWindow) {
+    return () => {}
+  }
+
+  try {
+    const unlistenMoved = await currentWindow.onMoved(handler)
+    const unlistenResized = await currentWindow.onResized(handler)
+    return () => {
+      unlistenMoved()
+      unlistenResized()
+    }
+  } catch (error) {
+    console.error('Failed to listen for window geometry changes:', error)
+    return () => {}
+  }
+}
+
 export const listenForDesktopCloseRequests = async (
   handler: () => void,
 ) => {

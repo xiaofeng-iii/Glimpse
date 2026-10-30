@@ -1,7 +1,26 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
-import { hintTooltip, installNativeTooltipGuard } from '../src/directives/hint-tooltip'
+import {
+  __resetGeometrySuppressForTests,
+  hintTooltip,
+  installNativeTooltipGuard,
+} from '../src/directives/hint-tooltip'
+
+const platformMocks = vi.hoisted(() => {
+  const geometryHandlers: Array<() => void> = []
+  return {
+    geometryHandlers,
+    fireGeometryChange: () => geometryHandlers.forEach((handler) => handler()),
+  }
+})
+
+vi.mock('@/platform/desktop', () => ({
+  listenForWindowGeometryChange: vi.fn(async (handler: () => void) => {
+    platformMocks.geometryHandlers.push(handler)
+    return () => {}
+  }),
+}))
 
 const Harness = defineComponent({
   template: `
@@ -37,6 +56,7 @@ const mountHarness = (component: ReturnType<typeof defineComponent>) =>
 describe('v-hint-tooltip', () => {
   afterEach(() => {
     vi.useRealTimers()
+    __resetGeometrySuppressForTests()
     document.body.innerHTML = ''
   })
 
@@ -63,6 +83,69 @@ describe('v-hint-tooltip', () => {
     expect(tooltip?.getAttribute('role')).toBe('tooltip')
     expect(tooltip?.textContent).toContain('设置')
     expect(tooltip?.querySelector('kbd')?.textContent).toBe('Ctrl+,')
+
+    wrapper.unmount()
+  })
+
+  it('拖动中抑制合成悬停，停手后光标所在触发元素立即回应', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountHarness(Harness)
+    const button = wrapper.get('button')
+
+    // 正常路径：悬停出现，移开关闭
+    await button.trigger('pointerenter')
+    vi.advanceTimersByTime(600)
+    expect(document.querySelector('.hint-tooltip')).not.toBeNull()
+    await button.trigger('pointerleave')
+    vi.advanceTimersByTime(600)
+    expect(document.querySelector('.hint-tooltip')).toBeNull()
+
+    // 拖动中（停手判定窗口内）：合成 pointerenter 不重现气泡
+    platformMocks.fireGeometryChange()
+    await button.trigger('pointerenter')
+    vi.advanceTimersByTime(100)
+    expect(document.querySelector('.hint-tooltip')).toBeNull()
+
+    // 停手（几何事件静默 200ms）：光标仍停在触发元素上 → 立即显示
+    vi.advanceTimersByTime(100)
+    expect(document.querySelector('.hint-tooltip')).not.toBeNull()
+    await button.trigger('pointerleave')
+    vi.advanceTimersByTime(600)
+    expect(document.querySelector('.hint-tooltip')).toBeNull()
+
+    // 拖动中已移开的合成悬停（enter 后又 leave）：停手后不回应
+    platformMocks.fireGeometryChange()
+    await button.trigger('pointerenter')
+    await button.trigger('pointerleave')
+    vi.advanceTimersByTime(300)
+    expect(document.querySelector('.hint-tooltip')).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('键盘聚焦路径照常显示，不受拖动抑制影响', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountHarness(Harness)
+
+    await wrapper.get('button').trigger('focus')
+    vi.advanceTimersByTime(600)
+    expect(document.querySelector('.hint-tooltip')).not.toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('鼠标按下即隐藏气泡，按住期间不保持显示', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountHarness(Harness)
+    const button = wrapper.get('button')
+
+    await button.trigger('pointerenter')
+    vi.advanceTimersByTime(600)
+    expect(document.querySelector('.hint-tooltip')).not.toBeNull()
+
+    await button.trigger('pointerdown')
+    vi.advanceTimersByTime(600)
+    expect(document.querySelector('.hint-tooltip')).toBeNull()
 
     wrapper.unmount()
   })
@@ -183,6 +266,9 @@ describe('v-hint-tooltip', () => {
     // 窗口内复活：不等待 300ms 冷启动延迟，立即出现。
     expect(document.querySelector('.hint-tooltip')).not.toBeNull()
     expect(document.querySelector('.hint-tooltip')?.textContent).toContain('第二个')
+    // 复活走"全量出现"而非冷启动出场：presence 直跳 1，初始不透明度即满
+    // （死分支回潮时会从 0 起步做 140ms 出场动画）。
+    expect(document.querySelector('.hint-tooltip .hint-tooltip__pop')?.style.opacity).toBe('1')
 
     wrapper.unmount()
   })

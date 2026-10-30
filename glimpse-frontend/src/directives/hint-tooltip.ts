@@ -19,6 +19,9 @@ type Side = 'top' | 'bottom'
 const SHOW_DELAY_MS = 300
 const CLOSE_GRACE_MS = 80
 const WARM_WINDOW_MS = 300
+// 窗口拖动/缩放的"停手判定"与冷启动抑制共用窗口：几何事件静默该时长
+// 视为停手，期间的合成悬停不显示但被记录，停手后光标所在处立即回应。
+const GEOMETRY_SETTLE_MS = 200
 const POP_DURATION_MS = 140
 const TRAVEL_SPRING = { type: 'spring' as const, duration: 0.32, bounce: 0.1 }
 const POP_EASE = [0.23, 1, 0.32, 1] as const
@@ -312,6 +315,10 @@ const showTooltip = (trigger: HintTriggerElement, instant = false) => {
     moveDir = Math.sign(b.left + b.width / 2 - (a.left + a.width / 2)) || 1
   }
 
+  // warm 复活判定必须在创建 DOM 之前捕获：一旦走到下面的动画分支，
+  // tooltipEl 已被创建为真值，条件里的 !tooltipEl 永远不成立（死分支）
+  const reviving = !tooltipEl && Date.now() < warmUntil
+
   if (!tooltipEl) {
     const tooltip = document.createElement('div')
     tooltip.className = 'hint-tooltip'
@@ -392,7 +399,7 @@ const showTooltip = (trigger: HintTriggerElement, instant = false) => {
       crossSlideLabel(moveDir)
     }
     animate(presence, 1, { duration: 0.12, ease: POP_EASE })
-  } else if (!tooltipEl && Date.now() < warmUntil) {
+  } else if (reviving) {
     // warm 窗口内复活（原版行为）：气泡已销毁但窗口未过，直接全量出现，不重走冷启动出场。
     ax.jump(targetX)
     ay.jump(targetY)
@@ -414,6 +421,10 @@ const showTooltip = (trigger: HintTriggerElement, instant = false) => {
 function hideTooltip(trigger?: HintTriggerElement, instant = false) {
   clearTimer(showTimer)
   showTimer = null
+  if (trigger === suppressedHoverTrigger) {
+    // 拖动中记录的合成悬停已被后续 pointerleave 否定：停手后不再回应
+    suppressedHoverTrigger = null
+  }
   if (trigger && trigger !== activeTrigger) {
     return
   }
@@ -426,6 +437,12 @@ function hideTooltip(trigger?: HintTriggerElement, instant = false) {
 }
 
 const scheduleShow = (trigger: HintTriggerElement) => {
+  if (Date.now() < geometrySuppressUntil) {
+    // 拖动中的合成悬停不显示，但记住最新目标——停手后光标仍在它
+    // 上面时要立即回应，而不是等一次未必会来的真实鼠标事件。
+    suppressedHoverTrigger = trigger
+    return
+  }
   clearTimer(showTimer)
   clearTimer(closeTimer)
   clearTimer(finishTimer)
@@ -442,8 +459,61 @@ const scheduleShow = (trigger: HintTriggerElement) => {
   }, SHOW_DELAY_MS)
 }
 
+// 窗口拖动/缩放期间，Chromium 会因"窗口在光标下方移动"对悬停做重算，
+// 补发没有对应 pointerleave 的合成 pointerenter——气泡会带入场动画在
+// 拖动中的窗口上重现并钉住。根修：几何一变即销毁气泡并抑制冷启动，
+// 被吞的合成悬停记录最新目标；几何事件静默 GEOMETRY_SETTLE_MS 视为
+// 停手，光标仍停在触发元素上时立即回应，否则保持安静。
+let geometrySuppressUntil = 0
+let geometrySettleTimer: number | null = null
+let suppressedHoverTrigger: HintTriggerElement | null = null
+let geometryGuardBound = false
+
+const handleWindowGeometryChange = () => {
+  geometrySuppressUntil = Date.now() + GEOMETRY_SETTLE_MS
+  if (geometrySettleTimer !== null) {
+    window.clearTimeout(geometrySettleTimer)
+  }
+  geometrySettleTimer = window.setTimeout(() => {
+    geometrySettleTimer = null
+    const target = suppressedHoverTrigger
+    suppressedHoverTrigger = null
+    if (target?.isConnected) {
+      // 停手后光标仍在触发元素上：直接全量显示（带入场动画），不重走延迟
+      showTooltip(target)
+    }
+  }, GEOMETRY_SETTLE_MS)
+  destroyTooltip()
+}
+
+const bindGeometryGuard = () => {
+  if (geometryGuardBound) {
+    return
+  }
+  geometryGuardBound = true
+  // 平台模块走动态导入：调用时才解析（tests/setup.ts 在 mock 注册前就静态
+  // 导入了本指令模块，静态绑定会让测试的模块替换失效）。部分测试对平台
+  // 模块做部分替换、可能缺本导出——订阅失败仅意味着无拖动抑制，静默即可。
+  void import('@/platform/desktop')
+    .then(({ listenForWindowGeometryChange }) => {
+      void listenForWindowGeometryChange(handleWindowGeometryChange)
+    })
+    .catch(() => {})
+}
+
+/** 仅供测试：重置模块级几何抑制状态（fake 时钟跨用例不等速会误吞后续悬停）。 */
+export const __resetGeometrySuppressForTests = () => {
+  geometrySuppressUntil = 0
+  if (geometrySettleTimer !== null) {
+    window.clearTimeout(geometrySettleTimer)
+    geometrySettleTimer = null
+  }
+  suppressedHoverTrigger = null
+}
+
 export const hintTooltip: Directive<HintTriggerElement, HintTooltipValue> = {
   mounted(el, binding) {
+    bindGeometryGuard()
     el.__hintTooltipValue = binding.value
 
     let pointerDown = false
