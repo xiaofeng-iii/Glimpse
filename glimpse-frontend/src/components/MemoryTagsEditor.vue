@@ -382,7 +382,6 @@ defineExpose({
       />
       <button
         v-else
-        v-hint-tooltip="t('tags.add')"
         type="button"
         class="tags-editor__add"
         :aria-label="t('tags.add')"
