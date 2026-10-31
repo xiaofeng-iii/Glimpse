@@ -98,7 +98,7 @@ defineExpose({ canLeave })
       </div>
       <button
         type="button"
-        class="inline-flex h-8 w-8 min-h-0 flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--titlebar-control-hover)]"
+        class="inline-flex h-8 w-8 min-h-0 flex-none items-center justify-center rounded-md text-[var(--shell-muted)] transition duration-[160ms] ease-[ease] hover:bg-[var(--color-surface-deep)]"
         :aria-label="t('action.close')"
         @click="emit('close')"
       >
